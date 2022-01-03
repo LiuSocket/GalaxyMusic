@@ -1,0 +1,197 @@
+QWidget:focus{outline: none;}  /*remove all  QWidget's focus border*/
+
+QWidget{
+	background: #101010;
+	color: #F0F0F0;
+	selection-background-color:#3daee9;
+    selection-color: #333333;
+	alternate-background-color: #30CCC1;
+}
+
+QPushButton {
+	background: #101010;
+	color: #F0F0F0;
+	background-repeat: no-repeat;
+	border-style: none;
+}
+QPushButton:hover {
+	color: #FF0000;
+}
+QPushButton:pressed {
+	color: #FF0505;
+}
+
+QPushButton:checked {
+	color: #8F05F5;
+}
+QPushButton:checked:hover {
+	color: #FFF000;
+}
+QPushButton:checked:pressed {
+	color: #F00505;
+}
+
+/* 右上角窗口操作按钮 */
+#minBtn {
+	image: url(:/Resources/btn_min.png);
+}
+#minBtn:hover {
+	image: url(:/Resources/btn_min_hover.png);
+}
+
+#maxBtn {
+	image: url(:/Resources/btn_max_unchecked.png);
+}
+#maxBtn:hover {
+	image: url(:/Resources/btn_max_unchecked_hover.png);
+}
+#maxBtn:checked {
+	image: url(:/Resources/btn_max_checked.png);
+}
+#maxBtn:checked:hover {
+	image: url(:/Resources/btn_max_checked_hover.png);
+}
+
+#closeBtn {
+	image: url(:/Resources/btn_close.png);
+}
+#closeBtn:hover {
+	image: url(:/Resources/btn_close_hover.png);
+}
+
+/* 自定义标题栏 */
+#titleEdgeLab {
+	background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #400000,stop:0.5 #dd001b,stop:1 #400000);
+	border-style: none;
+}
+
+#titleBtn {
+	background-image: url(:/Resources/GM_title.png);
+}
+
+/* 底部工具栏 */
+#toolEdgeLab {
+	background: #1f1f1f;
+	border-style: none;
+}
+
+/* 音频封面图 */
+#audioImgLab {
+	padding: 6px 6px 0px 0px;
+}
+
+/* 播放控制 */
+#lastBtn {
+	padding: 4px 0px 0px 0px;
+	image: url(:/Resources/btn_last.png);
+}
+#lastBtn:hover {
+	padding: 4px 0px 0px 0px;
+	image: url(:/Resources/btn_last_hover.png);
+}
+
+#playBtn {
+	padding: 4px 0px 0px 0px;
+	image: url(:/Resources/btn_play.png);
+}
+#playBtn:hover {
+	padding: 4px 0px 0px 0px;
+	image: url(:/Resources/btn_play_hover.png);
+}
+#playBtn:checked {
+	padding: 4px 0px 0px 0px;
+	image: url(:/Resources/btn_pause.png);
+}
+#playBtn:checked:hover {
+	padding: 4px 0px 0px 0px;
+	image: url(:/Resources/btn_pause_hover.png);
+}
+
+#nextBtn {
+	padding: 4px 0px 0px 0px;
+	image: url(:/Resources/btn_next.png);
+}
+#nextBtn:hover {
+	padding: 4px 0px 0px 0px;
+	image: url(:/Resources/btn_next_hover.png);
+}
+
+#volumeBtn {
+	image: url(:/Resources/btn_volume.png);
+}
+#volumeBtn:hover {
+	image: url(:/Resources/btn_volume_hover.png);
+}
+#volumeBtn:checked {
+	image: url(:/Resources/btn_mute.png);
+}
+#volumeBtn:checked:hover {
+	image: url(:/Resources/btn_mute_hover.png);
+}
+
+#fullScreenBtn {
+	image: url(:/Resources/btn_full.png);
+}
+#fullScreenBtn:hover {
+	image: url(:/Resources/btn_full_hover.png);
+}
+
+/* 时间滑轨 */
+#timeSlider::groove:horizontal{
+	border:0px;
+	border-radius:2px;
+	width:400px;
+	height:4px;
+	background:rgba(255,255,255,50);
+	margin:0px;
+}
+#timeSlider::sub-page:horizontal{
+	background:rgba(221,0,27,255);
+	border:0px;
+	border-radius:2px;
+}
+#timeSlider::handle:horizontal {
+    width: 22px;
+	margin: -9px -9px;
+	border-style: none;
+	background:transparent;
+	background-image: url(:/Resources/slider_handle.png);
+}
+#timeSlider::handle:horizontal:hover {
+	background-image: url(:/Resources/slider_handle_hover.png);
+}
+
+/* 音量控件背景 */
+#GMVolumeWidget{
+	background:transparent;
+}
+
+#volumeLab{
+	background:transparent;
+	background-image: url(:/Resources/volumeLab.png);
+}
+
+/* 音量滑轨 */
+#volumeSlider::groove:vertical{
+	border:0px;
+	border-radius:2px;
+	width:4px;
+	height:100px;
+	background:rgba(255,255,255,50);
+	margin:0px;
+}
+#volumeSlider::add-page:vertical{
+	background:rgba(221,0,27,255);
+	border:0px;
+	border-radius:2px;
+}
+#volumeSlider::handle:vertical {
+    height: 22px;
+	margin: -9px -9px;
+	background:transparent;
+	background-image: url(:/Resources/slider_handle.png);
+	border-style: none;
+}
+#volumeSlider::handle:vertical:hover {
+	background-image: url(:/Resources/slider_handle_hover.png);
+}
