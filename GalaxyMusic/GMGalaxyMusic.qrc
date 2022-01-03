@@ -1,0 +1,35 @@
+<RCC>
+    <qresource prefix="/">
+        <file>Resources/qt_zh_CN.qm</file>
+        <file>Resources/MainWindow.qss</file>
+        <file>Resources/btn_close.png</file>
+        <file>Resources/btn_close_hover.png</file>
+        <file>Resources/btn_last.png</file>
+        <file>Resources/btn_last_hover.png</file>
+        <file>Resources/btn_max_checked.png</file>
+        <file>Resources/btn_max_checked_hover.png</file>
+        <file>Resources/btn_max_unchecked.png</file>
+        <file>Resources/btn_max_unchecked_hover.png</file>
+        <file>Resources/btn_min.png</file>
+        <file>Resources/btn_min_hover.png</file>
+        <file>Resources/btn_next.png</file>
+        <file>Resources/btn_next_hover.png</file>
+        <file>Resources/btn_pause.png</file>
+        <file>Resources/btn_pause_hover.png</file>
+        <file>Resources/btn_play.png</file>
+        <file>Resources/btn_play_hover.png</file>
+        <file>Resources/btn_mute.png</file>
+        <file>Resources/btn_mute_hover.png</file>
+        <file>Resources/btn_volume.png</file>
+        <file>Resources/btn_volume_hover.png</file>
+        <file>Resources/slider_handle.png</file>
+        <file>Resources/slider_handle_hover.png</file>
+        <file>Resources/GM_title.png</file>
+        <file>Resources/btn_full.png</file>
+        <file>Resources/btn_full_hover.png</file>
+        <file>Resources/GM_logo.png</file>
+        <file>Resources/GM_logo.ico</file>
+        <file>Resources/volumeLab.png</file>
+        <file>Resources/default_Image.png</file>
+    </qresource>
+</RCC>
