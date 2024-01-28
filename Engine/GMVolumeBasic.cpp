@@ -10,69 +10,39 @@
 /// @date		2020.12.09
 //////////////////////////////////////////////////////////////////////////
 #include "GMVolumeBasic.h"
+#include "GMCommonUniform.h"
 #include "GMKit.h"
 
 #include <osg/Texture2D>
+#include <osg/Texture3D>
 #include <osgDB/ReadFile>
 
 using namespace GM;
 
-unsigned int CGMVolumeBasic::m_iShakeCount = 0;
-
 /** @brief 构造 */
-CGMVolumeBasic::CGMVolumeBasic()
-	: m_pKernelData(nullptr), m_pConfigData(nullptr)
-	, m_strShaderPath("Shaders/VolumeShader/"), m_strCoreTexturePath("Textures/Volume/"), m_strMediaTexturePath("Volume/")
-	, m_bHigh(false), m_iWidthFull(1920), m_iHeightFull(1080), m_iUnitColor(0), m_iUnitVelocity(0)
-	, m_mLastVP(osg::Matrixf())
-	, m_fNoiseNumUniform(new osg::Uniform("noiseNum", 1.0f))
-	, m_vScreenSizeUniform(new osg::Uniform("screenSize", osg::Vec3f(1920.0f, 1080.0f, 0.25f)))
-	, m_vShakeVectorUniform(new osg::Uniform("shakeVec", osg::Vec2f(-1.0f, -1.0f)))
-	, m_iUnitTAA(2)
-{}
-
-/**
-* GetShakeParameters
-* 设置相机抖动参数，用于TAA，可将分辨率提高4倍
-* @author LiuTao
-* @since 2020.08.17
-* @param fShake0:	抖动值0，-1.5/-0.5/+0.5/+1.5
-* @param fShake1:	抖动值1，-1.5/-0.5/+0.5/+1.5
-* @return void
-*/
-void CGMVolumeBasic::GetShakeParameters(float & fShake0, float & fShake1)
+CGMVolumeBasic::CGMVolumeBasic():
+	m_pKernelData(nullptr), m_pConfigData(nullptr), m_pCommonUniform(nullptr),
+	m_iScreenWidth(1920), m_iScreenHeight(1080),
+	m_strVolumeShaderPath("Shaders/VolumeShader/"), m_strCoreTexturePath("Textures/Volume/"), m_strMediaTexturePath("Volume/"),
+	m_fCountUniform(new osg::Uniform("countNum", 0.0f)),
+	m_vNoiseUniform(new osg::Uniform("noiseVec4", osg::Vec4f(0.0f, 0.0f, 0.0f, 0.0f))),
+	m_fPixelLengthUniform(new osg::Uniform("pixelLength", 0.01f)),
+	m_vShakeVectorUniform(new osg::Uniform("shakeVec", osg::Vec2f(0.5f, 0.5f))),
+	m_vDeltaShakeUniform(new osg::Uniform("deltaShakeVec", osg::Vec2f(0.0f, 0.0f))),
+	m_fShakeU(0.0f), m_fShakeV(0.0f), m_vLastShakeVec(osg::Vec2f(0.0f, 0.0f)),
+	m_dTimeLastFrame(0.0), m_iUnitTAA(0), m_iShakeCount(0)
 {
-	// 4 帧一个循环
-	fShake0 = ((m_iShakeCount / 2) % 2)*2.0 - 1.0;
-	fShake1 = (((m_iShakeCount + 1) / 2) % 2)*2.0 - 1.0;
-
-	// 16 帧一个循环
-	fShake0 += (((m_iShakeCount / 4) / 2) % 2) - 0.5;
-	fShake1 += (((m_iShakeCount / 4) + 1) % 2) - 0.5;
+	m_iRandom.seed(0);
 }
 
-/**
-* AddShakeCount
-* 增加相机同步抖动的计数
-* @author LiuTao
-* @since 2020.08.18
-* @return void
-*/
-void CGMVolumeBasic::AddShakeCount()
+/** @brief 更新(在主相机更新姿态之前) */
+void CGMVolumeBasic::Update(double dDeltaTime)
 {
+	// 4 帧一个循环，4个像素之间的抖动
+	m_fShakeU = ((m_iShakeCount / 2) % 2) - 0.5f;
+	m_fShakeV = (((m_iShakeCount + 1) / 2) % 2) - 0.5f;
+
 	m_iShakeCount++;
-}
-
-/**
-* GetShakeCount
-* 获取相机同步抖动的计数
-* @author LiuTao
-* @since 2020.08.18
-* @return m_iShakeCount 返回同步抖动的计数
-*/
-unsigned int CGMVolumeBasic::GetShakeCount()
-{
-	return m_iShakeCount;
 }
 
 /** @brief 析构 */
@@ -81,20 +51,23 @@ CGMVolumeBasic::~CGMVolumeBasic()
 }
 
 /** @brief 初始化 */
-void CGMVolumeBasic::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData)
+void CGMVolumeBasic::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCommonUniform* pCommonUniform)
 {
 	m_pKernelData = pKernelData;
 	m_pConfigData = pConfigData;
+	m_pCommonUniform = pCommonUniform;
 
-	for (int i = 0; i <= GM_HIERARCHY_MAX; i++)
-	{
-		osg::ref_ptr<osg::Group> _pRoot = new osg::Group();
-		m_pHierarchyRootVector.push_back(_pRoot);
-	}
-	GM_Root->addChild(m_pHierarchyRootVector.at(4).get());
+	m_iScreenWidth = pConfigData->iScreenWidth;
+	m_iScreenHeight = pConfigData->iScreenHeight;
 
 	std::string strTexturePath = pConfigData->strCorePath + m_strCoreTexturePath;
+	m_3DShapeTex = _Load3DShapeNoise();
+	m_3DErosionTex = _Load3DErosionNoise();
+	m_3DCurlTex = _Load3DCurlNoise();
 	m_blueNoiseTex = _CreateTexture2D(strTexturePath + "BlueNoise.jpg", 1);
+
+	// 传入屏幕像素尺寸，用于相机抖动
+	SetPixelLength(pConfigData->fFovy, m_iScreenHeight);
 
 	_InitTAA(pConfigData->strCorePath);
 }
@@ -102,38 +75,38 @@ void CGMVolumeBasic::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData
 /** @brief 更新(在主相机更新姿态之后) */
 void CGMVolumeBasic::UpdateLater(double dDeltaTime)
 {
-	if (m_fNoiseNumUniform.valid())
-		m_fNoiseNumUniform->set(0.01f * float((m_iRandom() % 100)));
+	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
+
+	if (m_vNoiseUniform.valid())
+	{
+		m_vNoiseUniform->set(osg::Vec4f(
+			(iPseudoNoise(m_iRandom)) / 1e4f,
+			(iPseudoNoise(m_iRandom)) / 1e4f,
+			(iPseudoNoise(m_iRandom)) / 1e4f,
+			(iPseudoNoise(m_iRandom)) / 1e4f));
+	}	
+	if (m_vShakeVectorUniform.valid())
+		m_vShakeVectorUniform->set(osg::Vec2f(m_fShakeU, m_fShakeV));
+	if (m_fCountUniform.valid())
+		m_fCountUniform->set(float(m_iShakeCount % 100000));
+	osg::Vec2f vShakeVec = osg::Vec2f(m_fShakeU, m_fShakeV);
+	if (m_vDeltaShakeUniform.valid())
+	{
+		osg::Vec2f vDeltaShake = vShakeVec - m_vLastShakeVec;
+		m_vDeltaShakeUniform->set(vDeltaShake);
+	}
+
+	m_vLastShakeVec = vShakeVec;
 }
 
-/**
-* ActiveTAA
-* 向TAA节点中添加Texture，并启动TAA
-* @author LiuTao
-* @since 2020.09.01
-* @param pTex 需要TAA操作的纹理指针
-* @param pVectorTex 速度矢量纹理指针
-* @param pDistanceTex 星云、气体、尘埃的距离信息纹理指针
-* @return bool 成功为true，失败为false
-*/
-bool CGMVolumeBasic::ActiveTAA(osg::Texture* pTex, osg::Texture* pVectorTex, osg::Texture* pDistanceTex)
+bool CGMVolumeBasic::ActiveTAA(osg::Texture* pTex, osg::Texture* pVectorTex)
 {
 	if (!m_statesetTAA.valid()) return false;
 
-	m_iUnitColor = m_iUnitTAA;
-	m_statesetTAA->setTextureAttributeAndModes(m_iUnitColor, pTex);
-	m_statesetTAA->addUniform(new osg::Uniform("currentTex", m_iUnitColor));
-	m_iUnitTAA++;
-	m_iUnitVelocity = m_iUnitTAA;
-	m_statesetTAA->setTextureAttributeAndModes(m_iUnitVelocity, pVectorTex);
-	m_statesetTAA->addUniform(new osg::Uniform("velocityTex", m_iUnitVelocity));
-	m_iUnitTAA++;
+	CGMKit::AddTexture(m_statesetTAA.get(), pTex, "currentTex", m_iUnitTAA++);
+	CGMKit::AddTexture(m_statesetTAA.get(), pVectorTex, "velocityTex", m_iUnitTAA++);
 
-	m_statesetTAA->setTextureAttributeAndModes(m_iUnitTAA, pDistanceTex);
-	m_statesetTAA->addUniform(new osg::Uniform("currentDistanceTex", m_iUnitTAA));
-	m_iUnitTAA++;
-
-	GM_Root->addChild(m_cameraTAA.get());
+	GM_Root->addChild(m_TAACamera.get());
 	return true;
 }
 
@@ -201,131 +174,449 @@ osg::Texture* CGMVolumeBasic::_CreateTexture2D(const std::string & fileName, con
 */
 void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 {
+	m_iScreenWidth = width;
+	m_iScreenHeight = height;
+
+	int iW = std::ceil(0.5 * width);
+	int iH = std::ceil(0.5 * height);
+	if (m_rayMarchCamera.valid())
+	{
+		m_rayMarchCamera->resize(iW, iH);
+
+		m_vectorMap_0->setTextureSize(iW, iH);
+		m_vectorMap_0->dirtyTextureObject();
+		m_vectorMap_1->setTextureSize(iW, iH);
+		m_vectorMap_1->dirtyTextureObject();
+
+		m_rayMarchTex->setTextureSize(iW, iH);
+		m_rayMarchTex->dirtyTextureObject();
+	}
+
 	_ResizeScreenTriangle(width, height);
 
-	float fRTTRatio = m_bHigh ? 0.5f : 0.25f;
-	if (m_cameraTAA.valid())
+	if (m_TAACamera.valid())
 	{
-		m_cameraTAA->resize(width, height);
-		m_cameraTAA->setProjectionMatrixAsOrtho2D(0, width, 0, height);
+		m_TAACamera->resize(width, height);
+		m_TAACamera->setProjectionMatrixAsOrtho2D(0, width, 0, height);
 	}
-	if (m_TAAMap_0.valid() && m_TAAMap_1.valid())
+	if (m_TAATex_0.valid() && m_TAATex_1.valid())
 	{
-		m_TAAMap_0->setTextureSize(width, height);
-		m_TAAMap_0->dirtyTextureObject();
-		m_TAAMap_1->setTextureSize(width, height);
-		m_TAAMap_1->dirtyTextureObject();
-	}
-	if (m_TAADistanceMap_0.valid() && m_TAADistanceMap_1.valid())
-	{
-		m_TAADistanceMap_0->setTextureSize(width, height);
-		m_TAADistanceMap_0->dirtyTextureObject();
-		m_TAADistanceMap_1->setTextureSize(width, height);
-		m_TAADistanceMap_1->dirtyTextureObject();
-	}
-	if (m_vScreenSizeUniform.valid())
-	{
-		m_vScreenSizeUniform->set(osg::Vec3f(width, height, fRTTRatio));
+		m_TAATex_0->setTextureSize(width, height);
+		m_TAATex_0->dirtyTextureObject();
+		m_TAATex_1->setTextureSize(width, height);
+		m_TAATex_1->dirtyTextureObject();
 	}
 }
 
-/**
-* _InitTAA
-* TAA初始化，用于体渲染
-* @author LiuTao
-* @since 2020.09.01
-* @param strCorePath 核心路径
-* @return void
-*/
+void CGMVolumeBasic::CreatePlatonicSolids(osg::Geometry ** pFaceGeom, osg::Geometry ** pEdgeGeom, osg::Geometry ** pVertGeom) const
+{
+	if (*pFaceGeom || *pEdgeGeom || *pVertGeom) return;
+
+	const float fBevel = 0.122f;
+	const float fScale = 1.0f;
+	// Vertex positions
+	osg::ref_ptr<osg::Vec3Array> rawVerts = new osg::Vec3Array();
+	rawVerts->reserveArray(20);
+	rawVerts->push_back(osg::Vec3(0.607f, 0.000f, -0.795f)*fScale);
+	rawVerts->push_back(osg::Vec3(0.188f, 0.577f, -0.795f)*fScale);
+	rawVerts->push_back(osg::Vec3(-0.491f, 0.357f, -0.795f)*fScale);
+	rawVerts->push_back(osg::Vec3(-0.491f, -0.357f, -0.795f)*fScale);
+	rawVerts->push_back(osg::Vec3(0.188f, -0.577f, -0.795f)*fScale);
+	rawVerts->push_back(osg::Vec3(0.982f, 0.000f, -0.188f)*fScale);
+	rawVerts->push_back(osg::Vec3(0.304f, 0.934f, -0.188f)*fScale);
+	rawVerts->push_back(osg::Vec3(-0.795f, 0.577f, -0.188f)*fScale);
+	rawVerts->push_back(osg::Vec3(-0.795f, -0.577f, -0.188f)*fScale);
+	rawVerts->push_back(osg::Vec3(0.304f, -0.934f, -0.188f)*fScale);
+	rawVerts->push_back(osg::Vec3(0.795f, 0.577f, 0.188f)*fScale);
+	rawVerts->push_back(osg::Vec3(-0.304f, 0.934f, 0.188f)*fScale);
+	rawVerts->push_back(osg::Vec3(-0.982f, 0.000f, 0.188f)*fScale);
+	rawVerts->push_back(osg::Vec3(-0.304f, -0.934f, 0.188f)*fScale);
+	rawVerts->push_back(osg::Vec3(0.795f, -0.577f, 0.188f)*fScale);
+	rawVerts->push_back(osg::Vec3(0.491f, 0.357f, 0.795f)*fScale);
+	rawVerts->push_back(osg::Vec3(-0.188f, 0.577f, 0.795f)*fScale);
+	rawVerts->push_back(osg::Vec3(-0.607f, 0.000f, 0.795f)*fScale);
+	rawVerts->push_back(osg::Vec3(-0.188f, -0.577f, 0.795f)*fScale);
+	rawVerts->push_back(osg::Vec3(0.491f, -0.357f, 0.795f)*fScale);
+
+	// (faceIndex, vertIndex) => index into rawVerts
+	int faceVertIndices[12][5] =
+	{
+		{ 0, 1, 2, 3, 4 },      // 0
+		{ 0, 5, 10, 6, 1 },     // 1
+		{ 1, 6, 11, 7, 2 },     // 2
+		{ 2, 7, 12, 8, 3 },     // 3
+		{ 3, 8, 13, 9, 4 },     // 4
+		{ 4, 9, 14, 5, 0 },     // 5
+		{ 10, 15, 16, 11, 6 },  // 6
+		{ 11, 16, 17, 12, 7 },  // 7
+		{ 12, 17, 18, 13, 8 },  // 8
+		{ 13, 18, 19, 14, 9 },  // 9
+		{ 5, 14, 19, 15, 10 },  // 10
+		{ 15, 19, 18, 17, 16 }, // 11
+	};
+
+	// For each vert, shows which three faces it's a part of
+	int vertFaceIndices[20][3];
+	for (int i = 0; i<20; i++)
+	{
+		int idx = 0;
+		for (int j = 0; j<12; j++)
+		{
+			for (int k = 0; k<5; k++)
+			{
+				if (faceVertIndices[j][k] == i)
+				{
+					vertFaceIndices[i][idx++] = j;
+				}
+			}
+		}
+	}
+
+	// Edges: (tri0, tri1, vert0, vert1)
+	int edges[][4] =
+	{
+		{ 0, 1, 0, 1 },
+		{ 0, 2, 1, 2 },
+		{ 0, 3, 2, 3 },
+		{ 0, 4, 3, 4 },
+		{ 0, 5, 4, 0 },
+		{ 1, 10, 5, 10 },
+		{ 1, 6, 10, 6 },
+		{ 1, 2, 1, 6 },
+		{ 2, 6, 6, 11 },
+		{ 2, 7, 11, 7 },
+		{ 2, 3, 7, 2 },
+		{ 3, 7, 7, 12 },
+		{ 3, 8, 12, 8 },
+		{ 3, 4, 8, 3 },
+		{ 4, 8, 8, 13 },
+		{ 4, 9, 13, 9 },
+		{ 4, 5, 9, 4 },
+		{ 5, 9, 9, 14 },
+		{ 5, 10, 14, 5 },
+		{ 5, 1, 5, 0 },
+		{ 6, 11, 15, 16 },
+		{ 6, 7, 16, 11 },
+		{ 7, 11, 16, 17 },
+		{ 7, 8, 17, 12 },
+		{ 8, 11, 17, 18 },
+		{ 8, 9, 18, 13 },
+		{ 9, 11, 18, 19 },
+		{ 9, 10, 19, 14 },
+		{ 10, 11, 19, 15 },
+		{ 10, 6, 15, 10 }
+	};
+
+	// Mid-point for each face
+	osg::ref_ptr<osg::Vec3Array> faceMidPoints = new osg::Vec3Array(12);
+	for (int i = 0; i<12; i++)
+	{
+		osg::Vec3 midPoint = osg::Vec3(0, 0, 0);
+		for (int j = 0; j<5; j++)
+		{
+			midPoint += (*rawVerts)[faceVertIndices[i][j]];
+		}
+
+		(*faceMidPoints)[i] = midPoint / 5.0f;
+	}
+
+	int nVertsTotal = 12 * 5 + 20 * 4 + 20 * 3;
+	// All vertex positions
+	osg::ref_ptr<osg::Vec3Array> verts = new osg::Vec3Array(); verts->reserveArray(nVertsTotal);
+	// All normals
+	osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array(); normals->reserveArray(nVertsTotal);
+	// Three sets of uvs encode the three normals needed to blend
+	osg::ref_ptr<osg::Vec3Array> uvNormal0 = new osg::Vec3Array(); uvNormal0->reserveArray(nVertsTotal);
+	osg::ref_ptr<osg::Vec3Array> uvNormal1 = new osg::Vec3Array(); uvNormal1->reserveArray(nVertsTotal);
+	osg::ref_ptr<osg::Vec3Array> uvNormal2 = new osg::Vec3Array(); uvNormal2->reserveArray(nVertsTotal);
+	// The vertex colors contain the blend weights in rgb
+	osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array(); colors->reserveArray(nVertsTotal);
+
+	// The triangle indices for the faces
+	osg::ref_ptr<osg::DrawElementsUShort> faceTris = new osg::DrawElementsUShort(GL_TRIANGLES);
+	faceTris->reserve(12 * 9);
+
+	// Compute the faces.
+	// Those have only one blend weight.
+	for (int i = 0; i<12; i++)
+	{
+		osg::Vec3 faceMidPoint = (*faceMidPoints)[i];
+		osg::Vec3 faceNormal = faceMidPoint;
+		faceNormal.normalize();
+		for (int j = 0; j < 5; j++)
+		{
+			osg::Vec3 beveledVertexPosition = faceMidPoint + ((*rawVerts)[faceVertIndices[i][j]] - faceMidPoint) * (1.0f - fBevel);
+			verts->push_back(beveledVertexPosition);
+
+			normals->push_back(faceNormal);
+
+			uvNormal0->push_back(faceNormal);//uv0
+			uvNormal1->push_back(osg::Vec3(0, 0, 0));
+			uvNormal2->push_back(osg::Vec3(0, 0, 0));
+
+			colors->push_back(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+		}
+
+		faceTris->push_back(5 * i + 0);
+		faceTris->push_back(5 * i + 1);
+		faceTris->push_back(5 * i + 2);
+		faceTris->push_back(5 * i + 0);
+		faceTris->push_back(5 * i + 2);
+		faceTris->push_back(5 * i + 3);
+		faceTris->push_back(5 * i + 0);
+		faceTris->push_back(5 * i + 3);
+		faceTris->push_back(5 * i + 4);
+	}
+
+	// Compute the bevelled edges.
+	// Those have two blend weights.
+	osg::ref_ptr<osg::DrawElementsUShort> edgeTris = new osg::DrawElementsUShort(GL_TRIANGLES);
+	edgeTris->reserve(20 * 6);
+
+	for (int i = 0; i< sizeof(edges) / sizeof(edges[0]); i++)
+	{
+		int f0 = edges[i][0];
+		int f1 = edges[i][1];
+		int v0 = edges[i][2];
+		int v1 = edges[i][3];
+
+		osg::Vec3 midPoint0 = (*faceMidPoints)[f0];
+		osg::Vec3 midPoint1 = (*faceMidPoints)[f1];
+
+		osg::Vec3 vert0 = (*rawVerts)[v0];
+		osg::Vec3 vert1 = (*rawVerts)[v1];
+
+		// Build a quad with beveled vertex positions
+		verts->push_back(midPoint0 + (vert0 - midPoint0) * (1.0f - fBevel));
+		verts->push_back(midPoint1 + (vert0 - midPoint1) * (1.0f - fBevel));
+		verts->push_back(midPoint1 + (vert1 - midPoint1) * (1.0f - fBevel));
+		verts->push_back(midPoint0 + (vert1 - midPoint0) * (1.0f - fBevel));
+
+		int i0 = verts->size() - 4;
+		int i1 = verts->size() - 3;
+		int i2 = verts->size() - 2;
+		int i3 = verts->size() - 1;
+
+		// Ensure ordering
+		osg::Vec3 _v0 = (*verts)[i1] - (*verts)[i0];
+		osg::Vec3 _v1 = (*verts)[i2] - (*verts)[i0];
+		osg::Vec3 _vCross = _v0 ^ _v1;
+		if ((_vCross * vert0) > 0.0f)
+		{
+			int tmp = i1;
+			i1 = i3;
+			i3 = tmp;
+		}
+
+		edgeTris->push_back(i0);
+		edgeTris->push_back(i1);
+		edgeTris->push_back(i2);
+		edgeTris->push_back(i0);
+		edgeTris->push_back(i2);
+		edgeTris->push_back(i3);
+
+		// Normal
+		osg::Vec3 normal = (vert0 + vert1) * 0.5f;
+		normal.normalize();
+		normals->push_back(normal);
+		normals->push_back(normal);
+		normals->push_back(normal);
+		normals->push_back(normal);
+
+		// The UVs encode the sampling plane normals.
+		midPoint0.normalize();
+		midPoint1.normalize();
+
+		uvNormal0->push_back(midPoint0);//uv0
+		uvNormal0->push_back(midPoint0);//uv0
+		uvNormal0->push_back(midPoint0);//uv0
+		uvNormal0->push_back(midPoint0);//uv0
+
+		uvNormal1->push_back(midPoint1);//uv1
+		uvNormal1->push_back(midPoint1);//uv1
+		uvNormal1->push_back(midPoint1);//uv1
+		uvNormal1->push_back(midPoint1);//uv1
+
+		uvNormal2->push_back(osg::Vec3(0, 0, 0));
+		uvNormal2->push_back(osg::Vec3(0, 0, 0));
+		uvNormal2->push_back(osg::Vec3(0, 0, 0));
+		uvNormal2->push_back(osg::Vec3(0, 0, 0));
+
+		// Blend weights are stored in the color channel
+		osg::Vec4 c0 = osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+		osg::Vec4 c1 = osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f);
+		colors->push_back(c0);
+		colors->push_back(c1);
+		colors->push_back(c1);
+		colors->push_back(c0);
+	}
+
+	// Compute the bevelled vertices.
+	// Those have three blend weights.
+	osg::ref_ptr<osg::DrawElementsUShort> vertTris = new osg::DrawElementsUShort(GL_TRIANGLES);
+	vertTris->reserve(20 * 3);
+
+	for (int i = 0; i<20; i++)
+	{
+		osg::Vec3 normal = (*rawVerts)[i];
+		normal.normalize();
+
+		// The UVs encode the sampling plane normals.
+		osg::Vec3 m1 = (*faceMidPoints)[vertFaceIndices[i][0]]; m1.normalize();
+		osg::Vec3 m2 = (*faceMidPoints)[vertFaceIndices[i][1]]; m2.normalize();
+		osg::Vec3 m3 = (*faceMidPoints)[vertFaceIndices[i][2]]; m3.normalize();
+
+		for (int j = 0; j<3; j++)
+		{
+			int faceIdx = vertFaceIndices[i][j];
+			osg::Vec3 faceMidPoint = (*faceMidPoints)[faceIdx];
+
+			osg::Vec3 beveledVertexPosition = faceMidPoint + ((*rawVerts)[i] - faceMidPoint) * (1.0f - fBevel);
+			verts->push_back(beveledVertexPosition);
+
+			normals->push_back(normal);
+
+			uvNormal0->push_back(m1);//uv0
+			uvNormal1->push_back(m2);//uv1
+			uvNormal2->push_back(m3);//uv2
+		}
+
+		// Blend weights are stored in the color channel.
+		colors->push_back(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+		colors->push_back(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f));
+		colors->push_back(osg::Vec4(0.0f, 0.0f, 1.0f, 1.0f));
+
+		// Indices
+		int i0 = verts->size() - 3;
+		int i1 = verts->size() - 2;
+		int i2 = verts->size() - 1;
+
+		// Ensure ordering
+		osg::Vec3 _v0 = (*verts)[i1] - (*verts)[i0];
+		osg::Vec3 _v1 = (*verts)[i2] - (*verts)[i0];
+		osg::Vec3 _vCross = _v0 ^ _v1;
+		if ((_vCross * (*rawVerts)[i]) > 0.0f)
+		{
+			int tmp = i1;
+			i1 = i2;
+			i2 = tmp;
+		}
+
+		vertTris->push_back(i0);
+		vertTris->push_back(i1);
+		vertTris->push_back(i2);
+	}
+
+	// Face Geom
+	*pFaceGeom = new osg::Geometry();
+	(*pFaceGeom)->setUseVertexBufferObjects(true);
+	(*pFaceGeom)->setUseDisplayList(false);
+	(*pFaceGeom)->setDataVariance(osg::Object::DYNAMIC);
+
+	// Array
+	(*pFaceGeom)->setVertexArray(verts.get());
+	(*pFaceGeom)->setNormalArray(normals.get());
+	(*pFaceGeom)->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+	(*pFaceGeom)->setColorArray(colors.get());
+	(*pFaceGeom)->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+	(*pFaceGeom)->setTexCoordArray(0, uvNormal0);
+	(*pFaceGeom)->setTexCoordArray(1, uvNormal1);
+	(*pFaceGeom)->setTexCoordArray(2, uvNormal2);
+
+	// Edge Geom
+	*pEdgeGeom = new osg::Geometry(**pFaceGeom, osg::CopyOp::DEEP_COPY_ARRAYS);
+	(*pEdgeGeom)->setUseVertexBufferObjects(true);
+	(*pEdgeGeom)->setUseDisplayList(false);
+	(*pEdgeGeom)->setDataVariance(osg::Object::DYNAMIC);
+
+	// Vert Geom
+	*pVertGeom = new osg::Geometry(**pFaceGeom, osg::CopyOp::DEEP_COPY_ARRAYS);
+	(*pVertGeom)->setUseVertexBufferObjects(true);
+	(*pVertGeom)->setUseDisplayList(false);
+	(*pVertGeom)->setDataVariance(osg::Object::DYNAMIC);
+
+	// Name
+	(*pFaceGeom)->setName("Dodecahedron_Face");
+	(*pEdgeGeom)->setName("Dodecahedron_Edge");
+	(*pVertGeom)->setName("Dodecahedron_Vert");
+
+	// PrimitiveSet
+	(*pFaceGeom)->addPrimitiveSet(faceTris.get());
+	(*pEdgeGeom)->addPrimitiveSet(edgeTris.get());
+	(*pVertGeom)->addPrimitiveSet(vertTris.get());
+}
+
+void CGMVolumeBasic::SetPixelLength(const float fFovy, const int iHeight)
+{
+	if (!m_fPixelLengthUniform.valid()) return;
+
+	float fFovyRadian = osg::DegreesToRadians(fFovy);
+	float fPixelLength = tan(fFovyRadian*0.5) / (iHeight*0.5);
+	m_fPixelLengthUniform->set(fPixelLength);
+}
+
+osg::Texture2D* CGMVolumeBasic::CreateTexture(
+	const osg::Vec2i & size,
+	GLint internalFormat,
+	GLenum sourceFormat,
+	GLenum sourceType)
+{
+	osg::Texture2D* texture = new osg::Texture2D();
+	texture->setTextureSize(size.x(), size.y());
+	texture->setInternalFormat(internalFormat);
+	texture->setSourceFormat(sourceFormat);
+	texture->setSourceType(sourceType);
+
+	texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	texture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+	texture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+	texture->setBorderColor(osg::Vec4d(0, 0, 0, 0));
+	texture->setDataVariance(osg::Object::DYNAMIC);
+	texture->setResizeNonPowerOfTwoHint(false);
+	return texture;
+}
+
 void CGMVolumeBasic::_InitTAA(std::string strCorePath)
 {
-	m_TAAMap_0 = new osg::Texture2D;
-	m_TAAMap_0->setName("TAAMap_0");
-	m_TAAMap_0->setTextureSize(m_iWidthFull, m_iHeightFull);
-	m_TAAMap_0->setInternalFormat(GL_RGBA8);
-	m_TAAMap_0->setSourceFormat(GL_RGBA);
-	m_TAAMap_0->setSourceType(GL_UNSIGNED_BYTE);
-	m_TAAMap_0->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_TAAMap_0->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_TAAMap_0->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_TAAMap_0->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_TAAMap_0->setDataVariance(osg::Object::DYNAMIC);
-	m_TAAMap_0->setResizeNonPowerOfTwoHint(false);
+	int iW = m_pConfigData->iScreenWidth;
+	int iH = m_pConfigData->iScreenHeight;
 
-	m_TAAMap_1 = new osg::Texture2D;
-	m_TAAMap_1->setName("TAAMap_1");
-	m_TAAMap_1->setTextureSize(m_iWidthFull, m_iHeightFull);
-	m_TAAMap_1->setInternalFormat(GL_RGBA8);
-	m_TAAMap_1->setSourceFormat(GL_RGBA);
-	m_TAAMap_1->setSourceType(GL_UNSIGNED_BYTE);
-	m_TAAMap_1->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_TAAMap_1->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_TAAMap_1->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_TAAMap_1->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_TAAMap_1->setDataVariance(osg::Object::DYNAMIC);
-	m_TAAMap_1->setResizeNonPowerOfTwoHint(false);
+	m_TAATex_0 = CreateTexture(osg::Vec2i(iW, iH));
+	m_TAATex_1 = CreateTexture(osg::Vec2i(iW, iH));
 
-	m_TAADistanceMap_0 = new osg::Texture2D;
-	m_TAADistanceMap_0->setName("TAADistanceMap_0");
-	m_TAADistanceMap_0->setTextureSize(m_iWidthFull, m_iHeightFull);
-	m_TAADistanceMap_0->setInternalFormat(GL_RGB32F_ARB);
-	m_TAADistanceMap_0->setSourceFormat(GL_RGB);
-	m_TAADistanceMap_0->setSourceType(GL_FLOAT);
-	m_TAADistanceMap_0->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_TAADistanceMap_0->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_TAADistanceMap_0->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_TAADistanceMap_0->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_TAADistanceMap_0->setDataVariance(osg::Object::DYNAMIC);
-	m_TAADistanceMap_0->setResizeNonPowerOfTwoHint(false);
+	m_TAACamera = new osg::Camera;
+	m_TAACamera->setName("TAACamera");
+	m_TAACamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF_INHERIT_VIEWPOINT);
+	m_TAACamera->setClearMask(GL_COLOR_BUFFER_BIT);
+	m_TAACamera->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
+	m_TAACamera->setViewport(0, 0, iW, iH);
+	m_TAACamera->setRenderOrder(osg::Camera::PRE_RENDER,2);
+	m_TAACamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
+	m_TAACamera->attach(osg::Camera::COLOR_BUFFER, m_TAATex_0.get());
+	m_TAACamera->setAllowEventFocus(false);
+	m_TAACamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+	m_TAACamera->setViewMatrix(osg::Matrix::identity());
+	m_TAACamera->setProjectionMatrixAsOrtho2D(0, iW, 0, iH);
+	m_TAACamera->setProjectionResizePolicy(osg::Camera::FIXED);
 
-	m_TAADistanceMap_1 = new osg::Texture2D;
-	m_TAADistanceMap_1->setName("TAADistanceMap_1");
-	m_TAADistanceMap_1->setTextureSize(m_iWidthFull, m_iHeightFull);
-	m_TAADistanceMap_1->setInternalFormat(GL_RGB32F_ARB);
-	m_TAADistanceMap_1->setSourceFormat(GL_RGB);
-	m_TAADistanceMap_1->setSourceType(GL_FLOAT);
-	m_TAADistanceMap_1->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_TAADistanceMap_1->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_TAADistanceMap_1->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_TAADistanceMap_1->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_TAADistanceMap_1->setDataVariance(osg::Object::DYNAMIC);
-	m_TAADistanceMap_1->setResizeNonPowerOfTwoHint(false);
-
-	m_cameraTAA = new osg::Camera;
-	m_cameraTAA->setName("TAACamera");
-	m_cameraTAA->setReferenceFrame(osg::Transform::ABSOLUTE_RF_INHERIT_VIEWPOINT);
-	m_cameraTAA->setClearMask(GL_COLOR_BUFFER_BIT);
-	m_cameraTAA->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
-	m_cameraTAA->setViewport(0, 0, m_iWidthFull, m_iHeightFull);
-	m_cameraTAA->setRenderOrder(osg::Camera::PRE_RENDER,2);
-	m_cameraTAA->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
-	m_cameraTAA->attach(osg::Camera::COLOR_BUFFER0, m_TAAMap_0.get());
-	m_cameraTAA->attach(osg::Camera::COLOR_BUFFER1, m_TAADistanceMap_0.get());
-	m_cameraTAA->setAllowEventFocus(false);
-	m_cameraTAA->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
-	m_cameraTAA->setViewMatrix(osg::Matrix::identity());
-	m_cameraTAA->setProjectionMatrixAsOrtho2D(0, m_iWidthFull, 0, m_iHeightFull);
-	m_cameraTAA->setProjectionResizePolicy(osg::Camera::FIXED);
+	// TAA交换buffer的回调函数指针
+	SwitchFBOCallback* pTAAFBOCallback = new SwitchFBOCallback(m_TAATex_1.get(), m_TAATex_0.get());
+	m_TAACamera->setPostDrawCallback(pTAAFBOCallback);
 
 	m_pTAAGeode = new osg::Geode();
-	m_pTAAGeode->addDrawable(_CreateScreenTriangle(m_iWidthFull, m_iHeightFull));
-	m_cameraTAA->addChild(m_pTAAGeode.get());
+	m_pTAAGeode->addDrawable(_CreateScreenTriangle(iW, iH));
+	m_TAACamera->addChild(m_pTAAGeode.get());
 
 	m_statesetTAA = m_pTAAGeode->getOrCreateStateSet();
-	m_statesetTAA->addUniform(m_vScreenSizeUniform.get());
+	m_statesetTAA->addUniform(m_pCommonUniform->GetScreenSize());
 	m_statesetTAA->addUniform(m_vShakeVectorUniform.get());
 
-	m_statesetTAA->setTextureAttributeAndModes(0, m_TAAMap_1.get());
-	m_statesetTAA->addUniform(new osg::Uniform("lastTex", 0));
-	m_statesetTAA->setTextureAttributeAndModes(1, m_TAADistanceMap_1.get());
-	m_statesetTAA->addUniform(new osg::Uniform("lastDistanceTex", 1));
-	m_statesetTAA->setTextureAttributeAndModes(m_iUnitTAA, m_blueNoiseTex.get());
-	m_statesetTAA->addUniform(new osg::Uniform("blueNoiseSampler", m_iUnitTAA));
-	m_iUnitTAA++;
+	CGMKit::AddTexture(m_statesetTAA.get(), m_TAATex_1.get(), "lastTex", m_iUnitTAA++);
 
-	std::string strTAAVertPath = strCorePath + m_strShaderPath + "TAAVert.glsl";
-	std::string strTAAFragPath = strCorePath + m_strShaderPath + "TAAFrag.glsl";
-	CGMKit::LoadShader(m_statesetTAA.get(), strTAAVertPath, strTAAFragPath);
+	std::string strTAAVertPath = m_pConfigData->strCorePath + m_strVolumeShaderPath + "TAAVert.glsl";
+	std::string strTAAFragPath = m_pConfigData->strCorePath + m_strVolumeShaderPath + "TAAFrag.glsl";
+	CGMKit::LoadShader(m_statesetTAA.get(), strTAAVertPath, strTAAFragPath, "TAA");
 }
 
 /**
@@ -368,15 +659,6 @@ osg::Geometry* CGMVolumeBasic::_CreateScreenTriangle(const int width, const int 
 	return pGeometry;
 }
 
-/**
-* 给渲染面重设尺寸
-* @brief 屏幕两倍大小的三角面，比矩形效率要高一些
-* @author LiuTao
-* @since 2020.12.07
-* @param width: 等效矩形的宽度
-* @param height: 等效矩形的高度
-* @return void
-*/
 void CGMVolumeBasic::_ResizeScreenTriangle(const int width, const int height)
 {
 	osg::ref_ptr<osg::Geometry> pGeometry = m_pTAAGeode->asGeode()->getDrawable(0)->asGeometry();
@@ -386,4 +668,61 @@ void CGMVolumeBasic::_ResizeScreenTriangle(const int width, const int height)
 	verArray->push_back(osg::Vec3(0, 2 * height, 0));
 	pGeometry->setVertexArray(verArray);
 	pGeometry->dirtyBound();
+}
+
+osg::Texture* CGMVolumeBasic::_Load3DShapeNoise() const
+{
+	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreTexturePath + "noiseShape.raw";
+	osg::ref_ptr<osg::Image> shapeImg = osgDB::readImageFile(strTexturePath);
+	shapeImg->setImage(128, 128, 128, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, shapeImg->data(), osg::Image::NO_DELETE);
+	osg::Texture3D* tex3d = new osg::Texture3D;
+	tex3d->setImage(shapeImg.get());
+	tex3d->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	tex3d->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	tex3d->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+	tex3d->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+	tex3d->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
+	tex3d->setInternalFormat(GL_RGBA8);
+	tex3d->setSourceFormat(GL_RGBA);
+	tex3d->setSourceType(GL_UNSIGNED_BYTE);
+	tex3d->allocateMipmapLevels();
+	return tex3d;
+}
+
+osg::Texture* CGMVolumeBasic::_Load3DErosionNoise() const
+{
+	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreTexturePath + "noiseErosion.raw";
+	osg::Image* img = osgDB::readImageFile(strTexturePath);
+	img->setImage(32, 32, 32, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE, img->data(), osg::Image::NO_DELETE);
+	osg::Texture3D* tex3d = new osg::Texture3D;
+	tex3d->setImage(img);
+	tex3d->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	tex3d->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	tex3d->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+	tex3d->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+	tex3d->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
+	tex3d->setInternalFormat(GL_RGB8);
+	tex3d->setSourceFormat(GL_RGB);
+	tex3d->setSourceType(GL_UNSIGNED_BYTE);
+	tex3d->allocateMipmapLevels();
+	return tex3d;
+}
+
+osg::Texture* CGMVolumeBasic::_Load3DCurlNoise() const
+{
+	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreTexturePath + "noiseCurl.raw";
+	osg::Image* img = osgDB::readImageFile(strTexturePath);
+	img->setImage(128, 128, 4, GL_R8, GL_RED, GL_UNSIGNED_BYTE, img->data(), osg::Image::NO_DELETE);
+	osg::Texture3D* tex3d = new osg::Texture3D;
+	tex3d->setImage(img);
+	tex3d->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	tex3d->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	tex3d->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+	tex3d->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+	tex3d->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
+	tex3d->setInternalFormat(GL_R8);
+	tex3d->setSourceFormat(GL_RED);
+	tex3d->setSourceType(GL_UNSIGNED_BYTE);
+	tex3d->allocateMipmapLevels();
+	return tex3d;
 }

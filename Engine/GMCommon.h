@@ -12,6 +12,7 @@
 #pragma once
 #include <Windows.h>
 #include "GMStructs.h"
+#include "GMEnums.h"
 
 namespace GM
 {
@@ -21,9 +22,31 @@ namespace GM
 
 	#define GM_UNIT_SCALE				(1e5)		// 每个层级空间之间的尺度比例
 	#define GM_HIERARCHY_MAX			(6)			// 宇宙最大层级
-	#define GM_STAR_POS_MIN				(1e10)		// 音频星世界空间坐标的最小空间单位
 	#define GM_MIN_RADIUS				(5e-4)		// 相机在每个层级空间中的最小焦距
 	#define GM_MAX_RADIUS				(GM_MIN_RADIUS*GM_UNIT_SCALE*2)	// 相机在每个层级空间中的最大焦距
+	#define GM_HANDLE_RADIUS			(0.15)		// 把手半径，单位：万光年，1e20
+
+	#define SCAT_COS_NUM				(32)		// 散射图的太阳方向与视线方向的点乘采样数 [-1,1]
+	#define SCAT_LIGHT_NUM				(16)		// 散射图的太阳方向与上方向的点乘采样数 [-1,1]
+	#define SCAT_PITCH_NUM				(256)		// 散射图的俯仰方向与上方向的点乘采样数 [-1,1]
+	#define SCAT_ALT_NUM				(16)		// 散射图的大气点高度采样数 [0,fAtmosThick]m
+
+	/*************************************************************************
+	 Enums
+	*************************************************************************/
+
+	/*!
+	 *  @enum EGMAtmosHeight
+	 *  @brief 大气厚度枚举，为方便计算，将大气厚度量化成几个限定值
+	 */
+	enum EGMAtmosHeight
+	{
+		EGMAH_0,		//!< 没有大气
+		EGMAH_16,		//!< 16km厚度
+		EGMAH_32,		//!< 32km厚度
+		EGMAH_64,		//!< 64km厚度
+		EGMAH_128,		//!< 128km厚度
+	};
 
 	/*************************************************************************
 	 Class
@@ -40,14 +63,21 @@ namespace GM
 	struct SGMConfigData
 	{
 		SGMConfigData()
-			: strCorePath("../../Data/Core/"), strMediaPath(L"../../Data/Media/")
-			, bHighQuality(false), bPhoto(false), fVolume(0.5f)
+			: strCorePath("../../Data/Core/"), strMediaPath(L"../../Data/Media/"),
+			eRenderQuality(EGMRENDER_LOW), bPhoto(false), bWanderingEarth(false),
+			fFovy(40.0f), fVolume(0.5f), fMinBPM(23.0),
+			iScreenWidth(1920), iScreenHeight(1080)
 		{}
 
 		std::string						strCorePath;			//!< 核心资源路径
 		std::wstring					strMediaPath;			//!< 外部资源路径
-		bool							bHighQuality;			//!< 高画质模式
+		EGMRENDER_QUALITY				eRenderQuality;			//!< 高画质模式
 		bool							bPhoto;					//!< 照片模式开关
-		float							fVolume;				//!< 音量
+		bool							bWanderingEarth;		//!< 流浪地球模式开关
+		float							fFovy;					//!< 相机的垂直FOV，单位：°
+		float							fVolume;				//!< 音量，[0.0,1.0]
+		double							fMinBPM;				//!< 音频的最小BPM
+		int								iScreenWidth;			//!< 屏幕宽度，单位：像素
+		int								iScreenHeight;			//!< 屏幕高度，单位：像素
 	};
 }	// GM

@@ -11,19 +11,37 @@
 //////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "GMNebula.h"
+#include "GMCommon.h"
+#include "GMKernel.h"
+
 #include <random>
 #include <osg/Node>
 #include <osg/AutoTransform>
 #include <osg/Texture>
 #include <osg/Texture2DArray>
 #include <osg/Depth>
-#include <osgUtil/CullVisitor>
+#include <osg/BlendFunc>
 #include <osg/CullFace>
-#include <osg/BlendEquation>
+#include <osgUtil/CullVisitor>
 
 namespace GM
 {
+	/*************************************************************************
+	 Enums
+	*************************************************************************/
+	/*!
+	 *  @enum EGMArrowDir
+	 *  @brief 箭头方向枚举
+	 */
+	enum EGMArrowDir
+	{
+		EGMAD_NONE,				//!< 未指定朝向
+		EGMAD_RADIUS_OUT,		//!< 朝向 半径 外方向
+		EGMAD_RADIUS_IN,		//!< 朝向 半径 内方向
+		EGMAD_ANGLE_PLUS,		//!< 朝向 角度 正方向
+		EGMAD_ANGLE_MINUS		//!< 朝向 角度 负方向
+	};
+
 	/*************************************************************************
 	Structs
 	*************************************************************************/
@@ -32,6 +50,10 @@ namespace GM
 	Class
 	*************************************************************************/
 	class osg::EllipsoidModel;
+	class CGMMilkyWay;
+	class CGMSolar;
+	class CGMDataManager;
+	class CGMCommonUniform;
 
 	class CCosmosBox : public osg::Transform
 	{
@@ -42,8 +64,9 @@ namespace GM
 			osg::ref_ptr<osg::StateSet> pStateSetCosmosBox = getOrCreateStateSet();
 			pStateSetCosmosBox->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 			pStateSetCosmosBox->setMode(GL_BLEND, osg::StateAttribute::ON);
-			osg::ref_ptr<osg::BlendEquation> blendEqua = new osg::BlendEquation(osg::BlendEquation::RGBA_MAX);
-			pStateSetCosmosBox->setAttributeAndModes(blendEqua.get(), osg::StateAttribute::ON);
+			pStateSetCosmosBox->setAttributeAndModes(new osg::BlendFunc(
+				GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+			), osg::StateAttribute::ON);
 			pStateSetCosmosBox->setAttributeAndModes(new osg::CullFace());
 			pStateSetCosmosBox->setAttributeAndModes(new osg::Depth(osg::Depth::GEQUAL, 1.0, 1.0));
 		}
@@ -91,7 +114,7 @@ namespace GM
 	*  @class CGMGalaxy
 	*  @brief Galaxy-Music GMGalaxy
 	*/
-	class CGMGalaxy : public CGMNebula
+	class CGMGalaxy
 	{
 		// 函数
 	public:
@@ -102,159 +125,198 @@ namespace GM
 		~CGMGalaxy();
 
 		/** @brief 初始化 */
-		bool Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData);
+		bool Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData,
+			CGMCommonUniform* pCommonUniform, CGMDataManager* pDataManager);
 		/** @brief 更新 */
 		bool Update(double dDeltaTime);
 		/** @brief 更新(在主相机更新姿态之后) */
 		bool UpdateLater(double dDeltaTime);
 		/** @brief 加载 */
 		bool Load();
+		/** @brief 保存 */
+		bool SaveSolarData();
+
+		/**
+		* 修改屏幕尺寸时调用此函数
+		* @author LiuTao
+		* @since 2022.11.19
+		* @param iW: 屏幕宽度
+		* @param iH: 屏幕高度
+		* @return void
+		*/
+		void ResizeScreen(const int iW, const int iH);
 
 		/** @brief 开启/关闭编辑模式 */
 		void SetEditMode(const bool bEnable);
 		/** @brief 获取编辑模式 */
-		bool GetEditMode();
-		/** @brief 开启/关闭捕获功能 */
+		inline bool GetEditMode() const
+		{
+			return m_bEdit;
+		}
+		/** @brief 开启/关闭抓手的悬浮状态 */
+		void SetHandleHover(const bool bHover);
+		/** @brief 开启/关闭捕获功能,开启后鼠标可以捕获当前播放的音频星 */
 		void SetCapture(const bool bEnable);
 
 		/**
-		* Welcome
 		* @brief 开启“欢迎效果”
-		* @brief 每次开启软件，Engine调用此函数以实现“欢迎功能”
-		* @author LiuTao
-		* @since 2021.07.24
-		* @param void
-		* @return void
+		* 每次开启软件，Engine调用此函数以实现“欢迎功能”
 		*/
 		void Welcome();
 
 		/**
-		* CreateGalaxy
-		* 创建星系
-		* @author LiuTao
-		* @since 2020.11.27
+		* @brief 创建星系
 		* @param fDiameter:	星系直径,单位：米
 		* @return bool 成功true， 失败false
 		*/
 		bool CreateGalaxy(double fDiameter);
 
 		/**
-		* SetMousePosition
-		* 将当前鼠标空间层级坐标传入
-		* @author LiuTao
-		* @since 2021.07.04
+		* @brief 将当前鼠标空间层级坐标传入
 		* @param vWorldPos:		当前帧鼠标的空间层级坐标
-		* @return void
 		*/
 		void SetMousePosition(const osg::Vec3d& vHierarchyPos);
 
 		/**
-		* SetCurrentStar
-		* 设置当前激活的恒星
-		* @author LiuTao
-		* @since 2021.07.04
+		* @brief 设置当前激活的恒星
 		* @param vWorldPos:		当前激活的恒星的世界空间坐标，单位：米
 		* @param wstrName：		当前播放的音频名称，XXX.mp3
-		* @return void
 		*/
 		void SetCurrentStar(const osg::Vec3d& vWorldPos, const std::wstring& wstrName);
 
 		/**
-		* SetAudioLevel
-		* 设置当前帧音频的振幅值
-		* @author LiuTao
-		* @since 2021.07.04
-		* @param fLevel 振幅值 [0.0f,1.0f]
-		* @return void
+		* @brief 设置当前播放的恒星的音频空间坐标
+		* @param vAudioCoord:	当前播放的恒星的音频空间坐标
 		*/
-		void SetAudioLevel(float fLevel);
+		void SetPlayingStarAudioCoord(const SGMAudioCoord& vAudioCoord);
 
 		/**
-		* GetStarWorldPos
-		* 获取当前播放的音频星世界空间坐标
-		* @author LiuTao
-		* @since 2021.07.30
-		* @param void
+		* 获取当前播放的恒星的音频空间坐标
+		* @return vAudioCoord:	当前播放的恒星的音频空间坐标
+		*/
+		inline SGMAudioCoord GetPlayingStarAudioCoord() const
+		{
+			return m_vPlayingAudioCoord;
+		}
+
+		/**
+		* @brief 计算升级矩阵，用于层级空间+1的情况
+		* @return Matrix: 升级矩阵
+		*/
+		osg::Matrix HierarchyAddMatrix() const;
+		/**
+		* @brief 计算降级矩阵，用于层级空间-1的情况
+		* @return Matrix: 降级矩阵
+		*/
+		osg::Matrix HierarchySubMatrix() const;
+		/**
+		* @brief 获取查询位置附近最近的一颗天体（行星或恒星）的位置
+		* @param vSearchHiePos 查询位置，当前空间层级坐标系
+		* @param vPlanetHiePos 返回最近的天体位置，当前空间层级坐标系
+		* @param fOrbitalPeriod 返回此行星公转轨道周期，如果是恒星则为0，单位：秒
+		* @return bool 第3层级空间下，点击位置附近有天体则true，否则false
+		*/
+		bool GetNearestCelestialBody(const SGMVector3& vSearchHiePos,
+			SGMVector3& vPlanetHiePos, double& fOrbitalPeriod);
+
+		/**
+		* @brief 获取目标点附近最近的天体（行星或恒星）的位置
+		* @param vPlanetPos 返回最近的天体位置，单位：米
+		* @param fOrbitalPeriod 返回此行星公转轨道周期，单位：秒
+		*/
+		void GetCelestialBody(SGMVector3& vPlanetPos, double& fOrbitalPeriod);
+
+		/**
+		* @brief 获取目标点附近最近的天体（行星或恒星）的平均半径
+		* @return double 天体平均半径，单位：米
+		*/
+		double GetCelestialMeanRadius() const;
+		/**
+		* @brief 获取目标点附近最近的天体（行星或恒星）的指定纬度的海平面与球心距离
+		* @param fLatitude 纬度，单位：°，范围：[-90.0, 90.0]
+		* @return double 指定纬度的海平面与球心距离，单位：米
+		*/
+		double GetCelestialRadius(const double fLatitude) const;
+		/**
+		* @brief 获取目标点附近最近的天体（行星或恒星）的北极轴（当前层级空间下）
+		* @return SGMVector3 北极轴（当前层级空间下）
+		*/
+		SGMVector3 GetCelestialNorth() const;
+		/**
+		* @brief 获取目标点附近最近的天体（行星或恒星）在本恒星系中的索引
+		* @return unsigned int 0代表恒星，1代表公转轨道半径最小的天体
+		*/
+		unsigned int GetCelestialIndex() const;
+		/**
+		* @brief 获取眼睛海拔高度
+		* @return double 眼睛海拔高度，单位：米
+		*/
+		double GetEyeAltitude() const;
+
+		/**
+		* @brief 获取当前播放的音频星世界空间坐标
 		* @return osg::Vec3d	当前播放的音频星世界空间坐标
 		*/
-		osg::Vec3d GetStarWorldPos();
+		inline osg::Vec3d GetStarWorldPos() const
+		{
+			return m_vPlayingStarWorld4Pos;
+		}
 
 		/**
-		* UpdateHierarchy
 		* @brief 由于空间层级变化而更新场景
-		* @author LiuTao
-		* @since 2021.09.15
-		* @param iHierarchy:		空间层级编号
+		* @param iHierarchyNew:		更新后的空间层级编号
 		* @return bool:				成功true，失败false
 		*/
-		bool UpdateHierarchy(int iHierarchy);
+		bool UpdateHierarchy(int iHierarchyNew);
+		/**
+		* @brief 更新当前行星/卫星相关信息，返回天体改变前后的位置差值
+		* @param vTargetHiePos:		目标点在当前空间的位置
+		* @return SGMVector3:		天体改变前后的位置差值，单位：米
+		*/
+		SGMVector3 UpdateCelestialBody(const SGMVector3& vTargetHiePos);
+		/**
+		* @brief 刷新最近的恒星在银河系坐标系（4级空间的世界坐标系）的位置
+		*/
+		void RefreshNearStarWorldPos();
+		/**
+		* @brief 获取最近的恒星在银河系坐标系（4级空间的世界坐标系）的位置
+		* @return osg::Vec3d:		最近的恒星在银河系坐标系（4级空间的世界坐标系）的位置
+		*/
+		inline osg::Vec3d GetNearStarWorldPos() const
+		{
+			return m_vNearStarWorld4Pos;
+		}
+		/**
+		* @brief 获取最近的恒星在银河系坐标系（4级空间的世界坐标系）的姿态（旋转）
+		* @return osg::Quat:		姿态四元数
+		*/
+		osg::Quat GetNearStarRotate() const;
 
 	private:
-
 		/**
-		* _CreateSupernova
-		* 创建超新星，一颗非常明亮的恒星
-		* 不属于任何层级，播放音频时,在12345层级空间，始终可见
+		* _InitBackground
+		* 初始化背景相关节点
 		* @author LiuTao
-		* @since 2021.10.06
-		* @return bool:			成功true，失败false
+		* @since 2022.08.07
+		* @return void:
 		*/
-		bool _CreateSupernova();
+		void _InitBackground();
 
-		/**
-		* _CreateStarCube
+		/** _CreateStarCube
 		* 创建PointSprite恒星盒，用于0123级空间
 		* 在一个正方体中创建点模式恒星
-		* @author LiuTao
-		* @since 2021.10.01
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateStarCube();
 
 		/**
-		* _CreateSun
-		* 创建1、2层级的太阳
+		* _CreateHandle
+		* 创建用于移动恒星的圆盘状的把手
 		* @author LiuTao
-		* @since 2022.01.02
-		* @param void：			无
+		* @since 2022.01.23
 		* @return bool:			成功true，失败false
 		*/
-		bool _CreateSun();
-
-		/**
-		* _CreatePlanets
-		* 创建2、3层级的行星,围绕恒星旋转
-		* @author LiuTao
-		* @since 2021.11.28
-		* @param void：			无
-		* @return bool:			成功true，失败false
-		*/
-		bool _CreatePlanets();
-
-		/**
-		* _AddPlanet
-		* 添加行星，围绕恒星旋转
-		* @author LiuTao
-		* @since 2022.01.01
-		* @param fRadius：			公转半径，单位：米
-		* @param fOrbitalPeriod:	公转周期，单位：年
-		* @param fStartPos:			公转起始位置，单位：弧度
-		* @return bool:				成功true，失败false
-		*/
-		bool _AddPlanet(
-			const double fRadius,
-			const double fOrbitalPeriod,
-			const double fStartPos);
-
-		/**
-		* _CreateOortCloud
-		* 创建奥尔特云，用于3级空间
-		* 一个球面，半径2光年
-		* @author LiuTao
-		* @since 2021.10.12
-		* @return bool:			成功true，失败false
-		*/
-		bool _CreateOortCloud();
+		bool _CreateHandle();
 
 		/**
 		* _CreateAudioPoints
@@ -310,8 +372,6 @@ namespace GM
 		* 完美融合，实现乾坤大挪移
 		* 在一个球面上创建星系群，球面中心始终在相机位置
 		* 每个星系都和5级空间的星系完全吻合
-		* @author LiuTao
-		* @since 2021.10.06
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateGalaxies_4();
@@ -319,8 +379,6 @@ namespace GM
 		/**
 		* _CreateGalaxyPlane_5
 		* 创建平面星系，用于5级空间
-		* @author LiuTao
-		* @since 2021.09.17
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateGalaxyPlane_5();
@@ -329,8 +387,6 @@ namespace GM
 		* _CreateGalaxies_5
 		* 创建PointSprite星系群，用于5级空间
 		* 在一个正方体中创建星系群，然后根据相机位置平移每个星系
-		* @author LiuTao
-		* @since 2021.10.06
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateGalaxies_5();
@@ -339,8 +395,6 @@ namespace GM
 		* _CreateSupercluster
 		* 创建超星系团
 		* 在一个正方体中创建超星系团
-		* @author LiuTao
-		* @since 2021.10.16
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateSupercluster();
@@ -348,8 +402,6 @@ namespace GM
 		* _CreateUltracluster
 		* 创建究极星系团（瞎编的名称）
 		* 在一个正方体中创建究极星系团
-		* @author LiuTao
-		* @since 2021.10.16
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateUltracluster();
@@ -357,20 +409,15 @@ namespace GM
 		/**
 		* _CreateMyWorld
 		* 创建我的世界
-		* @author LiuTao
-		* @since 2021.10.16
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateMyWorld();
 
-		/**
-		* _CreateGalaxyBackground
-		* 创建背景银河系环形
-		* @author LiuTao
-		* @since 2021.10.08
+		/** _CreateBackgroundGalaxy
+		* 创建背景银河系环形结构
 		* @return bool:			成功true，失败false
 		*/
-		bool _CreateGalaxyBackground();
+		bool _CreateBackgroundGalaxy();
 
 		/**
 		* _CreateCosmosBox
@@ -400,14 +447,27 @@ namespace GM
 		bool _AttachAudioPoints();
 
 		/**
+		* _UpdatePlayingStarInformation
+		* @brief 根据输入的音频空间坐标，更新当前播放的音频星信息
+		* @author LiuTao
+		* @since 2022.02.16
+		* @param sAudioCoord:		音频空间坐标
+		* @return bool:				成功true，如果不合法，则返回false
+		*/
+		bool _UpdatePlayingStarInformation(const SGMAudioCoord& sAudioCoord);
+
+		/**
 		* _CreateAudioGeometry
-		* 读取数据并创建未激活状态的音频星几何体
+		* 读取数据并创建音频星几何体
 		* @author LiuTao
 		* @since 2021.07.11
-		* @param coordVector：		音频星点星辰坐标Vector
+		* @param audioMap：			完整的音频数据map
+		* @param iDiscardUID:		因为激活而需要被剔除的音频星UID，默认0表示没有剔除的音频
 		* @return Geometry*:		创建的几何体节点指针，未成功则返回nullptr
 		*/
-		osg::Geometry* _CreateAudioGeometry(std::vector<SGMStarCoord>& coordVector);
+		osg::Geometry* _CreateAudioGeometry(
+			std::map<unsigned int, SGMAudioData>& audioMap,
+			const unsigned int iDiscardUID = 0);
 
 		/**
 		* _CreateConeGeometry
@@ -420,19 +480,25 @@ namespace GM
 		osg::Geometry* _CreateConeGeometry();
 
 		/**
-		* _CreateHelpLineGeometry
-		* 创建辅助线,辅助修改音频坐标
+		* _CreateSquareGeometry
+		* 创建正方形
 		* @author LiuTao
-		* @since 2021.07.24
-		* @param void：				无
+		* @since 2022.01.23
+		* @param fWidth：			正方形边长
+		* @param bCorner：			正方形中心点是否在角上，true == 在角上，false == 在中心
 		* @return Geometry*:		创建的几何体节点指针，未成功则返回nullptr
 		*/
-		osg::Geometry* _CreateHelpLineGeometry();
+		osg::Geometry* _CreateSquareGeometry(const float fWidth, const bool bCorner = false);
 
 		/**
-		* _MakeEllipsoidGeometry
-		* @author LiuTao
-		* @since 2020.06.22
+		* _CreateRegionGeometry
+		* 创建音频分区几何体
+		* @return Geometry*:		创建的几何体节点指针，未成功则返回nullptr
+		*/
+		osg::Geometry* _CreateRegionGeometry();
+
+		/**
+		* @brief 创建椭圆
 		* @param ellipsoid				用于描述天体的椭球模型
 		* @param iLonSegments			经度分段数
 		* @param iLatSegments			纬度分段数
@@ -440,8 +506,6 @@ namespace GM
 		* @param bGenTexCoords			是否生成UV坐标
 		* @param bWholeMap				是否显示完整贴图(在半球或者复杂曲面时)
 		* @param bFlipNormal			true 法线向内，false 法线向外
-		* @param fLonStart				经度开始位置，单位：角度 °
-		* @param fLonEnd				经度结束位置，单位：角度 °
 		* @param fLatStart				纬度开始位置，单位：角度 °
 		* @param fLatEnd				纬度结束位置，单位：角度 °
 		* @return Geometry				返回创建的几何体指针
@@ -454,40 +518,23 @@ namespace GM
 			bool						bGenTexCoords,
 			bool						bWholeMap = false,
 			bool						bFlipNormal = false,
-			float						fLonStart = -180.0,
-			float						fLonEnd = 180.0,
 			float						fLatStart = -90.0,
-			float						fLatEnd = 90.0);
+			float						fLatEnd = 90.0) const;
 
 		/**
-		* _GetGalaxyValue
-		* 获取星系图的RGBA通道值，channel为0/1/2/3，对应RGBA。
-		* @author LiuTao
-		* @since 2020.11.27
-		* @param fX:		图像x坐标,[0,1]
-		* @param fY:		图像y坐标,[0,1]
-		* @param iChannel:	0、1、2、3，对应R、G、B、A通道
-		* @param bLinear:	是否双线性插值，true = 双线性，false = 临近值
-		* @return float：	[0.0,1.0]
+		* @brief 创建长方体
+		* @param fLength			长度
+		* @param fWidth				宽度
+		* @param fHeight			高度
+		* @return Geometry			返回创建的几何体指针
 		*/
-		float _GetGalaxyValue(float fX, float fY, int iChannel, bool bLinear = false);
+		osg::Geometry* _MakeBoxGeometry(
+			const float fLength = 10.0f,
+			const float fWidth = 10.0f,
+			const float fHeight = 2.0f) const;
 
 		/**
-		* _GetGalaxyHeight
-		* 获取星系的厚度信息
-		* @author LiuTao
-		* @since 2020.11.27
-		* @param fX:		图像x坐标,[0,1]
-		* @param fY:		图像y坐标,[0,1]
-		* @return float：	[0.0,1.0]
-		*/
-		float _GetGalaxyHeight(float fX, float fY);
-
-		/**
-		* _Get3DValue
-		* 获取三维图片的某位置的线性插值后的值，repeat模式
-		* @author LiuTao
-		* @since 2021.09.26
+		* @brief 获取三维图片的某位置的线性插值后的值，repeat模式
 		* @param fX:		图像x坐标,无限制
 		* @param fY:		图像y坐标,无限制
 		* @param fZ:		图像z坐标,无限制
@@ -496,11 +543,8 @@ namespace GM
 		float _Get3DValue(float fX, float fY, float fZ);
 
 		/**
-		* _Get3DValue
-		* 获取三维图片的某unsigned int位置的值。只能获取“noiseShape128.tga”这张特殊的三维噪声图。
+		* @brief 获取三维图片的某unsigned int位置的值。只能获取“noiseShape128.tga”这张特殊的三维噪声图。
 		* 这张图片为128*4096，rgba分别表示4段三维噪声值，先遍历每一层，再遍历每个通道
-		* @author LiuTao
-		* @since 2021.09.26
 		* @param iX:		图像x坐标,[0,127]
 		* @param iY:		图像y坐标,[0,127]
 		* @param iZ:		图像z坐标,[0,127]
@@ -509,15 +553,11 @@ namespace GM
 		float _Get3DValue(unsigned int iX, unsigned int iY, unsigned int iZ);
 
 		/**
-		* _GetPhotoColor
-		* 获取照片的颜色，不插值
-		* @author LiuTao
-		* @since 2021.10.16
+		* @brief 音频空间坐标转音频区域UV
 		* @param fX:			图像x坐标,[0,1]
-		* @param fY:			图像y坐标,[0,1]
-		* @return osg::Vec4f：	Vec3[0.0,1.0]
+		* @return osg::Vec2f		返回一个随机且合理的恒星颜色，[0.0,1.0]
 		*/
-		osg::Vec4f _GetPhotoColor(float fX, float fY);
+		osg::Vec2f _AudioCoord2UV(const SGMAudioCoord& sAudioCoord) const;
 
 		/**
 		* 加载2D纹理
@@ -527,7 +567,30 @@ namespace GM
 		* @param iChannelNum: 1、2、3、4分别代表R、RG、RGB、RGBA
 		* @return osg::Texture* 返回纹理指针
 		*/
-		osg::Texture* _CreateTexture2D(const std::string& fileName, const int iChannelNum);
+		osg::Texture* _CreateTexture2D(const std::string& fileName, const int iChannelNum) const;
+		/**
+		* 加载2D纹理
+		* @author LiuTao
+		* @since 2023.03.04
+		* @param pImg:		图片指针
+		* @param iChannelNum: 1、2、3、4分别代表R、RG、RGB、RGBA
+		* @return osg::Texture* 返回纹理指针
+		*/
+		osg::Texture* _CreateTexture2D(osg::Image* pImg, const int iChannelNum) const;
+
+		/**
+		* 加载DDS纹理
+		* @author LiuTao
+		* @since 2023.01.08
+		* @param fileName: 图片文件路径
+		* @param eWrap_S: 横/X/U方向包裹模式
+		* @param eWrap_T: 纵/Y/V方向包裹模式
+		* @param bFlip: 是否翻转上下（dds需要考虑是否翻转）
+		* @return osg::Texture* 返回纹理指针
+		*/
+		osg::Texture* _CreateDDSTexture(const std::string& fileName,
+			osg::Texture::WrapMode eWrap_S, osg::Texture::WrapMode eWrap_T,
+			bool bFlip = false) const;
 
 		/**
 		* 加载cubeMap纹理，自动加载文件夹下的指定命名规则的六张jpg图片
@@ -537,19 +600,56 @@ namespace GM
 		* @param strFilePrefix:		图片文件名公用前缀
 		* @return osg::Texture*		返回cubeMap纹理指针
 		*/
-		osg::Texture* _ReadCubeMap(const std::string& strFolder, const std::string& strFilePrefix);
+		osg::Texture* _ReadCubeMap(const std::string& strFolder, const std::string& strFilePrefix) const;
 
 		/**
-		* _getRandomStarColor
+		* _GetRandomStarColor
 		* @brief 获取一个随机且合理的恒星颜色
 		* @author LiuTao
 		* @since 2021.10.05
 		* @return osg::Vec3f		返回一个随机且合理的恒星颜色，[0.0,1.0]
 		*/
-		osg::Vec3f _getRandomStarColor();
+		osg::Vec3f _GetRandomStarColor();
+
+		/**
+		* @brief 获取两个角度之间的夹角
+		* @author LiuTao
+		* @since 2022.02.10
+		* @param fA:			角度A，单位：弧度 (-PI, PI]
+		* @param fB:			角度B，单位：弧度 (-PI, PI]
+		* @return double:		A - B 的夹角，单位：弧度 (-PI, PI]
+		*/
+		double _IncludedAngle(const double fA, const double fB) const;
+
+		/**
+		* @brief 生成伪随机噪声图
+		* @author LiuTao
+		* @since 2022.05.15
+		* @param void:
+		* @return void:
+		*/
+		void _MakePseudoNoise();
+
+		osg::Texture* _Load3DShapeNoise() const;
+
+		/**
+		* @brief SGMVector3 转 osg::Vec3d
+		* @param vGM:				输入的GM向量
+		* @return osg::Vec3d:		输出的osg向量
+		*/
+		inline osg::Vec3d _GM2OSG(const SGMVector3& vGM) const
+		{
+			return osg::Vec3d(vGM.x, vGM.y, vGM.z);
+		}
 
 		// 变量
 	private:
+		SGMKernelData*									m_pKernelData;					//!< 内核数据
+		SGMConfigData*									m_pConfigData;					//!< 配置数据
+		CGMCommonUniform*								m_pCommonUniform;				//!< 公共Uniform
+		CGMDataManager*									m_pDataManager;					//!< 数据管理模块
+		std::vector<osg::ref_ptr<osg::Group>>			m_pHierarchyRootVector;			//!< 每个空间层级的根节点
+
 		//!< 星系半径，单位：米
 		double											m_fGalaxyRadius;
 		/** 星系厚度图片：
@@ -575,33 +675,31 @@ namespace GM
 		*/
 		osg::ref_ptr<osg::Image>						m_pPhotoImage;
 
-		std::default_random_engine						m_iRandom;
-
 		std::string										m_strGalaxyShaderPath;			//!< galaxy shader 着色器路径
 		std::string										m_strGalaxyTexPath;				//!< galaxy texture 贴图路径
+		std::string										m_strCoreModelPath;				//!< 核心模型资源路径
 		std::wstring									m_strPlayingStarName;			//!< 激活的音频星文件名,XXX.mp3
-		osg::ref_ptr<osg::Transform>					m_pPlayingStarTransform;		//!< 激活的音频星的变换结点
-		osg::ref_ptr<osg::Transform>					m_pStar_2_Transform;			//!< 第2层级中心恒星、行星变换结点
-		osg::ref_ptr<osg::Transform>					m_pStar_3_Transform;			//!< 第3层级中心恒星、奥尔特云变换结点
-		osg::ref_ptr<osg::Transform>					m_pOort_4_Transform;			//!< 第4层级奥尔特云变换结点
+		osg::ref_ptr<osg::Transform>					m_pStarInfoTransform;			//!< 激活恒星信息展示的变换结点
+		osg::ref_ptr<osg::Transform>					m_pStar_4_Transform;			//!< 第4层级把手的变换结点
 		osg::ref_ptr<osg::Transform>					m_pEye_4_Transform;				//!< 第4层级眼点的变换结点
 		osg::ref_ptr<osg::Transform>					m_pEye_5_Transform;				//!< 第5层级眼点的变换结点
 		osg::ref_ptr<osg::Transform>					m_pGalaxyGroup_Transform;		//!< 最小星系群的变换结点
-		osg::ref_ptr<osg::AutoTransform>				m_pSunBloomTransform;			//!< 太阳辉光的变换结点
+		osg::ref_ptr<osg::Transform>					m_pBackgroundGalaxyTransform;	//!< 背景银河系的变换结点
+		osg::ref_ptr<osg::Transform>					m_pBackgroundStarTransform;		//!< 背景恒星的变换结点
 		osg::ref_ptr<osg::AutoTransform>				m_pMyWorld_5_AutoTrans;			//!< 5级空间我的世界自动变换结点
 		osg::ref_ptr<osg::AutoTransform>				m_pMyWorld_6_AutoTrans;			//!< 6级空间我的世界自动变换结点
-		osg::ref_ptr<osg::AutoTransform>				m_pSupernovaTransform;			//!< 超新星的变换结点
+		osg::ref_ptr<osg::Switch>						m_pHandleSwitch;				//!< 把手的开关结点
+
+		unsigned int									m_iPlayingAudioUID;				//!< 激活的音频星的UID
 		SGMAudioCoord									m_vPlayingAudioCoord;			//!< 激活的音频星的音频空间坐标
-		osg::Vec3d										m_vPlayingStarWorldPos;			//!< 激活的音频星世界空间坐标
-		osg::ref_ptr<osg::Geode>						m_pGeodeHelpLine;				//!< 辅助修改音频坐标的线Geode	
+		osg::Vec3d										m_vPlayingStarWorld4Pos;		//!< 激活的音频星4级世界空间坐标
+		osg::Vec3d										m_vNearStarWorld4Pos;			//!< 最近恒星4级世界空间位置
+		osg::Vec3d										m_vMouseWorldPos;				//!< 鼠标世界空间坐标
+		osg::Vec3d										m_vMouseLastWorldPos;			//!< 鼠标上一帧世界空间坐标
+		osg::Matrixd									m_mLastVP;						//!< 上一帧Raymarch相机的ViewProjectionMatrix
+
+		osg::ref_ptr<osg::Geode>						m_pGeodeRegion;					//!< 音频区域Geode	
 		osg::ref_ptr<osg::Geode>						m_pGeodeAudio;					//!< 未激活的音频星Geode
-		osg::ref_ptr<osg::Geode>						m_pGeodeSun_2;					//!< 第2层级太阳Geode
-		osg::ref_ptr<osg::Geode>						m_pGeodePlanets_2;				//!< 第2层级行星点精灵Geode
-		osg::ref_ptr<osg::Geode>						m_pGeodePlanetsLine_2;			//!< 第2层级行星轨道线Geode
-		osg::ref_ptr<osg::Geode>						m_pGeodePlanets_3;				//!< 第3层级行星点精灵Geode
-		osg::ref_ptr<osg::Geode>						m_pGeodePlanetsLine_3;			//!< 第3层级行星轨道线Geode
-		osg::ref_ptr<osg::Geode>						m_pOortCloudGeode_3;			//!< 第3层级奥尔特云Geode
-		osg::ref_ptr<osg::Geode>						m_pGeodeStarCube;				//!< 第3层级恒星盒的Geode
 		osg::ref_ptr<osg::Geode>						m_pGeodePointsN_4;				//!< 第4层级N倍点星星的Geode
 		osg::ref_ptr<osg::Geode>						m_pGeodeStarCube_4;				//!< 第4层级恒星盒的Geode
 		osg::ref_ptr<osg::Geode>						m_pGeodeGalaxyGroup_4;			//!< 第4层级星系群的Geode
@@ -611,30 +709,28 @@ namespace GM
 		osg::ref_ptr<osg::Geode>						m_pGeodeUltracluster;			//!< 究极星系团的Geode
 		osg::ref_ptr<osg::Geode>						m_pGeodeMyWorld_5;				//!< 我的5级世界的Geode
 		osg::ref_ptr<osg::Geode>						m_pGeodeMyWorld_6;				//!< 我的6级世界的Geode
-		osg::ref_ptr<osg::Geode>						m_pGalaxyBackgroundGeode;		//!< 银河系背景的Geode
 		osg::ref_ptr<osg::Geode>						m_pCosmosBoxGeode;				//!< 宇宙盒的Geode
 		osg::ref_ptr<osg::StateSet>						m_pStateSetGalaxy;				//!< 点模式星系的状态集
 		osg::ref_ptr<osg::StateSet>						m_pStateSetPlayingAudio;		//!< 激活的音频星状态集
-		osg::ref_ptr<osg::StateSet>						m_pStateSetPlane;				//!< 银河盘面的状态集	
+		osg::ref_ptr<osg::StateSet>						m_pStateSetPlane;				//!< 银河盘面的状态集
+
 		osg::ref_ptr<osg::Uniform>						m_pMousePosUniform;				//!< 鼠标的世界空间坐标Uniform
-		osg::ref_ptr<osg::Uniform>						m_pStarHiePosUniform;			//!< 激活的音频星的当前空间坐标Uniform
-		osg::ref_ptr<osg::Uniform>						m_pStarAudioPosUniform;			//!< 当前激活的音频空间坐标Uniform
-		osg::ref_ptr<osg::Uniform>						m_pTimesUniform;				//!< 时间Uniform
-		osg::ref_ptr<osg::Uniform>						m_pStarColorUniform;			//!< 当前颜色Uniform
-		osg::ref_ptr<osg::Uniform>						m_pLevelArrayUniform;			//!< 振幅数组Uniform
+		osg::ref_ptr<osg::Uniform>						m_pAudioUVUniform;				//!< 当前音频在区域内的UV
 		osg::ref_ptr<osg::Uniform>						m_pGalaxyRadiusUniform;			//!< 第4层级单位下星系半径Uniform
 		osg::ref_ptr<osg::Uniform>						m_pEyePos4Uniform;				//!< 第4层级眼点坐标Uniform
+		osg::ref_ptr<osg::Uniform>						m_fGalaxyHeightUniform;			//!< 星系的单边高度Uniform
 		osg::ref_ptr<osg::Uniform>						m_pStarsCubeInfoUniform;		//!< cube恒星传入参数Uniform
-		osg::ref_ptr<osg::Uniform>						m_pCubeCenterUniform;			//!< 3层级cube星中心偏移Uniform
+		osg::ref_ptr<osg::Uniform>						m_pCubeCenterUniform;			//!< 第3层级cube恒星中心偏移
 		osg::ref_ptr<osg::Uniform>						m_pShapeUVWUniform;				//!< 三维噪声UVW系数的Uniform
-		osg::ref_ptr<osg::Uniform>						m_pStarAlphaUniform;			//!< 远处恒星的alpha的Uniform
-		osg::ref_ptr<osg::Uniform>						m_pGalaxiesAlphaUniform;		//!< 远处星系的alpha的Uniform
+		osg::ref_ptr<osg::Uniform>						m_fStarAlphaUniform;			//!< 远处恒星的alpha的Uniform
+		osg::ref_ptr<osg::Uniform>						m_fGalaxiesAlphaUniform;		//!< 远处星系的alpha的Uniform
 		osg::ref_ptr<osg::Uniform>						m_pGalaxiesInfoUniform;			//!< cube星系传入参数Uniform
-		osg::ref_ptr<osg::Uniform>						m_pSupernovaLightUniform;		//!< 控制超新星的亮度的Uniform
-		osg::ref_ptr<osg::Uniform>						m_pStarDistanceUniform;			//!< 控制0123层级的恒星的最远距离Uniform
-		osg::ref_ptr<osg::Uniform>						m_pUnitRatioUniform;			//!< 当前层级与第3层级的单位比例Uniform
-		osg::ref_ptr<osg::Uniform>						m_pMyWorldAlphaUniform;			//!< 我的世界的alpha的Uniform
+		osg::ref_ptr<osg::Uniform>						m_fStarDistanceUniform;			//!< 控制0123层级的恒星的最远距离
+		osg::ref_ptr<osg::Uniform>						m_fMyWorldAlphaUniform;			//!< 我的世界的alpha的Uniform
+
+		osg::ref_ptr<osgDB::Options>					m_pDDSOptions;					//!< dds的纹理操作
 		osg::ref_ptr<osg::Texture>						m_pGalaxyColorTex;				//!< 银河系颜色和alpha纹理
+		osg::ref_ptr<osg::Texture>						m_3DShapeTex;					//!< 三维无缝shape噪声，RGBA，128^3
 		osg::ref_ptr<osg::Texture2DArray>				m_pGalaxiesTex;					//!< 星系纹理数组
 		osg::ref_ptr<osg::Vec4Array>					m_pSphereVertArray;				//!< sphere点模式恒星顶点
 		osg::ref_ptr<osg::Vec4Array>					m_pSphereColorArray;			//!< sphere点模式恒星颜色
@@ -646,21 +742,17 @@ namespace GM
 		osg::ref_ptr<CCosmosBox>						m_pCosmosBoxNode;				//!< 宇宙盒结点，有裁剪回调
 		osg::ref_ptr<osg::Vec4Array>					m_pGalaxiesInfo;				//!< 星系旋转枚举(0123)和纹理编号
 		std::vector<osg::ref_ptr<osg::Geometry>>		m_pGalaxiesGeomVector;			//!< 星系几何体容器
-		osg::ref_ptr<osg::Vec3Array>					m_pPlanetLineVerts_2;			//!< 第2层级行星轨迹线顶点数组
-		osg::ref_ptr<osg::Vec3Array>					m_pPlanetLineCoords_2;			//!< 第2层级行星轨迹线UVW数组
-		osg::ref_ptr<osg::DrawElementsUShort>			m_pPlanetLineElement_2;			//!< 第2层级行星轨迹线元素
-		osg::ref_ptr<osg::Vec3Array>					m_pPlanetLineVerts_3;			//!< 第3层级行星轨迹线顶点数组
-		osg::ref_ptr<osg::Vec3Array>					m_pPlanetLineCoords_3;			//!< 第3层级行星轨迹线UVW数组
-		osg::ref_ptr<osg::DrawElementsUShort>			m_pPlanetLineElement_3;			//!< 第3层级行星轨迹线元素
-		osg::ref_ptr<osg::Vec4Array>					m_pPlanetVertArray_2;			//!< 第2层级行星顶点数组
-		osg::ref_ptr<osg::DrawElementsUShort>			m_pPlanetElement_2;				//!< 第2层级行星元素
-		osg::ref_ptr<osg::Vec4Array>					m_pPlanetVertArray_3;			//!< 第3层级行星顶点数组
-		osg::ref_ptr<osg::DrawElementsUShort>			m_pPlanetElement_3;				//!< 第3层级行星元素
-
-		int												m_iPlanetCount;					//!< 行星数量计数器
-
+				
+		float											m_fArrowAngle;					//!< 指示箭头的旋转角度，弧度
+		float											m_fPRPA;						//!< +Radius+Angle锐角平均值，弧度
+		EGMArrowDir										m_eArrowDir;					//!< 箭头方向枚举
 		bool											m_bEdit;						//!< 是否开启编辑模式
+		bool											m_bHandleHover;					//!< 抓手是否处于悬浮状态
 		bool											m_bCapture;						//!< 是否开启捕捉模式
 		bool											m_bWelcome;						//!< 是否启用欢迎功能
+		std::default_random_engine						m_iRandom;						//!< 随机值
+
+		CGMMilkyWay*									m_pMilkyWay;					//!< 银河系的体渲染模块
+		CGMSolar*										m_pSolarSystem;					//!< 太阳系模块
 	};
 }	// GM

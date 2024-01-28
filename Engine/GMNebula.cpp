@@ -12,6 +12,7 @@
 
 #include "GMNebula.h"
 #include "GMKit.h"
+#include "GMEngine.h"
 
 #include <osg/BlendFunc>
 #include <osg/CullFace>
@@ -25,38 +26,15 @@ using namespace GM;
 CGMNebula Methods
 *************************************************************************/
 
-class NebulaResizeEventHandler : public osgGA::GUIEventHandler
-{
-public:
-	NebulaResizeEventHandler(CGMNebula*	pNebula)
-		: _pNebula(pNebula) {}
-
-	bool handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter&)
-	{
-		if (ea.getEventType() == osgGA::GUIEventAdapter::RESIZE)
-		{
-			int vp_Width = ea.getWindowWidth();
-			int vp_Height = ea.getWindowHeight();
-			if (_pNebula)
-			{
-				_pNebula->ResizeScreen(vp_Width, vp_Height);
-			}
-			return true;
-		}
-		return false;
-	}
-private:
-	CGMNebula* _pNebula = nullptr;
-};
-
 /** @brief 构造 */
-CGMNebula::CGMNebula()
-	: CGMVolumeBasic()
-	, m_strNebulaShaderPath("Shaders/NebulaShader/"), m_strCoreNebulaTexPath("Textures/Nebula/")
-	, m_iUnitRayMarch(2), m_iUnitFinal(1), m_dTimeLastFrame(0.0), m_vLastShakeVec(osg::Vec2f(0.0f,0.0f))
-	, m_vDeltaShakeUniform(new osg::Uniform("deltaShakeVec", osg::Vec2f(0.0f, 0.0f)))
-	, m_fCountUniform(new osg::Uniform("countNum", 0.0f))
-	, m_pDeltaVPMatrixUniform(new osg::Uniform("deltaViewProjMatrix", osg::Matrixf()))
+CGMNebula::CGMNebula(): CGMVolumeBasic(),
+	m_strNebulaShaderPath("Shaders/NebulaShader/"), m_strCoreNebulaTexPath("Textures/Nebula/"),
+	m_vWorldEyePos(osg::Vec3d(10.0, 0.0, 0.0)), m_dTimeLastFrame(0.0),
+	m_fGalaxyAlphaUniform(new osg::Uniform("galaxyAlpha", 1.0f)),
+	m_vStarHiePosUniform(new osg::Uniform("starWorldPos", osg::Vec3f(0.0f, 0.0f, 0.0f))),
+	m_eVolumeState(EGM_VS_Galaxy),
+	m_mDeltaVPMatrixUniform(new osg::Uniform("deltaViewProjMatrix", osg::Matrixf())),
+	m_fOortVisibleUniform(new osg::Uniform("oortVisible", 1.0f))
 {
 }
 
@@ -66,13 +44,39 @@ CGMNebula::~CGMNebula()
 }
 
 /** @brief 初始化 */
-bool CGMNebula::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData)
+bool CGMNebula::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCommonUniform* pCommonUniform)
 {
-	CGMVolumeBasic::Init(pKernelData, pConfigData);
+	CGMVolumeBasic::Init(pKernelData, pConfigData, pCommonUniform);
 
-	m_3DShapeTex_128 = _Load3DShapeNoise();
+	m_3DShapeTex = _Load3DShapeNoise();
 	m_3DErosionTex = _Load3DErosionNoise();
-	m_2DNoiseTex = _CreateTexture2D(m_pConfigData->strCorePath + m_strCoreNebulaTexPath + "2DNoise.jpg", 3);
+	m_2DNoiseTex = _CreateTexture2D(m_pConfigData->strCorePath + m_strCoreNebulaTexPath + "2DNoise.tga", 4);
+
+	if (EGMRENDER_LOW != pConfigData->eRenderQuality)
+	{
+		m_distanceMap = new osg::Texture2D;
+		m_distanceMap->setName("distanceMap");
+		m_distanceMap->setTextureSize(pConfigData->iScreenWidth / 2, pConfigData->iScreenHeight / 2);
+		m_distanceMap->setInternalFormat(GL_RGBA8);
+		m_distanceMap->setSourceFormat(GL_RGBA);
+		m_distanceMap->setSourceType(GL_UNSIGNED_BYTE);
+		m_distanceMap->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+		m_distanceMap->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+		m_distanceMap->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+		m_distanceMap->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+		m_distanceMap->setDataVariance(osg::Object::DYNAMIC);
+		m_distanceMap->setResizeNonPowerOfTwoHint(false);
+
+		m_pSsOortDecFace = new osg::StateSet();
+		m_pSsOortDecEdge = new osg::StateSet();
+		m_pSsOortDecVert = new osg::StateSet();
+		_InitOortStateSet(m_pSsOortDecFace.get(), "OortFace");
+		_InitOortStateSet(m_pSsOortDecEdge.get(), "OortEdge");
+		_InitOortStateSet(m_pSsOortDecVert.get(), "OortVert");
+		m_pSsOortDecEdge->setDefine("RAYS_2", osg::StateAttribute::ON);
+		m_pSsOortDecVert->setDefine("RAYS_2", osg::StateAttribute::ON);
+		m_pSsOortDecVert->setDefine("RAYS_3", osg::StateAttribute::ON);
+	}
 
 	return true;
 }
@@ -80,99 +84,107 @@ bool CGMNebula::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData)
 /** @brief 更新 */
 bool CGMNebula::Update(double dDeltaTime)
 {
+	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return true;
+
+	if (4 == m_pKernelData->iHierarchy)
+	{
+		double fDistance = GM_ENGINE.GetHierarchyTargetDistance();
+		if (fDistance > 0.01)
+		{
+			if (EGM_VS_Galaxy != m_eVolumeState)
+			{
+				m_eVolumeState = EGM_VS_Galaxy;
+				m_pDodecahedronFace->setStateSet(m_pSsMilkyWayDecFace.get());
+				m_pDodecahedronEdge->setStateSet(m_pSsMilkyWayDecEdge.get());
+				m_pDodecahedronVert->setStateSet(m_pSsMilkyWayDecVert.get());
+			}
+		}
+		else
+		{
+			if (EGM_VS_Oort != m_eVolumeState)
+			{
+				m_eVolumeState = EGM_VS_Oort;
+				m_pDodecahedronFace->setStateSet(m_pSsOortDecFace.get());
+				m_pDodecahedronEdge->setStateSet(m_pSsOortDecEdge.get());
+				m_pDodecahedronVert->setStateSet(m_pSsOortDecVert.get());
+			}
+		}
+	}
+
+	CGMVolumeBasic::Update(dDeltaTime);
 	return true;
 }
 
 /** @brief 更新(在主相机更新姿态之后) */
 bool CGMNebula::UpdateLater(double dDeltaTime)
 {
-	if (m_rayMarchCamera.valid() && m_cameraTAA.valid() && m_rayMarchCamera->getCullMask())
+	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality &&
+		m_rayMarchCamera.valid() && m_rayMarchCamera->getNodeMask() &&
+		m_cameraTAA.valid())
 	{
-		double fLeft, fRight, fBottom, fTop, fZNear, fZFar;
-		bool bFrustum = GM_View->getCamera()->getProjectionMatrixAsFrustum(fLeft, fRight, fBottom, fTop, fZNear, fZFar);
-		if (bFrustum)
+		// 修改m_rayMarchCamera的投影矩阵，实现抖动，使最终渲染的分辨率提高四倍
+		osg::Matrixd mMainViewMatrix = GM_View->getCamera()->getViewMatrix();
+		osg::Matrixd mMainProjMatrix = GM_View->getCamera()->getProjectionMatrix();
+		double fFovy, fAspectRatio, fZNear, fZFar;
+		GM_View->getCamera()->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
+
+		osg::Vec3d vWorldEyeCenter, vWorldEyeUpDir;
+		mMainViewMatrix.getLookAt(m_vWorldEyePos, vWorldEyeCenter, vWorldEyeUpDir);
+		// 相机正前方单位向量（世界空间）
+		osg::Vec3d vWorldEyeFrontDir = vWorldEyeCenter - m_vWorldEyePos;
+		vWorldEyeFrontDir.normalize();
+		osg::Vec3d vWorldEyeRightDir = vWorldEyeFrontDir ^ vWorldEyeUpDir;
+		vWorldEyeRightDir.normalize();
+
+		m_vEyeUpDirUniform->set(osg::Vec3f(vWorldEyeUpDir));		// 相机上方向在世界空间下的单位向量
+		m_vEyeRightDirUniform->set(osg::Vec3f(vWorldEyeRightDir));	// 相机右方向在世界空间下的单位向量
+		m_vEyeFrontDirUniform->set(osg::Vec3f(vWorldEyeFrontDir));	// 相机前方向在世界空间下的单位向量
+
+		// 设置 Dodecahedron 的位置
+		osg::Matrixd mPos;
+		osg::Matrixd mMainViewInverseMatrix = osg::Matrixd::inverse(mMainViewMatrix);
+		mPos.setTrans(mMainViewInverseMatrix.getTrans());
+		m_pDodecahedronTrans->setMatrix(mPos);
+
+		osg::Matrixd VP = mMainViewMatrix*mMainProjMatrix;
+		SetPixelLength(fFovy, m_iScreenHeight);
+
+		m_rayMarchCamera->setViewMatrix(mMainViewMatrix);
+		m_rayMarchCamera->setProjectionMatrix(mMainProjMatrix);
+
+		osg::Matrixf mInvProjMatrix = osg::Matrixd::inverse(mMainProjMatrix);
+		m_mMainInvProjUniform->set(mInvProjMatrix);
+
+		int iHie = m_pKernelData->iHierarchy;
+		if (4 == iHie)
 		{
-			unsigned int iShakeCount = GetShakeCount();
-			m_fCountUniform->set(float(iShakeCount));
-
-			unsigned int iAttribute = osg::StateAttribute::ON | osg::StateAttribute::PROTECTED;
-			if (iShakeCount % 2)
-			{
-				m_stateSetRayMarch->setTextureAttributeAndModes(0, m_rayMarchMap_0.get(), iAttribute);
-				m_stateSetRayMarch->setTextureAttributeAndModes(1, m_vectorMap_0.get(), iAttribute);
-				m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_rayMarchMap_1.get());
-				m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_vectorMap_1.get());
-				m_rayMarchCamera->dirtyAttachmentMap();
-
-				m_statesetTAA->setTextureAttributeAndModes(0, m_TAAMap_0.get(), iAttribute);
-				m_statesetTAA->setTextureAttributeAndModes(1, m_TAADistanceMap_0.get(), iAttribute);
-				m_statesetTAA->setTextureAttributeAndModes(m_iUnitColor, m_rayMarchMap_1.get(), iAttribute);
-				m_statesetTAA->setTextureAttributeAndModes(m_iUnitVelocity, m_vectorMap_1.get(), iAttribute);
-
-				m_cameraTAA->attach(osg::Camera::COLOR_BUFFER0, m_TAAMap_1.get());
-				m_cameraTAA->attach(osg::Camera::COLOR_BUFFER1, m_TAADistanceMap_1.get());
-				m_cameraTAA->dirtyAttachmentMap();
-
-				m_stateSetFinal->setTextureAttributeAndModes(0, m_TAAMap_1.get(), iAttribute);
-			}
-			else
-			{
-				m_stateSetRayMarch->setTextureAttributeAndModes(0, m_rayMarchMap_1.get(), iAttribute);
-				m_stateSetRayMarch->setTextureAttributeAndModes(1, m_vectorMap_1.get(), iAttribute);
-				m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_rayMarchMap_0.get());
-				m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_vectorMap_0.get());
-				m_rayMarchCamera->dirtyAttachmentMap();
-
-				m_statesetTAA->setTextureAttributeAndModes(0, m_TAAMap_1.get(), iAttribute);
-				m_statesetTAA->setTextureAttributeAndModes(1, m_TAADistanceMap_1.get(), iAttribute);
-				m_statesetTAA->setTextureAttributeAndModes(m_iUnitColor, m_rayMarchMap_0.get(), iAttribute);
-				m_statesetTAA->setTextureAttributeAndModes(m_iUnitVelocity, m_vectorMap_0.get(), iAttribute);
-				m_cameraTAA->attach(osg::Camera::COLOR_BUFFER0, m_TAAMap_0.get());
-				m_cameraTAA->attach(osg::Camera::COLOR_BUFFER1, m_TAADistanceMap_0.get());
-				m_cameraTAA->dirtyAttachmentMap();
-
-				m_stateSetFinal->setTextureAttributeAndModes(0, m_TAAMap_0.get(), iAttribute);
-			}
-
-			float fShake0, fShake1;
-			GetShakeParameters(fShake0, fShake1);
-
-			osg::Vec2f vShakeVec = osg::Vec2f(fShake0, fShake1);
-			osg::Vec2f vDeltaShake = vShakeVec - m_vLastShakeVec;
-			m_vShakeVectorUniform->set(vShakeVec);
-			m_vDeltaShakeUniform->set(vDeltaShake);
-
-			// 修改m_rayMarchCamera的投影矩阵，实现抖动，使最终渲染的分辨率提高四倍
-			osg::Matrixd mMainViewMatrix = GM_View->getCamera()->getViewMatrix();
-			osg::Matrixd mMainProjMatrix = GM_View->getCamera()->getProjectionMatrix();
-			osg::Matrixd VP = mMainViewMatrix*mMainProjMatrix;
-
-			int iWidth = m_TAAMap_0->getTextureWidth();
-			int iHeight = m_TAAMap_0->getTextureHeight();
-			double fWidthShake = (fRight - fLeft) / double(iWidth);
-			double fHeightShake = (fTop - fBottom) / double(iHeight);
-			double fShakeLeft = fLeft + fShake0 * fWidthShake;
-			double fShakeRight = fRight + fShake0 * fWidthShake;
-			double fShakeBottom = fBottom + fShake1 * fHeightShake;
-			double fShakeTop = fTop + fShake1 * fHeightShake;
-			m_rayMarchCamera->setViewMatrix(mMainViewMatrix);
-			m_rayMarchCamera->setProjectionMatrixAsFrustum(fShakeLeft, fShakeRight, fShakeBottom, fShakeTop, fZNear, fZFar);
-
-			if (m_pDeltaVPMatrixUniform.valid())
-			{
-				// 修改差值矩阵
-				osg::Matrixf deltaVP = osg::Matrixf(
-					VP(0, 0) - m_mLastVP(0, 0), VP(0, 1) - m_mLastVP(0, 1), VP(0, 2) - m_mLastVP(0, 2), VP(0, 3) - m_mLastVP(0, 3),
-					VP(1, 0) - m_mLastVP(1, 0), VP(1, 1) - m_mLastVP(1, 1), VP(1, 2) - m_mLastVP(1, 2), VP(1, 3) - m_mLastVP(1, 3),
-					VP(2, 0) - m_mLastVP(2, 0), VP(2, 1) - m_mLastVP(2, 1), VP(2, 2) - m_mLastVP(2, 2), VP(2, 3) - m_mLastVP(2, 3),
-					VP(3, 0) - m_mLastVP(3, 0), VP(3, 1) - m_mLastVP(3, 1), VP(3, 2) - m_mLastVP(3, 2), VP(3, 3) - m_mLastVP(3, 3)
-				);
-				m_pDeltaVPMatrixUniform->set(deltaVP);
-			}
-
-			m_mLastVP = VP;
-			m_vLastShakeVec = vShakeVec;
+			m_fOortVisibleUniform->set(1.0f);
 		}
+		else if(3 == iHie)
+		{
+			double fDistance = GM_ENGINE.GetHierarchyTargetDistance();
+			float fOortAlpha = 1.0 - exp2(-fDistance*10.0);
+			m_fOortVisibleUniform->set(fOortAlpha);
+		}
+		else
+		{
+			m_fOortVisibleUniform->set(0.0f);
+		}
+
+
+		if (m_mDeltaVPMatrixUniform.valid())
+		{
+			// 修改差值矩阵
+			osg::Matrixf deltaVP = osg::Matrixf(
+				VP(0, 0) - m_mLastVP(0, 0), VP(0, 1) - m_mLastVP(0, 1), VP(0, 2) - m_mLastVP(0, 2), VP(0, 3) - m_mLastVP(0, 3),
+				VP(1, 0) - m_mLastVP(1, 0), VP(1, 1) - m_mLastVP(1, 1), VP(1, 2) - m_mLastVP(1, 2), VP(1, 3) - m_mLastVP(1, 3),
+				VP(2, 0) - m_mLastVP(2, 0), VP(2, 1) - m_mLastVP(2, 1), VP(2, 2) - m_mLastVP(2, 2), VP(2, 3) - m_mLastVP(2, 3),
+				VP(3, 0) - m_mLastVP(3, 0), VP(3, 1) - m_mLastVP(3, 1), VP(3, 2) - m_mLastVP(3, 2), VP(3, 3) - m_mLastVP(3, 3)
+			);
+			m_mDeltaVPMatrixUniform->set(deltaVP);
+		}
+
+		m_mLastVP = VP;
 	}
 
 	CGMVolumeBasic::UpdateLater(dDeltaTime);
@@ -182,24 +194,35 @@ bool CGMNebula::UpdateLater(double dDeltaTime)
 /** @brief 加载 */
 bool CGMNebula::Load()
 {
-	if (m_stateSetRayMarch.valid() && m_stateSetFinal.valid())
+	std::string strNebulaShader = m_pConfigData->strCorePath + m_strNebulaShaderPath;
+
+	if (m_pSsMilkyWayDecFace.valid() && m_pSsMilkyWayDecEdge.valid() && m_pSsMilkyWayDecVert.valid())
 	{
-		std::string strNebulaVertPath = m_pConfigData->strCorePath + m_strNebulaShaderPath + "NebulaVert.glsl";
-		std::string strNebulaFragPath = m_pConfigData->strCorePath + m_strNebulaShaderPath + "NebulaFrag.glsl";
-		CGMKit::LoadShader(m_stateSetRayMarch.get(), strNebulaVertPath, strNebulaFragPath);
-		CGMKit::LoadShader(m_stateSetFinal.get(), strNebulaVertPath, strNebulaFragPath);
+		std::string strVertPath = strNebulaShader + "NebulaVert.glsl";
+		std::string strFragPath = strNebulaShader + "NebulaFrag.glsl";
+		CGMKit::LoadShader(m_pSsMilkyWayDecFace.get(), strVertPath, strFragPath, "NebulaFace");
+		CGMKit::LoadShader(m_pSsMilkyWayDecEdge.get(), strVertPath, strFragPath, "NebulaEdge");
+		CGMKit::LoadShader(m_pSsMilkyWayDecVert.get(), strVertPath, strFragPath, "NebulaVert");
+	}
+	if (m_pSsOortDecFace.valid() && m_pSsOortDecEdge.valid() && m_pSsOortDecVert.valid())
+	{
+		std::string strVertPath = strNebulaShader + "Oort.Vert";
+		std::string strFragPath = strNebulaShader + "Oort.Frag";
+		CGMKit::LoadShader(m_pSsOortDecFace.get(), strVertPath, strFragPath, "OortFace");
+		CGMKit::LoadShader(m_pSsOortDecEdge.get(), strVertPath, strFragPath, "OortEdge");
+		CGMKit::LoadShader(m_pSsOortDecVert.get(), strVertPath, strFragPath, "OortVert");
 	}
 	if (m_statesetTAA.valid())
 	{
 		std::string strTAAVertPath = m_pConfigData->strCorePath + m_strShaderPath + "TAAVert.glsl";
 		std::string strTAAFragPath = m_pConfigData->strCorePath + m_strShaderPath + "TAAFrag.glsl";
-		CGMKit::LoadShader(m_statesetTAA.get(), strTAAVertPath, strTAAFragPath);
+		CGMKit::LoadShader(m_statesetTAA.get(), strTAAVertPath, strTAAFragPath, "TAA");
 	}
 	return true;
 }
 
 // make Nebula for the galaxy
-void CGMNebula::MakeNebula(double fLength, double fWidth, double fHeight, double fX, double fY, double fZ)
+void CGMNebula::MakeMilkyWay(double fLength, double fWidth, double fHeight, double fX, double fY, double fZ)
 {
 	double fUnit = m_pKernelData->fUnitArray->at(4);
 	double fLengthHie = fLength / fUnit;
@@ -214,46 +237,14 @@ void CGMNebula::MakeNebula(double fLength, double fWidth, double fHeight, double
 	m_galaxyTex = _CreateTexture2D(strTexturePath + "milkyWay_color.tga", 4);
 	m_galaxyHeightTex = _CreateTexture2D(strTexturePath + "milkyWay_height.tga", 4);
 
-	osg::ref_ptr<osg::Geometry> pBoxGeom = MakeBoxGeometry(fLengthHie, fWidthHie, fHeightHie);
-	osg::ref_ptr<osg::Geode> pBoxGeode = new osg::Geode();
-	pBoxGeode->addDrawable(pBoxGeom.get());
-	m_nebulaRayMarchTransform = new osg::MatrixTransform();
-	m_nebulaRayMarchTransform->addChild(pBoxGeode.get());
-
-	// First step: create the 1/16 ray marching map
-	int iWidth = 480;
-	int iHeight = 270;
-
-	m_rayMarchMap_0 = new osg::Texture2D;
-	m_rayMarchMap_0->setName("rayMarchMap_0");
-	m_rayMarchMap_0->setTextureSize(iWidth, iHeight);
-	m_rayMarchMap_0->setInternalFormat(GL_RGBA8);
-	m_rayMarchMap_0->setSourceFormat(GL_RGBA);
-	m_rayMarchMap_0->setSourceType(GL_UNSIGNED_BYTE);
-	m_rayMarchMap_0->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_rayMarchMap_0->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_rayMarchMap_0->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_rayMarchMap_0->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_rayMarchMap_0->setDataVariance(osg::Object::DYNAMIC);
-	m_rayMarchMap_0->setResizeNonPowerOfTwoHint(false);
-
-	m_rayMarchMap_1 = new osg::Texture2D;
-	m_rayMarchMap_1->setName("rayMarchMap_1");
-	m_rayMarchMap_1->setTextureSize(iWidth, iHeight);
-	m_rayMarchMap_1->setInternalFormat(GL_RGBA8);
-	m_rayMarchMap_1->setSourceFormat(GL_RGBA);
-	m_rayMarchMap_1->setSourceType(GL_UNSIGNED_BYTE);
-	m_rayMarchMap_1->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_rayMarchMap_1->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_rayMarchMap_1->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_rayMarchMap_1->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_rayMarchMap_1->setDataVariance(osg::Object::DYNAMIC);
-	m_rayMarchMap_1->setResizeNonPowerOfTwoHint(false);
+	// create the ray marching texture
+	int iWidth = 960;
+	int iHeight = 540;
 
 	m_vectorMap_0 = new osg::Texture2D;
 	m_vectorMap_0->setName("vectorMap_0");
 	m_vectorMap_0->setTextureSize(iWidth, iHeight);
-	m_vectorMap_0->setInternalFormat(GL_RGB32F_ARB);
+	m_vectorMap_0->setInternalFormat(GL_RGB16F_ARB);
 	m_vectorMap_0->setSourceFormat(GL_RGB);
 	m_vectorMap_0->setSourceType(GL_FLOAT);
 	m_vectorMap_0->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
@@ -266,7 +257,7 @@ void CGMNebula::MakeNebula(double fLength, double fWidth, double fHeight, double
 	m_vectorMap_1 = new osg::Texture2D;
 	m_vectorMap_1->setName("vectorMap_1");
 	m_vectorMap_1->setTextureSize(iWidth, iHeight);
-	m_vectorMap_1->setInternalFormat(GL_RGB32F_ARB);
+	m_vectorMap_1->setInternalFormat(GL_RGB16F_ARB);
 	m_vectorMap_1->setSourceFormat(GL_RGB);
 	m_vectorMap_1->setSourceType(GL_FLOAT);
 	m_vectorMap_1->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
@@ -276,18 +267,18 @@ void CGMNebula::MakeNebula(double fLength, double fWidth, double fHeight, double
 	m_vectorMap_1->setDataVariance(osg::Object::DYNAMIC);
 	m_vectorMap_1->setResizeNonPowerOfTwoHint(false);
 
-	m_distanceMap = new osg::Texture2D;
-	m_distanceMap->setName("distanceMap");
-	m_distanceMap->setTextureSize(iWidth, iHeight);
-	m_distanceMap->setInternalFormat(GL_RGB32F_ARB);
-	m_distanceMap->setSourceFormat(GL_RGB);
-	m_distanceMap->setSourceType(GL_FLOAT);
-	m_distanceMap->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_distanceMap->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_distanceMap->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_distanceMap->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_distanceMap->setDataVariance(osg::Object::DYNAMIC);
-	m_distanceMap->setResizeNonPowerOfTwoHint(false);
+	m_nebulaTex = new osg::Texture2D;
+	m_nebulaTex->setName("nebulaTex");
+	m_nebulaTex->setTextureSize(iWidth, iHeight);
+	m_nebulaTex->setInternalFormat(GL_RGBA8);
+	m_nebulaTex->setSourceFormat(GL_RGBA);
+	m_nebulaTex->setSourceType(GL_UNSIGNED_BYTE);
+	m_nebulaTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	m_nebulaTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	m_nebulaTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+	m_nebulaTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+	m_nebulaTex->setDataVariance(osg::Object::DYNAMIC);
+	m_nebulaTex->setResizeNonPowerOfTwoHint(false);
 
 	// Create its camera and render to it
 	m_rayMarchCamera = new osg::Camera;
@@ -298,18 +289,29 @@ void CGMNebula::MakeNebula(double fLength, double fWidth, double fHeight, double
 	m_rayMarchCamera->setViewport(0, 0, iWidth, iHeight);
 	m_rayMarchCamera->setRenderOrder(osg::Camera::PRE_RENDER, 1);
 	m_rayMarchCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
-	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_rayMarchMap_0.get());
-	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_vectorMap_0.get());
+	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_vectorMap_0.get());
+	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_nebulaTex.get());
 	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER2, m_distanceMap.get());
 	m_rayMarchCamera->setAllowEventFocus(false);
 	m_rayMarchCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
-	m_rayMarchCamera->addChild(m_nebulaRayMarchTransform.get());
 
-	m_stateSetRayMarch = pBoxGeode->getOrCreateStateSet();
-	m_stateSetRayMarch->setMode(GL_BLEND, osg::StateAttribute::ON);
-	m_stateSetRayMarch->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	m_stateSetRayMarch->setAttributeAndModes(new osg::CullFace());
-	m_stateSetRayMarch->setDefine("RAYMARCHING", osg::StateAttribute::ON);
+	// Raymarch交换buffer的回调函数指针
+	SwitchFBOCallback* pRaymarchFBOCallback = new SwitchFBOCallback(m_vectorMap_1.get(), m_vectorMap_0.get());
+	m_rayMarchCamera->setPostDrawCallback(pRaymarchFBOCallback);
+
+	GM_Root->addChild(m_rayMarchCamera.get());
+
+	// 正十二面体方法绘制的星云
+	osg::Geometry* pDodecahedronFaceGeom = nullptr;
+	osg::Geometry* pDodecahedronEdgeGeom = nullptr;
+	osg::Geometry* pDodecahedronVertGeom = nullptr;
+
+	CreatePlatonicSolids(&pDodecahedronFaceGeom, &pDodecahedronEdgeGeom, &pDodecahedronVertGeom);
+
+	// make the transform of Dodecahedron :
+	m_pDodecahedronTrans = new osg::MatrixTransform();
+	m_pDodecahedronTrans->setMatrix(osg::Matrixd());
+	m_rayMarchCamera->addChild(m_pDodecahedronTrans.get());
 
 	SGMVolumeRange sVR;
 	sVR.fXMin = fXHie - fLengthHie * 0.5;
@@ -319,113 +321,33 @@ void CGMNebula::MakeNebula(double fLength, double fWidth, double fHeight, double
 	sVR.fZMin = fZHie - fHeightHie * 0.5;
 	sVR.fZMax = fZHie + fHeightHie * 0.5;
 
-	osg::Vec3f vRangeMin = osg::Vec3f(sVR.fXMin, sVR.fYMin, sVR.fZMin);
-	osg::ref_ptr<osg::Uniform> pRangeMin = new osg::Uniform("rangeMin", vRangeMin);
-	m_stateSetRayMarch->addUniform(pRangeMin.get());
-	osg::Vec3f vRangeMax = osg::Vec3f(sVR.fXMax, sVR.fYMax, sVR.fZMax);
-	osg::ref_ptr<osg::Uniform> pRangeMax = new osg::Uniform("rangeMax", vRangeMax);
-	m_stateSetRayMarch->addUniform(pRangeMax.get());
+	m_pDodecahedronFace = new osg::Geode();
+	m_pDodecahedronFace->addDrawable(pDodecahedronFaceGeom);
+	m_pDodecahedronTrans->addChild(m_pDodecahedronFace.get());
+	m_pSsMilkyWayDecFace = new osg::StateSet();
+	_InitMilkyWayStateSet(m_pSsMilkyWayDecFace.get(), sVR, "NebulaFace");
+	m_pDodecahedronFace->setStateSet(m_pSsMilkyWayDecFace.get());
 
-	m_stateSetRayMarch->addUniform(m_pDeltaVPMatrixUniform.get());
-	m_stateSetRayMarch->addUniform(m_fCountUniform.get());
-	m_stateSetRayMarch->addUniform(m_fNoiseNumUniform.get());
-	m_stateSetRayMarch->addUniform(m_vScreenSizeUniform.get());
-	m_stateSetRayMarch->addUniform(m_vDeltaShakeUniform.get());
+	m_pDodecahedronEdge = new osg::Geode();
+	m_pDodecahedronEdge->addDrawable(pDodecahedronEdgeGeom);
+	m_pDodecahedronTrans->addChild(m_pDodecahedronEdge.get());
+	m_pSsMilkyWayDecEdge = new osg::StateSet();
+	_InitMilkyWayStateSet(m_pSsMilkyWayDecEdge.get(), sVR, "NebulaEdge");
+	m_pSsMilkyWayDecEdge->setDefine("RAYS_2", osg::StateAttribute::ON);
+	m_pDodecahedronEdge->setStateSet(m_pSsMilkyWayDecEdge.get());
 
-	m_stateSetRayMarch->setTextureAttributeAndModes(0, m_rayMarchMap_1.get());
-	m_stateSetRayMarch->addUniform(new osg::Uniform("lastRayMarchTex", 0));
-	m_stateSetRayMarch->setTextureAttributeAndModes(1, m_vectorMap_1.get());
-	m_stateSetRayMarch->addUniform(new osg::Uniform("lastVectorTex", 1));
+	m_pDodecahedronVert = new osg::Geode();
+	m_pDodecahedronVert->addDrawable(pDodecahedronVertGeom);
+	m_pDodecahedronTrans->addChild(m_pDodecahedronVert.get());
+	m_pSsMilkyWayDecVert = new osg::StateSet();
+	_InitMilkyWayStateSet(m_pSsMilkyWayDecVert.get(), sVR, "NebulaVert");
+	m_pSsMilkyWayDecVert->setDefine("RAYS_2", osg::StateAttribute::ON);
+	m_pSsMilkyWayDecVert->setDefine("RAYS_3", osg::StateAttribute::ON);
+	m_pDodecahedronVert->setStateSet(m_pSsMilkyWayDecVert.get());
 
-	m_stateSetRayMarch->setTextureAttributeAndModes(m_iUnitRayMarch, m_galaxyTex.get());
-	m_stateSetRayMarch->addUniform(new osg::Uniform("galaxyTex", m_iUnitRayMarch));
-	m_iUnitRayMarch++;
-	m_stateSetRayMarch->setTextureAttributeAndModes(m_iUnitRayMarch, m_galaxyHeightTex.get());
-	m_stateSetRayMarch->addUniform(new osg::Uniform("galaxyHeightTex", m_iUnitRayMarch));
-	m_iUnitRayMarch++;
-	m_stateSetRayMarch->setTextureAttributeAndModes(m_iUnitRayMarch, m_2DNoiseTex.get());
-	m_stateSetRayMarch->addUniform(new osg::Uniform("noise2DTex", m_iUnitRayMarch));
-	m_iUnitRayMarch++;
-	m_stateSetRayMarch->setTextureAttributeAndModes(m_iUnitRayMarch, m_blueNoiseTex.get());
-	m_stateSetRayMarch->addUniform(new osg::Uniform("blueNoiseSampler", m_iUnitRayMarch));
-	m_iUnitRayMarch++;
-	m_stateSetRayMarch->setTextureAttributeAndModes(m_iUnitRayMarch, _Load3DCurlNoise());
-	m_stateSetRayMarch->addUniform(new osg::Uniform("noiseCurlTex", m_iUnitRayMarch));
-	m_iUnitRayMarch++;
-	m_stateSetRayMarch->setTextureAttributeAndModes(m_iUnitRayMarch, m_3DShapeTex_128.get());
-	m_stateSetRayMarch->addUniform(new osg::Uniform("noiseShapeTex", m_iUnitRayMarch));
-	m_iUnitRayMarch++;
-	m_stateSetRayMarch->setTextureAttributeAndModes(m_iUnitRayMarch, m_3DErosionTex.get());
-	m_stateSetRayMarch->addUniform(new osg::Uniform("noiseErosionTex", m_iUnitRayMarch));
-	m_iUnitRayMarch++;
-
-	std::string strNebulaVertPath = m_pConfigData->strCorePath + m_strNebulaShaderPath + "NebulaVert.glsl";
-	std::string strNebulaFragPath = m_pConfigData->strCorePath + m_strNebulaShaderPath + "NebulaFrag.glsl";
-	CGMKit::LoadShader(m_stateSetRayMarch.get(), strNebulaVertPath, strNebulaFragPath);
-
-	m_pHierarchyRootVector.at(4)->addChild(m_rayMarchCamera.get());
-
-	/////////////////////
-	// Second step: get and mix the last frame by TAA(temporal anti-aliasing)
+	// get and mix the last frame by TAA(temporal anti-aliasing)
 	// Add texture to TAA board,and active TAA
-	ActiveTAA(m_rayMarchMap_0.get(), m_vectorMap_0.get(), m_distanceMap.get());
-
-	/////////////////////
-	// Third step: render the final cloud texture
-	osg::ref_ptr<osg::Geode> geode = new osg::Geode();
-	geode->addDrawable(pBoxGeom.get());
-	m_nebulaRayMarchTransform = new osg::MatrixTransform();
-	m_nebulaRayMarchTransform->addChild(geode.get());
-	//m_nebulaRayMarchTransform->addChild(osgDB::readNodeFile(m_pConfigData->strMediaPath + "Models/test_1.fbx"));
-	m_pHierarchyRootVector.at(4)->addChild(m_nebulaRayMarchTransform.get());
-
-	// configure the state set:
-	m_stateSetFinal = geode->getOrCreateStateSet();
-	m_stateSetFinal->setAttributeAndModes(new osg::BlendFunc());
-	m_stateSetFinal->setMode(GL_BLEND, osg::StateAttribute::ON);
-	m_stateSetFinal->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	m_stateSetFinal->setAttributeAndModes(new osg::CullFace());
-	m_stateSetFinal->setRenderBinDetails(BIN_NEBULA, "DepthSortedBin");
-	m_stateSetFinal->setDefine("RAYMARCHING", osg::StateAttribute::OFF);
-
-	m_stateSetFinal->addUniform(pRangeMin.get());
-	m_stateSetFinal->addUniform(pRangeMax.get());
-	m_stateSetFinal->addUniform(m_vScreenSizeUniform.get());
-
-	m_stateSetFinal->setTextureAttributeAndModes(0, m_TAAMap_0.get());
-	m_stateSetFinal->addUniform(new osg::Uniform("TAATex", 0));
-
-	m_stateSetFinal->setTextureAttributeAndModes(m_iUnitFinal, m_galaxyTex.get());
-	m_stateSetFinal->addUniform(new osg::Uniform("galaxyTex", m_iUnitFinal));
-	m_iUnitFinal++;
-
-	CGMKit::LoadShader(m_stateSetFinal.get(), strNebulaVertPath, strNebulaFragPath);
-
-	GM_View->addEventHandler(new NebulaResizeEventHandler(this));
-}
-
-/** @brief: Show or hide the Nebula*/
-void
-CGMNebula::SetNebulaEnabled(const bool bEnable)
-{
-	unsigned int iMask = bEnable ? ~0 : 0;
-
-	if (m_rayMarchCamera.valid())
-	{
-		m_rayMarchCamera->setCullMask(iMask);
-	}
-}
-
-/** @brief Get the No.0 switching texture for TAA */
-osg::Texture2D* CGMNebula::GetTAAMap_0()
-{
-	return m_TAAMap_0.get();
-}
-
-/** @brief Get the No.1switching texture for TAA */
-osg::Texture2D* CGMNebula::GetTAAMap_1()
-{
-	return m_TAAMap_1.get();
+	ActiveTAA(m_nebulaTex.get(), m_vectorMap_0.get());
 }
 
 /**
@@ -438,22 +360,19 @@ osg::Texture2D* CGMNebula::GetTAAMap_1()
 */
 void CGMNebula::ResizeScreen(const int width, const int height)
 {
-	float fRTTRatio = m_bHigh ? 0.5f : 0.25f;
-	int iW = std::ceil(fRTTRatio*width);
-	int iH = std::ceil(fRTTRatio*height);
+	int iW = std::ceil(0.5*width);
+	int iH = std::ceil(0.5*height);
 	if (m_rayMarchCamera.valid())
 	{
 		m_rayMarchCamera->resize(iW, iH);
-
-		m_rayMarchMap_0->setTextureSize(iW, iH);
-		m_rayMarchMap_0->dirtyTextureObject();
-		m_rayMarchMap_1->setTextureSize(iW, iH);
-		m_rayMarchMap_1->dirtyTextureObject();
 
 		m_vectorMap_0->setTextureSize(iW, iH);
 		m_vectorMap_0->dirtyTextureObject();
 		m_vectorMap_1->setTextureSize(iW, iH);
 		m_vectorMap_1->dirtyTextureObject();
+
+		m_nebulaTex->setTextureSize(iW, iH);
+		m_nebulaTex->dirtyTextureObject();
 
 		m_distanceMap->setTextureSize(iW, iH);
 		m_distanceMap->dirtyTextureObject();
@@ -461,7 +380,39 @@ void CGMNebula::ResizeScreen(const int width, const int height)
 	CGMVolumeBasic::ResizeScreen(width, height);
 }
 
-osg::Geometry* CGMNebula::MakeSphereGeometry(float fRadius, int iLatSegment)
+bool CGMNebula::UpdateHierarchy(int iHieNew)
+{
+	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
+	{
+		if (4 == iHieNew || 3 == iHieNew)
+		{
+			if (0 == m_rayMarchCamera->getNodeMask())
+				m_rayMarchCamera->setNodeMask(~0);
+
+			if (3 == iHieNew)
+			{
+				m_pSsOortDecFace->setDefine("LOW_HIERARCHY", osg::StateAttribute::ON);
+				m_pSsOortDecEdge->setDefine("LOW_HIERARCHY", osg::StateAttribute::ON);
+				m_pSsOortDecVert->setDefine("LOW_HIERARCHY", osg::StateAttribute::ON);
+			}
+			else
+			{
+				m_pSsOortDecFace->setDefine("LOW_HIERARCHY", osg::StateAttribute::OFF);
+				m_pSsOortDecEdge->setDefine("LOW_HIERARCHY", osg::StateAttribute::OFF);
+				m_pSsOortDecVert->setDefine("LOW_HIERARCHY", osg::StateAttribute::OFF);
+			}
+		}
+		else
+		{
+			if (0 != m_rayMarchCamera->getNodeMask())
+				m_rayMarchCamera->setNodeMask(0);
+		}
+	}
+
+	return false;
+}
+
+osg::Geometry* CGMNebula::MakeSphereGeometry(const float fRadius, const int iLatSegment) const
 {
 	int iLonSegment = 2 * iLatSegment;
 
@@ -528,7 +479,10 @@ osg::Geometry* CGMNebula::MakeSphereGeometry(float fRadius, int iLatSegment)
 	return geom;
 }
 
-osg::Geometry* CGMNebula::MakeBoxGeometry(float fLength, float fWidth, float fHeight)
+osg::Geometry* CGMNebula::MakeBoxGeometry(
+	const float fLength,
+	const float fWidth,
+	const float fHeight) const
 {
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
@@ -615,11 +569,11 @@ osg::Geometry* CGMNebula::MakeBoxGeometry(float fLength, float fWidth, float fHe
 	return geom;
 }
 
-osg::Texture* CGMNebula::_Load3DShapeNoise()
+osg::Texture* CGMNebula::_Load3DShapeNoise() const
 {
-	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreTexturePath + "noiseShape128.raw";
+	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreTexturePath + "noiseShape.raw";
 	osg::ref_ptr<osg::Image> shapeImg = osgDB::readImageFile(strTexturePath);
-	shapeImg->setImage(128, 128, 128, GL_R8, GL_RED, GL_UNSIGNED_BYTE, shapeImg->data(), osg::Image::NO_DELETE);
+	shapeImg->setImage(128, 128, 128, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, shapeImg->data(), osg::Image::NO_DELETE);
 	osg::Texture3D* tex3d = new osg::Texture3D;
 	tex3d->setImage(shapeImg.get());
 	tex3d->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
@@ -627,18 +581,18 @@ osg::Texture* CGMNebula::_Load3DShapeNoise()
 	tex3d->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
 	tex3d->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
 	tex3d->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-	tex3d->setInternalFormat(GL_R8);
-	tex3d->setSourceFormat(GL_RED);
+	tex3d->setInternalFormat(GL_RGBA8);
+	tex3d->setSourceFormat(GL_RGBA);
 	tex3d->setSourceType(GL_UNSIGNED_BYTE);
 	tex3d->allocateMipmapLevels();
 	return tex3d;
 }
 
-osg::Texture* CGMNebula::_Load3DErosionNoise()
+osg::Texture* CGMNebula::_Load3DErosionNoise() const
 {
 	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreTexturePath + "noiseErosion.raw";
 	osg::Image* img = osgDB::readImageFile(strTexturePath);
-	img->setImage(32, 32, 32, GL_R8, GL_RED, GL_UNSIGNED_BYTE, img->data(), osg::Image::NO_DELETE);
+	img->setImage(32, 32, 32, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE, img->data(), osg::Image::NO_DELETE);
 	osg::Texture3D* tex3d = new osg::Texture3D;
 	tex3d->setImage(img);
 	tex3d->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
@@ -646,14 +600,14 @@ osg::Texture* CGMNebula::_Load3DErosionNoise()
 	tex3d->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
 	tex3d->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
 	tex3d->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-	tex3d->setInternalFormat(GL_R8);
-	tex3d->setSourceFormat(GL_RED);
+	tex3d->setInternalFormat(GL_RGB8);
+	tex3d->setSourceFormat(GL_RGB);
 	tex3d->setSourceType(GL_UNSIGNED_BYTE);
 	tex3d->allocateMipmapLevels();
 	return tex3d;
 }
 
-osg::Texture* CGMNebula::_Load3DCurlNoise()
+osg::Texture* CGMNebula::_Load3DCurlNoise() const
 {
 	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreTexturePath + "noiseCurl.raw";
 	osg::Image* img = osgDB::readImageFile(strTexturePath);
@@ -670,4 +624,84 @@ osg::Texture* CGMNebula::_Load3DCurlNoise()
 	tex3d->setSourceType(GL_UNSIGNED_BYTE);
 	tex3d->allocateMipmapLevels();
 	return tex3d;
+}
+
+bool CGMNebula::_InitMilkyWayStateSet(osg::StateSet * pSS, const SGMVolumeRange& sVR, const std::string strShaderName)
+{
+	if (!pSS) return false;
+
+	pSS->setMode(GL_BLEND, osg::StateAttribute::OFF);
+	pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+	pSS->setAttributeAndModes(new osg::CullFace(osg::CullFace::BACK));
+
+	pSS->addUniform(m_fGalaxyAlphaUniform.get());
+	pSS->addUniform(m_fPixelLengthUniform.get());
+	pSS->addUniform(m_vShakeVectorUniform.get());
+	pSS->addUniform(m_vDeltaShakeUniform.get());
+	pSS->addUniform(m_pCommonUniform->GetScreenSize());
+	pSS->addUniform(m_vEyeFrontDirUniform.get());
+	pSS->addUniform(m_vEyeRightDirUniform.get());
+	pSS->addUniform(m_vEyeUpDirUniform.get());
+	pSS->addUniform(m_vNoiseUniform.get());
+	pSS->addUniform(m_mMainInvProjUniform.get());
+	pSS->addUniform(m_mDeltaVPMatrixUniform.get());
+
+	osg::Vec3f vRangeMin = osg::Vec3f(sVR.fXMin, sVR.fYMin, sVR.fZMin);
+	osg::ref_ptr<osg::Uniform> pRangeMin = new osg::Uniform("rangeMin", vRangeMin);
+	pSS->addUniform(pRangeMin.get());
+	osg::Vec3f vRangeMax = osg::Vec3f(sVR.fXMax, sVR.fYMax, sVR.fZMax);
+	osg::ref_ptr<osg::Uniform> pRangeMax = new osg::Uniform("rangeMax", vRangeMax);
+	pSS->addUniform(pRangeMax.get());
+
+	int iUnit = 0;
+	CGMKit::AddTexture(pSS, m_vectorMap_1.get(), "lastVectorTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_galaxyTex.get(), "galaxyTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_galaxyHeightTex.get(), "galaxyHeightTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_2DNoiseTex.get(), "noise2DTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_blueNoiseTex.get(), "blueNoiseTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_3DShapeTex.get(), "noiseShapeTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_3DErosionTex.get(), "noiseErosionTex", iUnit++);
+	CGMKit::AddTexture(pSS, _Load3DCurlNoise(), "noiseCurlTex", iUnit++);
+
+	std::string strNebulaVertPath = m_pConfigData->strCorePath + m_strNebulaShaderPath + "NebulaVert.glsl";
+	std::string strNebulaFragPath = m_pConfigData->strCorePath + m_strNebulaShaderPath + "NebulaFrag.glsl";
+	CGMKit::LoadShader(pSS, strNebulaVertPath, strNebulaFragPath, strShaderName);
+
+	return true;
+}
+
+bool CGMNebula::_InitOortStateSet(osg::StateSet * pSS, const std::string strShaderName)
+{
+	if (!pSS) return false;
+
+	pSS->setMode(GL_BLEND, osg::StateAttribute::OFF);
+	pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+	pSS->setAttributeAndModes(new osg::CullFace(osg::CullFace::BACK));
+
+	pSS->addUniform(m_pCommonUniform->GetLevelArray());
+	pSS->addUniform(m_pCommonUniform->GetTime());
+	pSS->addUniform(m_fPixelLengthUniform.get());
+	pSS->addUniform(m_fOortVisibleUniform.get());
+	pSS->addUniform(m_vShakeVectorUniform.get());
+	pSS->addUniform(m_vDeltaShakeUniform.get());
+	pSS->addUniform(m_pCommonUniform->GetScreenSize());
+	pSS->addUniform(m_vEyeFrontDirUniform.get());
+	pSS->addUniform(m_vEyeRightDirUniform.get());
+	pSS->addUniform(m_vEyeUpDirUniform.get());
+	pSS->addUniform(m_vStarHiePosUniform.get());
+	pSS->addUniform(m_pCommonUniform->GetStarColor());
+	pSS->addUniform(m_mMainInvProjUniform.get());
+	pSS->addUniform(m_mDeltaVPMatrixUniform.get());
+
+	int iUnit = 0;
+	CGMKit::AddTexture(pSS, m_vectorMap_1.get(), "lastVectorTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_blueNoiseTex.get(), "blueNoiseTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_3DShapeTex.get(), "noiseShapeTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_3DErosionTex.get(), "noiseErosionTex", iUnit++);
+
+	std::string strNebulaVertPath = m_pConfigData->strCorePath + m_strNebulaShaderPath + "Oort.vert";
+	std::string strNebulaFragPath = m_pConfigData->strCorePath + m_strNebulaShaderPath + "Oort.frag";
+	CGMKit::LoadShader(pSS, strNebulaVertPath, strNebulaFragPath, strShaderName);
+
+	return true;
 }

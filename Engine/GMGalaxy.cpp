@@ -1,5 +1,4 @@
-#include "GMGalaxy.h"
-//////////////////////////////////////////////////////////////////////////
+ï»¿//////////////////////////////////////////////////////////////////////////
 /// COPYRIGHT NOTICE
 /// Copyright (c) 2020~2030, LiuTao
 /// All rights reserved.
@@ -12,25 +11,34 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "GMGalaxy.h"
+#include "GMMilkyWay.h"
+#include "GMSolar.h"
 #include "GMEngine.h"
+#include "GMCommonUniform.h"
 #include "GMDataManager.h"
 #include "GMKit.h"
 #include <osg/PointSprite>
 #include <osg/LineWidth>
-#include <osg/BlendFunc>
 #include <osg/Texture2D>
+#include <osg/Texture3D>
 #include <osg/TextureCubeMap>
 #include <osg/PositionAttitudeTransform>
+#include <osg/PolygonOffset>
 #include <osgDB/ReadFile>
 
+#include <ppl.h>
+using namespace concurrency;
 using namespace GM;
 /*************************************************************************
 Macro Defines
 *************************************************************************/
 
-#define GM_MIN_STARS_CUBE		8e18		// cubeºãĞÇµÄ×îĞ¡³ß´ç
-#define GM_MIN_GALAXIES_CUBE	2e25		// cubeĞÇÏµµÄ×îĞ¡³ß´ç
-#define PULSE_NUM				128 		// max number of audio pulse
+#define GM_MIN_STARS_CUBE		(8e18)			// cubeæ’æ˜Ÿçš„æœ€å°å°ºå¯¸
+#define GM_MIN_GALAXIES_CUBE	(2e25)			// cubeæ˜Ÿç³»çš„æœ€å°å°ºå¯¸
+#define ID_HANDLE				(0) 			// æŠŠæ‰‹é»˜è®¤çŠ¶æ€ä¸‹åœ¨switchä¸­çš„ç´¢å¼•å·
+#define ID_HANDLE_HOVER			(1)				// æŠŠæ‰‹hoverçŠ¶æ€ä¸‹åœ¨switchä¸­çš„ç´¢å¼•å·
+#define ID_ARROW				(2) 			// ç®­å¤´åœ¨switchä¸­çš„ç´¢å¼•å·
+#define MAX_BPM_RATIO			(25) 			// æœ€å¤§å‘¨æœŸ/æœ€å°å‘¨æœŸ
 
 /*************************************************************************
 Class
@@ -40,71 +48,85 @@ Class
 CGMGalaxy Methods
 *************************************************************************/
 
-/** @brief ¹¹Ôì */
-CGMGalaxy::CGMGalaxy() :CGMNebula(), m_fGalaxyRadius(5e20),
-	m_strGalaxyShaderPath("Shaders/GalaxyShader/"), m_strGalaxyTexPath("Textures/Galaxy/"),
-	m_strPlayingStarName(L""), m_vPlayingAudioCoord(SGMAudioCoord(0.5, 0.0)),
-	m_vPlayingStarWorldPos(osg::Vec3d(0.0, 0.0, 0.0)),
+/** @brief æ„é€  */
+CGMGalaxy::CGMGalaxy() :
+	m_pKernelData(nullptr), m_pConfigData(nullptr), m_pCommonUniform(nullptr), m_pDataManager(nullptr),
+	m_fGalaxyRadius(5e20),
+	m_strGalaxyShaderPath("Shaders/GalaxyShader/"), m_strGalaxyTexPath("Textures/Galaxy/"), 
+	m_strCoreModelPath("Models/"), m_strPlayingStarName(L""),
+	m_iPlayingAudioUID(0),m_vPlayingAudioCoord(SGMAudioCoord(0.5, 0.0)),
+	m_vPlayingStarWorld4Pos(0.0, 0.0, 0.0), m_vNearStarWorld4Pos(0, 0, 0),
+	m_vMouseWorldPos(0.0, 0.0, 0.0), m_vMouseLastWorldPos(0.0, 0.0, 0.0), m_mLastVP(osg::Matrixf()),
 	m_pMousePosUniform(new osg::Uniform("mouseWorldPos", osg::Vec3f(0.0f, 0.0f, 0.0f))),
-	m_pStarHiePosUniform(new osg::Uniform("starWorldPos", osg::Vec3f(0.0f, 0.0f, 0.0f))),
-	m_pStarAudioPosUniform(new osg::Uniform("starAudioPos", osg::Vec2f(0.5f, 0.0f))),
-	m_pTimesUniform(new osg::Uniform("times", 0.0f)),
-	m_pStarColorUniform(new osg::Uniform("playingStarColor", osg::Vec4f(1.0f, 1.0f, 1.0f, 1.0f))),
-	m_pLevelArrayUniform(new osg::Uniform(osg::Uniform::Type::FLOAT, "level", PULSE_NUM)),
+	m_pAudioUVUniform(new osg::Uniform("audioUV", osg::Vec2f(0.5f, 0.0f))),
 	m_pGalaxyRadiusUniform(new osg::Uniform("galaxyRadius", 5.0f)),
 	m_pEyePos4Uniform(new osg::Uniform("eyePos4", osg::Vec3f(0.0f, -2.5f, 0.0f))),
+	m_fGalaxyHeightUniform(new osg::Uniform("galaxyHeight", 1.0f)),
 	m_pCubeCenterUniform(new osg::Uniform("centerOffset", osg::Vec3f(0.0f, 0.0f, 0.0f))),
 	m_pShapeUVWUniform(new osg::Uniform("shapeUVW", osg::Vec3f(3.2f, 3.2f, 4.0f))),
-	m_pStarAlphaUniform(new osg::Uniform("starAlpha", 1.0f)),
-	m_pGalaxiesAlphaUniform(new osg::Uniform("galaxiesAlpha", 1.0f)),
-	m_pSupernovaLightUniform(new osg::Uniform("supernovaLight", 1.0f)),
-	m_pStarDistanceUniform(new osg::Uniform("starDistance", 1.0f)),
-	m_pUnitRatioUniform(new osg::Uniform("unitRatio", 1.0f)),
-	m_pMyWorldAlphaUniform(new osg::Uniform("myWorldAlpha", 0.0f)),
-	m_iPlanetCount(0),
-	m_bEdit(false), m_bCapture(false), m_bWelcome(false)
+	m_fStarAlphaUniform(new osg::Uniform("starAlpha", 1.0f)),
+	m_fGalaxiesAlphaUniform(new osg::Uniform("galaxiesAlpha", 1.0f)),
+	m_fStarDistanceUniform(new osg::Uniform("starDistance", 1.0f)),
+	m_fMyWorldAlphaUniform(new osg::Uniform("myWorldAlpha", 0.0f)),
+	m_fArrowAngle(0.0f), m_fPRPA(0.0f), m_eArrowDir(EGMAD_NONE),
+	m_bEdit(false), m_bHandleHover(false), m_bCapture(false), m_bWelcome(false),
+	m_pMilkyWay(nullptr), m_pSolarSystem(nullptr)
 {
-	for (int i = 0; i < PULSE_NUM; i++)
-	{
-		m_pLevelArrayUniform->setElement(i, 0.0f);
-	}
+	m_pMilkyWay = new CGMMilkyWay();
+	m_pSolarSystem = new CGMSolar();
+
+	m_iRandom.seed(0);
 }
 
-/** @brief Îö¹¹ */
+/** @brief ææ„ */
 CGMGalaxy::~CGMGalaxy()
 {
 }
 
-/** @brief ³õÊ¼»¯ */
-bool CGMGalaxy::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData)
+/** @brief åˆå§‹åŒ– */
+bool CGMGalaxy::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData,
+	CGMCommonUniform* pCommonUniform, CGMDataManager* pDataManager)
 {
-	CGMNebula::Init(pKernelData, pConfigData);
+	m_pKernelData = pKernelData;
+	m_pConfigData = pConfigData;
+	m_pCommonUniform = pCommonUniform;
+	m_pDataManager = pDataManager;
 
-	std::string strGalaxyTexPath = m_pConfigData->strCorePath + m_strGalaxyTexPath;
-	m_pGalaxyColorTex = _CreateTexture2D(strGalaxyTexPath + "milkyWay.tga", 4);
-
-	// ³õÊ¼»¯µÚÒ»²ã¼¶µÄÖĞĞÄºãĞÇ±ä»»½Úµã
-
-	// ³õÊ¼»¯µÚ¶ş²ã¼¶µÄÖĞĞÄºãĞÇ±ä»»½Úµã£¬Ò²ÊÇµÚ¶ş²ã¼¶ĞĞĞÇµÄ¹«×ª¹ìµÀÖĞĞÄ±ä»»½Úµã
-	if (!m_pStar_2_Transform.valid())
+	for (int i = 0; i <= GM_HIERARCHY_MAX; i++)
 	{
-		m_pStar_2_Transform = new osg::PositionAttitudeTransform();
-		m_pStar_2_Transform->asPositionAttitudeTransform()->setPosition(osg::Vec3d(0, 0, 0));
-		m_pHierarchyRootVector.at(2)->addChild(m_pStar_2_Transform.get());
+		osg::ref_ptr<osg::Group> _pRoot = new osg::Group();
+		m_pHierarchyRootVector.push_back(_pRoot);
+	}
+	GM_Root->addChild(m_pHierarchyRootVector.at(4).get());
+
+	m_pMilkyWay->Init(pKernelData, pConfigData, pCommonUniform);
+	m_pSolarSystem->Init(pKernelData, pConfigData, pCommonUniform, pDataManager);
+
+	// è¯»å–ddsæ—¶éœ€è¦å‚ç›´ç¿»è½¬
+	m_pDDSOptions = new osgDB::Options("dds_flip");
+
+	// åˆå§‹åŒ–èƒŒæ™¯ç›¸å…³èŠ‚ç‚¹
+	_InitBackground();
+
+	std::string strGalaxyTexPath = pConfigData->strCorePath + m_strGalaxyTexPath;
+	m_pGalaxyImage = osgDB::readImageFile(strGalaxyTexPath + "milkyWay.tga");
+	m_pGalaxyColorTex = _CreateTexture2D(m_pGalaxyImage.get(), 4);
+	m_3DShapeTex = _Load3DShapeNoise();
+
+	// åˆå§‹åŒ–ç¬¬ä¸‰å±‚çº§
+
+	// åˆå§‹åŒ–ç¬¬å››å±‚çº§çš„å¥¥å°”ç‰¹äº‘ã€æŠŠæ‰‹çš„å˜æ¢èŠ‚ç‚¹
+	if (!m_pStar_4_Transform.valid())
+	{
+		m_pStar_4_Transform = new osg::PositionAttitudeTransform();
+		m_pHierarchyRootVector.at(4)->addChild(m_pStar_4_Transform.get());
 	}
 
-	// ³õÊ¼»¯µÚÈı²ã¼¶µÄÖĞĞÄºãĞÇ±ä»»½Úµã£¬Ò²ÊÇ°Â¶ûÌØÔÆ¡¢µÚÈı²ã¼¶ĞĞĞÇµÄ¹«×ª¹ìµÀÖĞĞÄ±ä»»½Úµã
-	if (!m_pStar_3_Transform.valid())
-	{
-		m_pStar_3_Transform = new osg::PositionAttitudeTransform();
-		m_pHierarchyRootVector.at(3)->addChild(m_pStar_3_Transform.get());
-	}
-
-	// ¼ÓÔØĞÇÏµÎÆÀíÊı×é
+	// åŠ è½½æ˜Ÿç³»çº¹ç†æ•°ç»„
 	const int iTexNum = 32;
 	std::string strGalaxiesPath = strGalaxyTexPath + "GalaxyArray/";
 	m_pGalaxiesTex = new osg::Texture2DArray();
-	m_pGalaxiesTex->setTextureSize(256,256, iTexNum);
+	m_pGalaxiesTex->setTextureSize(64, 64, iTexNum);
 	for (int i = 0; i < iTexNum; i++)
 	{
 		std::string strName = std::to_string(i);
@@ -116,19 +138,19 @@ bool CGMGalaxy::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData)
 		{
 			strName = "0" + strName;
 		}
-		m_pGalaxiesTex->setImage(i, osgDB::readImageFile(strGalaxiesPath + strName + ".jpg"));
+		m_pGalaxiesTex->setImage(i, osgDB::readImageFile(strGalaxiesPath + strName + ".dds", m_pDDSOptions.get()));
 	}
-	m_pGalaxiesTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	m_pGalaxiesTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_NEAREST);
 	m_pGalaxiesTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
 	m_pGalaxiesTex->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
 	m_pGalaxiesTex->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
 	m_pGalaxiesTex->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-	m_pGalaxiesTex->setInternalFormat(GL_RGB);
-	m_pGalaxiesTex->setSourceFormat(GL_RGB);
+	m_pGalaxiesTex->setInternalFormat(GL_COMPRESSED_RGBA_S3TC_DXT5_EXT);
+	m_pGalaxiesTex->setSourceFormat(GL_RGBA);
 	m_pGalaxiesTex->setSourceType(GL_UNSIGNED_BYTE);
 
 	size_t iMaxNum = 65536;
-	// ³õÊ¼»¯Á¢·½ÌåºãĞÇÊı×é
+	// åˆå§‹åŒ–ç«‹æ–¹ä½“æ’æ˜Ÿæ•°ç»„
 	m_pCubeVertArray = new osg::Vec4Array;
 	m_pCubeColorArray = new osg::Vec4Array();
 	m_pCubeElement = new osg::DrawElementsUShort(GL_POINTS);
@@ -136,13 +158,15 @@ bool CGMGalaxy::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData)
 	m_pCubeColorArray->reserve(iMaxNum);
 	m_pCubeElement->reserve(iMaxNum);
 
+	std::uniform_int_distribution<> iPseudoNoise(0, 9999);
+
 	float fMinAlpha = 0.25f;
 	int x = 0;
 	while (x < iMaxNum)
 	{
-		float fU = (m_iRandom() % 10000)*1e-4f;
-		float fV = (m_iRandom() % 10000)*1e-4f;
-		float fW = (m_iRandom() % 10000)*1e-4f;
+		float fU = iPseudoNoise(m_iRandom)*1e-4f;
+		float fV = iPseudoNoise(m_iRandom)*1e-4f;
+		float fW = iPseudoNoise(m_iRandom)*1e-4f;
 		float fAlpha = 1.0f - _Get3DValue(fU*4.0f, fV*4.0f, fW*4.0f);
 		fAlpha *= fAlpha;
 		if (fAlpha > fMinAlpha)
@@ -153,7 +177,7 @@ bool CGMGalaxy::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData)
 			float fX = fRandomX;
 			float fY = fRandomY;
 			float fZ = fRandomZ;
-			osg::Vec3f vColor = _getRandomStarColor();
+			osg::Vec3f vColor = _GetRandomStarColor();
 
 			m_pCubeVertArray->push_back(osg::Vec4(fX, fY, fZ, 1.0f));
 			m_pCubeColorArray->push_back(osg::Vec4(vColor, (fAlpha - fMinAlpha) / (1.0f - fMinAlpha)));
@@ -162,7 +186,7 @@ bool CGMGalaxy::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData)
 		}
 	}
 
-	// ³õÊ¼»¯ÇòÃæºãĞÇÊı×é
+	// åˆå§‹åŒ–çƒé¢æ’æ˜Ÿæ•°ç»„
 	m_pSphereVertArray = new osg::Vec4Array;
 	m_pSphereColorArray = new osg::Vec4Array;
 	m_pSphereElement = new osg::DrawElementsUShort(GL_POINTS);
@@ -187,13 +211,13 @@ bool CGMGalaxy::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData)
 		}
 	}
 
-	// ĞÇÏµĞı×ªÃ¶¾Ù(0123)ºÍÎÆÀí±àºÅ
-	// xyz = Ğı×ªÃ¶¾Ù£¬·Ö±ğ´ú±íÍ¼Æ¬Ğı×ª0¡ã¡¢90¡ã¡¢180¡ã¡¢270¡ã
-	// 000 = 0¡ã
-	// 100 = 90¡ã
-	// 010 = 180¡ã
-	// 001 = 270¡ã
-	// w = ĞÇÏµÎÆÀí±àºÅ
+	// æ˜Ÿç³»æ—‹è½¬æšä¸¾(0123)å’Œçº¹ç†ç¼–å·
+	// xyz = æ—‹è½¬æšä¸¾ï¼Œåˆ†åˆ«ä»£è¡¨å›¾ç‰‡æ—‹è½¬0Â°ã€90Â°ã€180Â°ã€270Â°
+	// 000 = 0Â°
+	// 100 = 90Â°
+	// 010 = 180Â°
+	// 001 = 270Â°
+	// w = æ˜Ÿç³»çº¹ç†ç¼–å·
 	m_pGalaxiesInfo = new osg::Vec4Array;
 	m_pGalaxiesInfo->reserve(iMaxNum);
 
@@ -201,10 +225,9 @@ bool CGMGalaxy::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData)
 	float fLayer = 0.0f;
 	for (int i = 0; i < iMaxNum; i++)
 	{
-		unsigned int iRandom = m_iRandom();
-		float fHue = (iRandom % 1024) / 256.0f;
+		float fHue = iPseudoNoise(m_iRandom) / 2500.0f;
 		float fAlpha = m_pCubeColorArray->at(i).a();
-		int iSpin = iRandom % 4;
+		int iSpin = iPseudoNoise(m_iRandom) % 4;
 		m_pGalaxiesInfo->push_back(osg::Vec4(fHue, iSpin, fLayer, fAlpha));
 		if (3 == (i % 4))
 		{
@@ -218,18 +241,14 @@ bool CGMGalaxy::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData)
 		m_pHierarchyRootVector.at(4)->addChild(m_pEye_4_Transform.get());
 	}
 
-	m_pCosmosBoxNode = new CCosmosBox();
-	GM_Root->addChild(m_pCosmosBoxNode.get());
-
 	return true;
 }
 
-/** @brief ¸üĞÂ */
+/** @brief æ›´æ–° */
 bool CGMGalaxy::Update(double dDeltaTime)
 {
-	double dTime = osg::Timer::instance()->time_s();
-	float fTimes = std::fmod((float)dTime, 1000000.0f);
-	m_pTimesUniform->set(fTimes);
+	float fTimes;
+	m_pCommonUniform->GetTime()->get(fTimes);
 
 	if (m_bWelcome)
 	{
@@ -250,40 +269,184 @@ bool CGMGalaxy::Update(double dDeltaTime)
 	{
 		if (m_bCapture)
 		{
-			m_pStarAudioPosUniform->set(osg::Vec2f(m_vPlayingAudioCoord.radius, m_vPlayingAudioCoord.angle));
-		}
-	}
+			if (4 == m_pKernelData->iHierarchy)
+			{
+				// åŠå¾„æ–¹å‘çš„å¾®å°åç§»
+				SGMAudioCoord vAudioCoord_radius = SGMAudioCoord(
+					m_vPlayingAudioCoord.BPM > m_pConfigData->fMinBPM
+					? m_vPlayingAudioCoord.BPM - 0.01 : m_vPlayingAudioCoord.BPM + 0.01,
+					m_vPlayingAudioCoord.angle);
+				// è§’åº¦æ–¹å‘çš„å¾®å°åç§»
+				SGMAudioCoord vAudioCoord_angle = SGMAudioCoord(
+					m_vPlayingAudioCoord.BPM,
+					std::fmod(m_vPlayingAudioCoord.angle + 0.01, osg::PI * 2));
 
-	CGMNebula::Update(dDeltaTime);
-	return true;
-}
+				SGMGalaxyCoord vGCRadius = m_pDataManager->AudioCoord2GalaxyCoord(vAudioCoord_radius);
+				SGMGalaxyCoord vGCAngle = m_pDataManager->AudioCoord2GalaxyCoord(vAudioCoord_angle);
 
-/** @brief ¸üĞÂ(ÔÚÖ÷Ïà»ú¸üĞÂ×ËÌ¬Ö®ºó) */
-bool CGMGalaxy::UpdateLater(double dDeltaTime)
-{
-	if (m_pConfigData->bHighQuality && m_pStateSetGalaxy.valid() && m_pGeodePointsN_4.valid())
-	{
-		unsigned int iShakeCount = GetShakeCount();
-		if (iShakeCount % 2)
-		{
-			m_pStateSetGalaxy->setTextureAttributeAndModes(1, m_TAADistanceMap_1.get());
-			m_pGeodePointsN_4->getStateSet()->setTextureAttributeAndModes(1, m_TAADistanceMap_1.get());
+				osg::Vec3d vWorldPos_radius = osg::Vec3d(vGCRadius.x, vGCRadius.y, vGCRadius.z) * m_fGalaxyRadius;
+				osg::Vec3d vWorldPos_angle = osg::Vec3d(vGCAngle.x, vGCAngle.y, vGCAngle.z) * m_fGalaxyRadius;
+				// éŸ³é¢‘åæ ‡çš„åŠå¾„å˜å¤§çš„æ–¹å‘çš„å•ä½å‘é‡
+				osg::Vec3d vRadiusAxis = vWorldPos_radius - m_vPlayingStarWorld4Pos;
+				vRadiusAxis.z() = 0;
+				if (vWorldPos_radius.length() < m_vPlayingStarWorld4Pos.length()) vRadiusAxis *= -1;
+				vRadiusAxis.normalize();
+				// éŸ³é¢‘åæ ‡çš„è§’åº¦å˜å¤§çš„æ–¹å‘çš„å•ä½å‘é‡
+				osg::Vec3d vAngleAxis = vWorldPos_angle - m_vPlayingStarWorld4Pos;
+				vAngleAxis.z() = 0;
+				vAngleAxis.normalize();
+
+				// vRadiusAxis çš„é“¶ç›˜é¢æ—‹è½¬è§’ éŸ³é¢‘ç©ºé—´åŠå¾„å¤–æ–¹å‘çš„æ—‹è½¬è§’åº¦(-PI,PI]
+				float fRadiusTheta = std::atan2(vRadiusAxis.y(), vRadiusAxis.x());
+				// vAngleAxis çš„é“¶ç›˜é¢æ—‹è½¬è§’ éŸ³é¢‘ç©ºé—´è§’æ­£æ–¹å‘çš„æ—‹è½¬è§’åº¦(-PI,PI]
+				float fAngleTheta = std::atan2(vAngleAxis.y(), vAngleAxis.x());
+
+				// + Radius + Angle
+				m_fPRPA = 0.5*(fRadiusTheta + fAngleTheta);
+				if (std::abs(fRadiusTheta - fAngleTheta) > osg::PI)
+				{
+					m_fPRPA += osg::PI;
+					if (m_fPRPA > osg::PI)
+					{
+						m_fPRPA -= osg::PI * 2;
+					}
+				}
+				
+				double fMouse2CenterRatio = m_vMouseWorldPos.length() / m_fGalaxyRadius;
+				osg::Vec3d vMouseMove = m_vMouseWorldPos - m_vMouseLastWorldPos;
+				osg::Vec3d vMouseMoveDir = vMouseMove;
+				vMouseMoveDir.normalize();
+
+				const double fDeadValue = 0.001;
+
+				// æ±‚vStar2MouseDirçš„é“¶ç›˜é¢æ—‹è½¬è§’
+				float fDeltaTheta = _IncludedAngle(std::atan2(vMouseMoveDir.y(), vMouseMoveDir.x()), m_fPRPA);
+				double fMouseMove = vMouseMove * vRadiusAxis;
+				if (EGMAD_RADIUS_OUT == m_eArrowDir || EGMAD_RADIUS_IN == m_eArrowDir)// åªæ”¹å˜éŸ³é¢‘åŠå¾„åˆ†é‡
+				{
+					if (EGMAD_RADIUS_OUT == m_eArrowDir)
+					{
+						if ((fDeltaTheta < osg::PI*0.25 && fDeltaTheta > -osg::PI*0.75)
+							|| (abs(fMouseMove / m_fGalaxyRadius) < fDeadValue))
+						{
+							m_fArrowAngle = fRadiusTheta;
+							fMouseMove = std::fmax(0.0, fMouseMove);
+						}
+						else
+						{
+							m_eArrowDir = EGMAD_RADIUS_IN;
+							m_fArrowAngle = std::fmod(fRadiusTheta + osg::PI, osg::PI * 2);
+						}
+					}
+					else if (EGMAD_RADIUS_IN == m_eArrowDir)
+					{
+						if ((fDeltaTheta > osg::PI*0.25 || fDeltaTheta < -osg::PI*0.75)
+							|| (abs(fMouseMove / m_fGalaxyRadius) < fDeadValue))
+						{
+							m_fArrowAngle = std::fmod(fRadiusTheta + osg::PI, osg::PI * 2);
+							fMouseMove = std::fmin(0.0, fMouseMove);
+						}
+						else
+						{
+							m_eArrowDir = EGMAD_RADIUS_OUT;
+							m_fArrowAngle = fRadiusTheta;
+						}
+					}
+					double fRadiusFact = 0.7 - 0.4*fMouse2CenterRatio;
+
+					m_vPlayingAudioCoord.BPM = max(
+						m_vPlayingAudioCoord.BPM * (1-fRadiusFact * fMouseMove / m_fGalaxyRadius),
+						m_pConfigData->fMinBPM);
+				}
+				else if (EGMAD_ANGLE_PLUS == m_eArrowDir || EGMAD_ANGLE_MINUS == m_eArrowDir)// åªæ”¹å˜éŸ³é¢‘è§’åº¦åˆ†é‡
+				{
+					fMouseMove = vMouseMove * vAngleAxis;
+					if (EGMAD_ANGLE_PLUS == m_eArrowDir)
+					{
+						if ((fDeltaTheta > -osg::PI*0.25 && fDeltaTheta < osg::PI*0.75)
+							|| (abs(fMouseMove / m_fGalaxyRadius) < fDeadValue))
+						{
+							m_fArrowAngle = fAngleTheta;
+							fMouseMove = std::fmax(0.0, fMouseMove);
+						}
+						else
+						{
+							m_eArrowDir = EGMAD_ANGLE_MINUS;
+							m_fArrowAngle = std::fmod(fAngleTheta + osg::PI, osg::PI * 2);
+						}
+					}
+					else if (EGMAD_ANGLE_MINUS == m_eArrowDir)
+					{
+						if ((fDeltaTheta < -osg::PI*0.25 || fDeltaTheta > osg::PI*0.75)
+							|| (abs(fMouseMove / m_fGalaxyRadius) < fDeadValue))
+						{
+							m_fArrowAngle = std::fmod(fAngleTheta + osg::PI, osg::PI * 2);
+							fMouseMove = std::fmin(0.0, fMouseMove);
+						}
+						else
+						{
+							m_eArrowDir = EGMAD_ANGLE_PLUS;
+							m_fArrowAngle = fAngleTheta;
+						}
+					}
+					double fRadiusFact = 10.0 - 6.0*fMouse2CenterRatio;
+					double fAngle = m_vPlayingAudioCoord.angle + fRadiusFact * fMouseMove / m_fGalaxyRadius;
+					if (fAngle < 0.0)
+					{
+						fAngle += osg::PI * 2;
+					}
+					m_vPlayingAudioCoord.angle = std::fmod(fAngle, osg::PI * 2);
+				}
+			}
+			_UpdatePlayingStarInformation(m_vPlayingAudioCoord);
 		}
 		else
 		{
-			m_pStateSetGalaxy->setTextureAttributeAndModes(1, m_TAADistanceMap_0.get());
-			m_pGeodePointsN_4->getStateSet()->setTextureAttributeAndModes(1, m_TAADistanceMap_0.get());
+			osg::Vec3d vDir = m_vMouseWorldPos - m_vPlayingStarWorld4Pos;
+			vDir.normalize();
+			float fDeltaTheta = _IncludedAngle(std::atan2(vDir.y(), vDir.x()), m_fPRPA);
+			osg::Quat quat = osg::Quat(m_fPRPA, osg::Vec3d(0, 0, 1));
+			if (fDeltaTheta > osg::PI_2)
+			{
+				m_eArrowDir = EGMAD_RADIUS_OUT;
+			}
+			else if (fDeltaTheta <= 0.0 && fDeltaTheta > -osg::PI_2)
+			{
+				m_eArrowDir = EGMAD_RADIUS_IN;
+			}
+			else
+			{
+				quat = osg::Quat(m_fPRPA + osg::PI_2, osg::Vec3d(0, 0, 1));
+				if (fDeltaTheta <= osg::PI_2 && fDeltaTheta > 0.0)
+				{
+					m_eArrowDir = EGMAD_ANGLE_PLUS;
+				}
+				else
+				{
+					m_eArrowDir = EGMAD_ANGLE_MINUS;
+				}
+			}
+			m_pStar_4_Transform->asPositionAttitudeTransform()->setAttitude(quat);
 		}
+		m_vMouseLastWorldPos = m_vMouseWorldPos;
 	}
 
+	m_pMilkyWay->Update(dDeltaTime);
+	m_pSolarSystem->Update(dDeltaTime);
+
+	return true;
+}
+
+/** @brief æ›´æ–°(åœ¨ä¸»ç›¸æœºæ›´æ–°å§¿æ€ä¹‹å) */
+bool CGMGalaxy::UpdateLater(double dDeltaTime)
+{
 	osg::Vec3d vEye, vCenter, vUp;
 	GM_View->getCamera()->getViewMatrixAsLookAt(vEye, vCenter, vUp);
 	double fDistance = GM_ENGINE.GetHierarchyTargetDistance();
 
-	float fLight = std::exp2(- fDistance*GM_ENGINE.GetUnit() / 5e22);
-	m_pSupernovaLightUniform->set(fLight);
-
 	int iHie = GM_ENGINE.GetHierarchy();
+	double fUnit = m_pKernelData->fUnitArray->at(iHie);
+
 	if (4 == iHie)
 	{
 		m_pEyePos4Uniform->set(osg::Vec3(vEye));
@@ -308,12 +471,11 @@ bool CGMGalaxy::UpdateLater(double dDeltaTime)
 	break;
 	case 2:
 	{
-
 	}
 	break;
 	case 3:
 	{
-		m_pStarDistanceUniform->set(osg::clampBetween(float(fDistance)*100.0f, 1.0f, 4000.0f));
+		m_fStarDistanceUniform->set(osg::clampBetween(float(fDistance)*100.0f, 1.0f, 4000.0f));
 	}
 	break;
 	case 4:
@@ -322,8 +484,8 @@ bool CGMGalaxy::UpdateLater(double dDeltaTime)
 		{
 			m_pEye_4_Transform->asPositionAttitudeTransform()->setPosition(osg::Vec3f(vEye));
 
-			// ¿ØÖÆcubeºãĞÇµÄÏÔÒş
-			double fCubeMinSize = GM_MIN_STARS_CUBE / m_pKernelData->fUnitArray->at(4);
+			// æ§åˆ¶cubeæ’æ˜Ÿçš„æ˜¾éš
+			double fCubeMinSize = GM_MIN_STARS_CUBE / fUnit;
 			for (int i = 0; i < int(m_pStarsGeomVector.size()); i++)
 			{
 				if (fDistance < fCubeMinSize * std::pow(2, i + 3))
@@ -339,12 +501,22 @@ bool CGMGalaxy::UpdateLater(double dDeltaTime)
 			m_pStarsCubeInfoUniform->get(vCubeInfo);
 			vCubeInfo.y() = fDistance;
 			m_pStarsCubeInfoUniform->set(vCubeInfo);
+
+			// è·å–å½“å‰ä½ç½®çš„æ˜Ÿç³»å•è¾¹é«˜åº¦ï¼Œçº¦æŸcubeæ’æ˜Ÿçš„æ˜¾éš
+			double fGalaxyRadius4 = m_fGalaxyRadius / m_pKernelData->fUnitArray->at(4);// 4çº§ç©ºé—´ä¸‹çš„æ˜Ÿç³»åŠå¾„
+			float fU = 0.5 + 0.5 * osg::clampBetween(vEye.x() / fGalaxyRadius4, -1.0, 1.0);
+			float fV = 0.5 + 0.5 * osg::clampBetween(vEye.y() / fGalaxyRadius4, -1.0, 1.0);
+			float fGalaxH = 0.15f * CGMKit::GetImageColor(m_pGalaxyImage.get(), fU, fV, true).a();
+			m_fGalaxyHeightUniform->set(fGalaxH);
 		}
 
 		float fStarAlpha = 1.0 - exp2(std::fmin(0.0, 0.001 - fDistance)*100.0);
-		m_pStarAlphaUniform->set(fStarAlpha);
+		m_fStarAlphaUniform->set(fStarAlpha);
 
-		m_pGalaxyBackgroundGeode->setNodeMask((fDistance > 0.05) ? 0 : ~0);
+		float fGalaxyAlpha = 1.0 - exp2(std::fmin(0.0, 0.01 - fDistance)*10.0);
+		m_pCommonUniform->SetGalaxyAlpha(fGalaxyAlpha);
+
+		m_pBackgroundGalaxyTransform->setNodeMask((fDistance > 0.05) ? 0 : ~0);
 		m_pCosmosBoxGeode->setNodeMask((fDistance > 0.001) ? ~0 : 0);
 	}
 	break;
@@ -391,7 +563,7 @@ bool CGMGalaxy::UpdateLater(double dDeltaTime)
 
 		if (m_pConfigData->bPhoto)
 		{
-			m_pMyWorldAlphaUniform->set(osg::clampBetween(float((fDistance - 1) / 99), 0.0f, 1.0f));
+			m_fMyWorldAlphaUniform->set(osg::clampBetween(float((fDistance - 1) / 99), 0.0f, 1.0f));
 		}
 	}
 	break;
@@ -399,7 +571,7 @@ bool CGMGalaxy::UpdateLater(double dDeltaTime)
 	{
 		if (m_pConfigData->bPhoto)
 		{
-			m_pMyWorldAlphaUniform->set(osg::clampBetween(float((fDistance - 1e-5) / 9.9e-4), 0.0f, 1.0f));
+			m_fMyWorldAlphaUniform->set(osg::clampBetween(float((fDistance - 1e-5) / 9.9e-4), 0.0f, 1.0f));
 		}
 	}
 	break;
@@ -407,172 +579,246 @@ bool CGMGalaxy::UpdateLater(double dDeltaTime)
 		break;
 	}
 
-	CGMNebula::UpdateLater(dDeltaTime);
+	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
+	{
+		// å®ç°æŠ–åŠ¨æŠ—é”¯é½¿
+		// ç›¸æœºæ­£å‰æ–¹å•ä½å‘é‡ï¼ˆä¸–ç•Œç©ºé—´ï¼‰
+		osg::Vec3d vWorldEyeFrontDir = vCenter - vEye;
+		vWorldEyeFrontDir.normalize();
+		osg::Vec3d vWorldEyeRightDir = vWorldEyeFrontDir ^ vUp;
+		vWorldEyeRightDir.normalize();
+
+		m_pCommonUniform->SetEyeUpDir(vUp);		// ç›¸æœºä¸Šæ–¹å‘åœ¨ä¸–ç•Œç©ºé—´ä¸‹çš„å•ä½å‘é‡
+		m_pCommonUniform->SetEyeRightDir(vWorldEyeRightDir);	// ç›¸æœºå³æ–¹å‘åœ¨ä¸–ç•Œç©ºé—´ä¸‹çš„å•ä½å‘é‡
+		m_pCommonUniform->SetEyeFrontDir(vWorldEyeFrontDir);	// ç›¸æœºå‰æ–¹å‘åœ¨ä¸–ç•Œç©ºé—´ä¸‹çš„å•ä½å‘é‡
+
+		osg::Matrixd mMainViewMatrix = GM_View->getCamera()->getViewMatrix();
+		osg::Matrixd mMainProjMatrix = GM_View->getCamera()->getProjectionMatrix();
+		osg::Matrixf mInvProjMatrix = osg::Matrixd::inverse(mMainProjMatrix);
+		m_pCommonUniform->SetMainInvProjMatrix(mInvProjMatrix);
+
+		osg::Matrixd VP = mMainViewMatrix * mMainProjMatrix;
+		// ä¿®æ”¹VPå·®å€¼çŸ©é˜µ
+		osg::Matrixf deltaVP = osg::Matrixf(
+			VP(0, 0) - m_mLastVP(0, 0), VP(0, 1) - m_mLastVP(0, 1), VP(0, 2) - m_mLastVP(0, 2), VP(0, 3) - m_mLastVP(0, 3),
+			VP(1, 0) - m_mLastVP(1, 0), VP(1, 1) - m_mLastVP(1, 1), VP(1, 2) - m_mLastVP(1, 2), VP(1, 3) - m_mLastVP(1, 3),
+			VP(2, 0) - m_mLastVP(2, 0), VP(2, 1) - m_mLastVP(2, 1), VP(2, 2) - m_mLastVP(2, 2), VP(2, 3) - m_mLastVP(2, 3),
+			VP(3, 0) - m_mLastVP(3, 0), VP(3, 1) - m_mLastVP(3, 1), VP(3, 2) - m_mLastVP(3, 2), VP(3, 3) - m_mLastVP(3, 3)
+		);
+		m_pCommonUniform->SetDeltaVPMatrix(deltaVP);
+		// ä¿®æ”¹ä¸Šä¸€å¸§VPçŸ©é˜µ
+		m_mLastVP = VP;
+	}
+
+	m_pMilkyWay->UpdateLater(dDeltaTime);
+	m_pSolarSystem->UpdateLater(dDeltaTime);
+
 	return true;
 }
 
-
-/** @brief ¼ÓÔØ */
+/** @brief åŠ è½½ */
 bool CGMGalaxy::Load()
 {
-	if ( m_pGeodeSun_2.valid())
-	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SunVert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SunFrag.glsl";
-		CGMKit::LoadShader(m_pGeodeSun_2->getStateSet(), strVertPath, strFragPath);
-	}
-	if (m_pSunBloomTransform.valid())
-	{
-		std::string strBloomVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SunBloomVert.glsl";
-		std::string strBloomFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SunBloomFrag.glsl";
-		CGMKit::LoadShader(m_pSunBloomTransform->getStateSet(), strBloomVertPath, strBloomFragPath);
-	}
-
-	if (m_pGeodePlanets_2.valid() && m_pGeodePlanets_3.valid())
-	{
-		std::string strPlanetVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Planets_Vert.glsl";
-		std::string strPlanetFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Planets_Frag.glsl";
-		CGMKit::LoadShader(m_pGeodePlanets_2->getStateSet(), strPlanetVertPath, strPlanetFragPath);
-		CGMKit::LoadShader(m_pGeodePlanets_3->getStateSet(), strPlanetVertPath, strPlanetFragPath);
-	}
-
-	if (m_pGeodePlanetsLine_2.valid() && m_pGeodePlanetsLine_3.valid())
-	{
-		std::string strLineVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "PlanetLineVert.glsl";
-		std::string strLineFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "PlanetLineFrag.glsl";
-		CGMKit::LoadShader(m_pGeodePlanetsLine_2->getStateSet(), strLineVertPath, strLineFragPath);
-		CGMKit::LoadShader(m_pGeodePlanetsLine_3->getStateSet(), strLineVertPath, strLineFragPath);
-	}
-
-	if (m_pOortCloudGeode_3.valid() && m_pOort_4_Transform.valid())
-	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "OortCloudVert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "OortCloudFrag.glsl";
-		CGMKit::LoadShader(m_pOortCloudGeode_3->getOrCreateStateSet(), strVertPath, strFragPath);
-		CGMKit::LoadShader(m_pOort_4_Transform->getStateSet(), strVertPath, strFragPath);
-	}
+	std::string strGalaxyShader = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 
 	if (m_pGeodeStarCube_4.valid())
 	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_4_Vert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_4_Frag.glsl";
-		CGMKit::LoadShader(m_pGeodeStarCube_4->getStateSet(), strVertPath, strFragPath);
+		CGMKit::LoadShader(m_pGeodeStarCube_4->getStateSet(),
+			strGalaxyShader + "StarCube_4_Vert.glsl",
+			strGalaxyShader + "StarCube_4_Frag.glsl",
+			"StarCube_4");
 	}
-	if (m_pGeodeStarCube.valid())
+	if (m_pBackgroundStarTransform.valid())
 	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_Vert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_Frag.glsl";
-		CGMKit::LoadShader(m_pGeodeStarCube->getStateSet(), strVertPath, strFragPath);
+		CGMKit::LoadShader(m_pBackgroundStarTransform->getStateSet(),
+			strGalaxyShader + "StarCube_Vert.glsl",
+			strGalaxyShader + "StarCube_Frag.glsl",
+			"StarCube");
 	}
 	if (m_pStateSetGalaxy.valid())
 	{
-		std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyStarVert.glsl";
-		std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyStarFrag.glsl";
-		CGMKit::LoadShader(m_pStateSetGalaxy.get(), strStarVertPath, strStarFragPath);
+		CGMKit::LoadShader(m_pStateSetGalaxy.get(),
+			strGalaxyShader + "GalaxyStarVert.glsl",
+			strGalaxyShader + "GalaxyStarFrag.glsl",
+			"GalaxyStar");
 	}
 	if (m_pGeodePointsN_4.valid())
 	{
-		std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarNVert.glsl";
-		std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarNFrag.glsl";
-		osg::ref_ptr<osg::StateSet> pPointsNSS = m_pGeodePointsN_4->getOrCreateStateSet();
-		CGMKit::LoadShader(pPointsNSS.get(), strStarVertPath, strStarFragPath);
+		CGMKit::LoadShader(m_pGeodePointsN_4->getOrCreateStateSet(),
+			strGalaxyShader + "StarNVert.glsl",
+			strGalaxyShader + "StarNFrag.glsl",
+			"StarN");
 	}
 	if (m_pGeodeAudio.valid())
 	{
-		std::string strAudioVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "AudioVert.glsl";
-		std::string strAudioFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "AudioFrag.glsl";
-		CGMKit::LoadShader(m_pGeodeAudio->getStateSet(), strAudioVertPath, strAudioFragPath);
+		CGMKit::LoadShader(m_pGeodeAudio->getStateSet(),
+			strGalaxyShader + "AudioVert.glsl",
+			strGalaxyShader + "AudioFrag.glsl",
+			"AudioStar");
 	}
 	if (m_pStateSetPlane.valid())
 	{
-		std::string strGalaxyPlaneVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyPlaneVert.glsl";
-		std::string strGalaxyPlaneFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyPlaneFrag.glsl";
-		CGMKit::LoadShader(m_pStateSetPlane.get(), strGalaxyPlaneVertPath, strGalaxyPlaneFragPath);
+		CGMKit::LoadShader(m_pStateSetPlane.get(),
+			strGalaxyShader + "GalaxyPlaneVert.glsl",
+			strGalaxyShader + "GalaxyPlaneFrag.glsl",
+			"GalaxyPlanet");
 	}
-	if(m_pPlayingStarTransform.valid())
+	if (m_pStarInfoTransform.valid())
 	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "PlayingStarVert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "PlayingStarFrag.glsl";
-		CGMKit::LoadShader(m_pPlayingStarTransform->getStateSet(), strVertPath, strFragPath);
+		CGMKit::LoadShader(m_pStarInfoTransform->getStateSet(),
+			strGalaxyShader + "PlayingStarVert.glsl",
+			strGalaxyShader + "PlayingStarFrag.glsl",
+			"PlayingStar");
 	}
-	if (m_pGeodeHelpLine.valid())
+	if (m_pGeodeRegion.valid())
 	{
-		std::string strLineVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "HelpLineVert.glsl";
-		std::string strLineFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "HelpLineFrag.glsl";
-		CGMKit::LoadShader(m_pGeodeHelpLine->getStateSet(), strLineVertPath, strLineFragPath);
+		CGMKit::LoadShader(m_pGeodeRegion->getStateSet(), 
+			strGalaxyShader + "AudioRegionVert.glsl",
+			strGalaxyShader + "AudioRegionFrag.glsl",
+			"AudioRegion");
 	}
-
 	if (m_pGeodeGalaxyGroup_4.valid())
 	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_4_Vert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_4_Frag.glsl";
-		CGMKit::LoadShader(m_pGeodeGalaxyGroup_4->getStateSet(), strVertPath, strFragPath);
+		CGMKit::LoadShader(m_pGeodeGalaxyGroup_4->getStateSet(),
+			strGalaxyShader + "Galaxies_4_Vert.glsl",
+			strGalaxyShader + "Galaxies_4_Frag.glsl",
+			"Galaxies_4");
 	}
 	if (m_pGeodeGalaxyGroup_5.valid() && m_pGeodeGalaxies_5.valid())
 	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_5_Vert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_5_Frag.glsl";
-		CGMKit::LoadShader(m_pGeodeGalaxyGroup_5->getStateSet(), strVertPath, strFragPath);
-		CGMKit::LoadShader(m_pGeodeGalaxies_5->getStateSet(), strVertPath, strFragPath);
+		CGMKit::LoadShader(m_pGeodeGalaxyGroup_5->getStateSet(),
+			strGalaxyShader + "Galaxies_5_Vert.glsl", strGalaxyShader + "Galaxies_5_Frag.glsl",
+			"GalaxyGroup_5");
+		CGMKit::LoadShader(m_pGeodeGalaxies_5->getStateSet(),
+			strGalaxyShader + "Galaxies_5_Vert.glsl", strGalaxyShader + "Galaxies_5_Frag.glsl",
+			"Galaxies_5");
 	}
-
 	if (m_pGeodeSupercluster.valid() && m_pGeodeUltracluster.valid())
 	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SuperclusterVert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SuperclusterFrag.glsl";
-		CGMKit::LoadShader(m_pGeodeSupercluster->getStateSet(), strVertPath, strFragPath);
-		CGMKit::LoadShader(m_pGeodeUltracluster->getStateSet(), strVertPath, strFragPath);
+		CGMKit::LoadShader(m_pGeodeSupercluster->getStateSet(),
+			strGalaxyShader + "SuperclusterVert.glsl", strGalaxyShader + "SuperclusterFrag.glsl",
+			"Supercluster");
+		CGMKit::LoadShader(m_pGeodeUltracluster->getStateSet(),
+			strGalaxyShader + "SuperclusterVert.glsl", strGalaxyShader + "SuperclusterFrag.glsl",
+			"Ultracluster");
 	}
-
 	if (m_pGeodeMyWorld_5.valid() && m_pGeodeMyWorld_6.valid())
 	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "MyWorldVert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "MyWorldFrag.glsl";
-		CGMKit::LoadShader(m_pGeodeMyWorld_5->getStateSet(), strVertPath, strFragPath);
-		CGMKit::LoadShader(m_pGeodeMyWorld_6->getStateSet(), strVertPath, strFragPath);
+		CGMKit::LoadShader(m_pGeodeMyWorld_5->getStateSet(),
+			strGalaxyShader + "MyWorldVert.glsl", strGalaxyShader + "MyWorldFrag.glsl",
+			"MyWorld_5");
+		CGMKit::LoadShader(m_pGeodeMyWorld_6->getStateSet(),
+			strGalaxyShader + "MyWorldVert.glsl", strGalaxyShader + "MyWorldFrag.glsl",
+			"MyWorld_6");
 	}
-
-	if (m_pGalaxyBackgroundGeode.valid())
+	if (m_pBackgroundGalaxyTransform.valid())
 	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyBackgroundVert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyBackgroundFrag.glsl";
-		CGMKit::LoadShader(m_pGalaxyBackgroundGeode->getStateSet(), strVertPath, strFragPath);
+		CGMKit::LoadShader(m_pBackgroundGalaxyTransform->getStateSet(),
+			strGalaxyShader + "GalaxyBackgroundVert.glsl", strGalaxyShader + "GalaxyBackgroundFrag.glsl",
+			"GalaxyBackground");
 	}
-
 	if (m_pCosmosBoxGeode.valid())
 	{
-		std::string strCosmosBoxVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "CosmosBoxVert.glsl";
-		std::string strCosmosBoxFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "CosmosBoxFrag.glsl";
-		CGMKit::LoadShader(m_pCosmosBoxGeode->getStateSet(), strCosmosBoxVertPath, strCosmosBoxFragPath);
+		CGMKit::LoadShader(m_pCosmosBoxGeode->getStateSet(),
+			strGalaxyShader + "CosmosBoxVert.glsl", strGalaxyShader + "CosmosBoxFrag.glsl",
+			"CosmosBox");
 	}
 
-	if (m_pSupernovaTransform.valid())
-	{
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SupernovaVert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SupernovaFrag.glsl";
-		CGMKit::LoadShader(m_pSupernovaTransform->getStateSet(), strVertPath, strFragPath);
-	}
+	m_pMilkyWay->Load();
+	m_pSolarSystem->Load();
 
-	return CGMNebula::Load();
+	return true;
+}
+
+bool CGMGalaxy::SaveSolarData()
+{
+	m_pSolarSystem->SaveSolarData();
+	return true;
+}
+
+void CGMGalaxy::ResizeScreen(const int iW, const int iH)
+{
+	m_pMilkyWay->ResizeScreen(iW, iH);
+	m_pSolarSystem->ResizeScreen(iW, iH);
 }
 
 void CGMGalaxy::SetEditMode(const bool bEnable)
 {
 	m_bEdit = bEnable;
 	m_pStateSetPlane->setDefine("EDIT", bEnable ? osg::StateAttribute::ON : osg::StateAttribute::OFF);
-	if(bEnable)
+	if (bEnable)
 	{
+		m_pHandleSwitch->setNodeMask(~0);
+		m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_HANDLE), true);
+		m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_HANDLE_HOVER), false);
+		m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_ARROW), false);
+
 		_DetachAudioPoints();
+
+		// æ›´æ–°éŸ³é¢‘çš„UV
+		m_pAudioUVUniform->set(_AudioCoord2UV(m_vPlayingAudioCoord));
 	}
 	else
 	{
+		m_pHandleSwitch->setNodeMask(0);
 		_AttachAudioPoints();
 	}
 }
 
-bool CGMGalaxy::GetEditMode()
+void CGMGalaxy::SetHandleHover(const bool bHover)
 {
-	return m_bEdit;
+	if (!m_bCapture && bHover != m_bHandleHover)
+	{
+		m_bHandleHover = bHover;
+		m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_HANDLE), !bHover);
+		m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_HANDLE_HOVER), bHover);
+
+		if (bHover)
+		{
+			// åœ¨è¿™é‡Œå¿…é¡»é‡æ–°è®¡ç®—ç²¾ç¡®çš„â€œå½“å‰æ’æ˜Ÿä¸–ç•Œç©ºé—´ä½ç½®â€ï¼šm_vPlayingStarWorld4Pos
+			SGMGalaxyCoord vGC = m_pDataManager->AudioCoord2GalaxyCoord(m_vPlayingAudioCoord);
+			m_vPlayingStarWorld4Pos = osg::Vec3d(vGC.x, vGC.y, vGC.z) * m_fGalaxyRadius;
+
+			// åŠå¾„æ–¹å‘çš„å¾®å°åç§»
+			SGMAudioCoord vAudioCoord_radius = SGMAudioCoord(
+				m_vPlayingAudioCoord.BPM > m_pConfigData->fMinBPM
+				? m_vPlayingAudioCoord.BPM - 0.01 : m_vPlayingAudioCoord.BPM + 0.01,
+				m_vPlayingAudioCoord.angle);
+			// è§’åº¦æ–¹å‘çš„å¾®å°åç§»
+			SGMAudioCoord vAudioCoord_angle = SGMAudioCoord(
+				m_vPlayingAudioCoord.BPM,
+				std::fmod(m_vPlayingAudioCoord.angle + 0.01, osg::PI * 2));
+
+
+			SGMGalaxyCoord vGCRadius = m_pDataManager->AudioCoord2GalaxyCoord(vAudioCoord_radius);
+			SGMGalaxyCoord vGCAngle = m_pDataManager->AudioCoord2GalaxyCoord(vAudioCoord_angle);
+			osg::Vec3d vWorldPos_radius = osg::Vec3d(vGCRadius.x, vGCRadius.y, vGCRadius.z) * m_fGalaxyRadius;
+			osg::Vec3d vWorldPos_angle = osg::Vec3d(vGCAngle.x, vGCAngle.y, vGCAngle.z) * m_fGalaxyRadius;
+			osg::Vec3d vRadiusAxis = vWorldPos_radius - m_vPlayingStarWorld4Pos;
+			vRadiusAxis.z() = 0;
+			if (vWorldPos_radius.length() < m_vPlayingStarWorld4Pos.length()) vRadiusAxis *= -1;
+			vRadiusAxis.normalize();
+			osg::Vec3d vAngleAxis = vWorldPos_angle - m_vPlayingStarWorld4Pos;
+			vAngleAxis.z() = 0;
+			vAngleAxis.normalize();
+
+			// vRadiusAxis çš„é“¶ç›˜é¢æ—‹è½¬è§’ éŸ³é¢‘ç©ºé—´åŠå¾„å¤–æ–¹å‘çš„æ—‹è½¬è§’åº¦(-PI,PI]
+			float fRadiusTheta = std::atan2(vRadiusAxis.y(), vRadiusAxis.x());
+			// vAngleAxis çš„é“¶ç›˜é¢æ—‹è½¬è§’ éŸ³é¢‘ç©ºé—´è§’æ­£æ–¹å‘çš„æ—‹è½¬è§’åº¦(-PI,PI]
+			float fAngleTheta = std::atan2(vAngleAxis.y(), vAngleAxis.x());
+
+			// + Radius + Angle
+			m_fPRPA = 0.5*(fRadiusTheta + fAngleTheta);
+			if (std::abs(fRadiusTheta - fAngleTheta) > osg::PI)
+			{
+				m_fPRPA += osg::PI;
+				if (m_fPRPA > osg::PI)
+				{
+					m_fPRPA -= osg::PI * 2;
+				}
+			}
+		}
+	}
 }
 
 void CGMGalaxy::SetCapture(const bool bEnable)
@@ -581,6 +827,23 @@ void CGMGalaxy::SetCapture(const bool bEnable)
 	{
 		m_bCapture = bEnable;
 		m_pStateSetPlane->setDefine("CAPTURE", bEnable ? osg::StateAttribute::ON : osg::StateAttribute::OFF);
+
+		if (bEnable && (4 == m_pKernelData->iHierarchy))
+		{
+			m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_HANDLE), false);
+			m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_HANDLE_HOVER), false);
+			m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_ARROW), true);
+		}
+		else if (!bEnable)
+		{
+			m_eArrowDir = EGMAD_NONE;
+			m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_HANDLE), !m_bHandleHover);
+			m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_HANDLE_HOVER), m_bHandleHover);
+			m_pHandleSwitch->setChildValue(m_pHandleSwitch->getChild(ID_ARROW), false);
+
+			osg::Quat quat = osg::Quat(m_fPRPA, osg::Vec3d(0, 0, 1));
+			m_pStar_4_Transform->asPositionAttitudeTransform()->setAttitude(quat);
+		}
 	}
 }
 
@@ -602,52 +865,44 @@ bool CGMGalaxy::CreateGalaxy(double fDiameter)
 	m_fGalaxyRadius = fDiameter * 0.5;
 	m_pGalaxyRadiusUniform->set(float(m_fGalaxyRadius / m_pKernelData->fUnitArray->at(4)));
 
-	// 0123²ã¼¶¿Õ¼äÏÂ¶¼¿É¼ûµÄĞÇ¿Õcube
+	// 0123å±‚çº§ç©ºé—´ä¸‹éƒ½å¯è§çš„æ˜Ÿç©ºcube
 	_CreateStarCube();
 
-	// ´´½¨Ì«Ñô£¬Ö»ĞèÒªÔÚ2¼¶¿Õ¼ä´´½¨
-	_CreateSun();
+	// 3å±‚çº§ç©ºé—´ä¸‹çš„ç‰©ä½“
 
-	// ´´½¨ĞĞĞÇ£¬ÓÃÓÚ2¡¢3¼¶¿Õ¼ä
-	_CreatePlanets();
-
-	// 3²ã¼¶¿Õ¼äÏÂµÄÎïÌå
-	// ´´½¨°Â¶ûÌØÔÆ£¬ÓÃÓÚ3¼¶¿Õ¼ä
-	_CreateOortCloud();
-
-	// 4²ã¼¶¿Õ¼äÏÂµÄÎïÌå
+	// 4å±‚çº§ç©ºé—´ä¸‹çš„ç‰©ä½“
 	_CreateAudioPoints();
 	_CreateGalaxyPoints();
-	_CreateGalaxyPointsN_4(2);	// 2±¶ÃÜ¶ÈµÄĞÇĞÇ
-	_CreateGalaxyPointsN_4(4);	// 4±¶ÃÜ¶ÈµÄĞÇĞÇ
-	_CreateGalaxyPointsN_4(8);	// 8±¶ÃÜ¶ÈµÄĞÇĞÇ
+	_CreateGalaxyPointsN_4(2);	// 2å€å¯†åº¦çš„æ˜Ÿæ˜Ÿ
+	_CreateGalaxyPointsN_4(4);	// 4å€å¯†åº¦çš„æ˜Ÿæ˜Ÿ
+	_CreateGalaxyPointsN_4(8);	// 8å€å¯†åº¦çš„æ˜Ÿæ˜Ÿ
 
-	_CreateStarCube_4(); // ´´½¨PointSpriteºãĞÇ£¬ÓÃÓÚ4¼¶¿Õ¼ä
+	_CreateStarCube_4(); // åˆ›å»ºcubeæ’æ˜Ÿï¼Œç”¨äº4çº§ç©ºé—´
 	_CreateGalaxyPlane_4();
-	_CreateGalaxies_4(); // ´´½¨PointSpriteĞÇÏµÈº£¬ÓÃÓÚ4¼¶¿Õ¼ä
+	_CreateGalaxies_4(); // åˆ›å»ºæ˜Ÿç³»ç¾¤ï¼Œç”¨äº4çº§ç©ºé—´
 
-	// 5²ã¼¶¿Õ¼äÏÂµÄÎïÌå
+	_CreateHandle(); // åˆ›å»ºç”¨äºç§»åŠ¨æ’æ˜Ÿçš„åœ†ç›˜çŠ¶çš„æŠŠæ‰‹
+
+	// 5å±‚çº§ç©ºé—´ä¸‹çš„ç‰©ä½“
 	_CreateGalaxyPlane_5();
 	_CreateGalaxies_5();
 	//_CreateSupercluster();
 	//_CreateUltracluster();
 
 	if (m_pConfigData->bPhoto)
-	{
 		_CreateMyWorld();
-	}
 
-	// ´´½¨³¬ĞÂĞÇ
-	_CreateSupernova();
-
-	// ±³¾°
-	_CreateGalaxyBackground();
+	// èƒŒæ™¯é“¶æ²³
+	_CreateBackgroundGalaxy();
+	// èƒŒæ™¯å®‡å®™
 	_CreateCosmosBox();
 
-	if (m_pConfigData->bHighQuality)
+	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
 	{
-		MakeNebula(fDiameter, fDiameter, 0.13f*fDiameter);
+		m_pMilkyWay->MakeMilkyWay(fDiameter, fDiameter, 0.13f * fDiameter);
 	}
+
+	m_pSolarSystem->CreateSolarSystem();
 
 	return true;
 }
@@ -658,368 +913,351 @@ void CGMGalaxy::SetMousePosition(const osg::Vec3d& vHierarchyPos)
 
 	osg::Vec3f vPosHierarchy = vHierarchyPos;
 	m_pMousePosUniform->set(vPosHierarchy);
+
+	if (4 == m_pKernelData->iHierarchy)
+	{
+		m_vMouseWorldPos = vHierarchyPos * m_pKernelData->fUnitArray->at(4);
+	}
+	else
+	{
+		// to do
+		//m_vMouseWorldPos = vHierarchyPos * m_pKernelData->fUnitArray->at();
+	}
 }
 
 void CGMGalaxy::SetCurrentStar(const osg::Vec3d& vWorldPos, const std::wstring& wstrName)
 {
-	if (m_bWelcome) return;
+	if (m_bWelcome || m_bEdit) return;
 
-	m_vPlayingStarWorldPos = vWorldPos;
 	osg::Vec3f vPosHierarchy = vWorldPos / m_pKernelData->fUnitArray->at(4);
 	if (4 > m_pKernelData->iHierarchy)
 	{
-		osg::Vec3d vTargetHie = GM_ENGINE_PTR->GetHierarchyLastTargetPos(4);
-		vPosHierarchy = (vPosHierarchy - vTargetHie)*GM_UNIT_SCALE;
+		vPosHierarchy = (vPosHierarchy - m_vPlayingStarWorld4Pos)*GM_UNIT_SCALE;
 	}
 	else
 	{
 		vPosHierarchy = vWorldPos / m_pKernelData->fUnitArray->at(m_pKernelData->iHierarchy);
 	}
-	m_pStarHiePosUniform->set(vPosHierarchy);
+	m_pCommonUniform->SetStarHiePos(vPosHierarchy);
 	m_strPlayingStarName = wstrName;
 
-	// ÉèÖÃ¼¤»îºãĞÇĞÅÏ¢½ÚµãµÄÎ»ÖÃ
-	if(m_pPlayingStarTransform.valid())
+	// è®¾ç½®æ¿€æ´»æ’æ˜Ÿä¿¡æ¯èŠ‚ç‚¹çš„ä½ç½®
+	if (m_pStarInfoTransform.valid())
 	{
-		m_pPlayingStarTransform->asPositionAttitudeTransform()->setPosition(vPosHierarchy);
+		m_pStarInfoTransform->asPositionAttitudeTransform()->setPosition(vPosHierarchy);
 	}
-	// ÉèÖÃ°Â¶ûÌØÔÆ¡¢ÖĞĞÄºãĞÇ¡¢ĞĞĞÇ¹ìµÀµÈµÄÎ»ÖÃ
-	if (m_pStar_3_Transform.valid())
+	// è®¾ç½®ä¸­å¿ƒæ’æ˜Ÿã€è¡Œæ˜Ÿè½¨é“ç­‰çš„ä½ç½®
+	if (m_pStar_4_Transform.valid())
 	{
-		m_pStar_3_Transform->asPositionAttitudeTransform()->setPosition(vPosHierarchy);
-	}
-	if (m_pOort_4_Transform.valid())
-	{
-		m_pOort_4_Transform->asPositionAttitudeTransform()->setPosition(vPosHierarchy);
+		m_pStar_4_Transform->asPositionAttitudeTransform()->setPosition(vPosHierarchy);
 	}
 
-	if (m_pSunBloomTransform.valid())
+	// è®¾ç½®è¶…æ–°æ˜Ÿçš„ä½ç½®
+	if (3 == m_pKernelData->iHierarchy)
 	{
-		m_pSunBloomTransform->setPosition(osg::Vec3d(0,0,0));
+		osg::Vec3f vPosHie = (vPosHierarchy - m_vPlayingStarWorld4Pos)*GM_UNIT_SCALE;
+		m_pSolarSystem->SetSupernovaHiePos(vPosHie);
 	}
-
-	// ÉèÖÃ³¬ĞÂĞÇµÄÎ»ÖÃ
-	if (m_pSupernovaTransform.valid())
+	else if (4 <= m_pKernelData->iHierarchy)
 	{
-		if (4 > m_pKernelData->iHierarchy)
-		{
-			osg::Vec3d vTargetHie = GM_ENGINE_PTR->GetHierarchyLastTargetPos(4);
-			osg::Vec3f vPosHie = (vPosHierarchy - vTargetHie)*GM_UNIT_SCALE;
-			m_pSupernovaTransform->setPosition(vPosHie);
-		}
-		else
-		{
-			m_pSupernovaTransform->setPosition(vPosHierarchy);
-		}
+		m_pSolarSystem->SetSupernovaHiePos(vPosHierarchy);
 	}
+	else {}
 
-	// ÉèÖÃµ±Ç°ÑÕÉ«
-	SGMStarCoord vStarcoord = GM_ENGINE_PTR->GetDataManager()->GetStarCoord(wstrName);
-	m_pStarColorUniform->set(GM_ENGINE_PTR->GetDataManager()->GetAudioColor(vStarcoord));
+	m_vPlayingStarWorld4Pos = vWorldPos;
+	// è®¾ç½®å½“å‰éŸ³é¢‘æ˜Ÿé¢œè‰²
+	m_pCommonUniform->SetStarColor(m_pDataManager->GetAudioColor(m_pDataManager->GetUID(wstrName)));
 }
 
-void CGMGalaxy::SetAudioLevel(float fLevel)
+void CGMGalaxy::SetPlayingStarAudioCoord(const SGMAudioCoord& vAudioCoord)
 {
-	for (int i = PULSE_NUM-2; i >= 0; i--)
-	{
-		float fL;
-		m_pLevelArrayUniform->getElement(i, fL);
-		m_pLevelArrayUniform->setElement(i+1, fL);
-	}
-	m_pLevelArrayUniform->setElement(0, fLevel);
+	m_vPlayingAudioCoord = vAudioCoord;
+	_UpdatePlayingStarInformation(vAudioCoord);
 }
 
-osg::Vec3d CGMGalaxy::GetStarWorldPos()
+osg::Matrix CGMGalaxy::HierarchyAddMatrix() const
 {
-	return m_vPlayingStarWorldPos;
+	osg::Vec3d vZeroPos = osg::Vec3d(0, 0, 0);
+	osg::Quat qRotate = osg::Quat();
+	switch (m_pKernelData->iHierarchy)
+	{
+	case 3:	// 2->3
+	{
+		SGMVector3 vPlanetPos;
+		double fOrbitalPeriod;
+		m_pSolarSystem->GetCelestialBody(vPlanetPos, fOrbitalPeriod);
+		vZeroPos = osg::Vec3d(vPlanetPos.x, vPlanetPos.y, vPlanetPos.z) / m_pKernelData->fUnitArray->at(3);
+	}
+	break;
+	case 4:	// 3->4
+	{
+		vZeroPos = m_vNearStarWorld4Pos / m_pKernelData->fUnitArray->at(4);
+		qRotate = m_pSolarSystem->GetSolarRotate();
+	}
+	break;
+	default:
+		break;
+	}
+
+	if (2 < m_pKernelData->iHierarchy) // 2->3->4->5->6
+	{
+		osg::Matrix mHierarchyMatrix = osg::Matrix();
+		mHierarchyMatrix.preMultTranslate(vZeroPos);
+		mHierarchyMatrix.preMultRotate(qRotate);
+		mHierarchyMatrix.preMultScale(osg::Vec3d(1.0, 1.0, 1.0) / GM_UNIT_SCALE);
+		return mHierarchyMatrix;
+	}
+	else // 0,1,2
+	{
+		return m_pSolarSystem->HierarchyAddMatrix();
+	}
 }
 
-bool CGMGalaxy::UpdateHierarchy(int iHierarchy)
+osg::Matrix CGMGalaxy::HierarchySubMatrix() const
 {
-	if (iHierarchy > 0 && GM_Root->containsNode(m_pHierarchyRootVector.at(iHierarchy - 1).get()))
+	osg::Vec3d vZeroPos = osg::Vec3d(0, 0, 0);
+	osg::Quat qRotate = osg::Quat();
+	switch (m_pKernelData->iHierarchy)
 	{
-		GM_Root->removeChild(m_pHierarchyRootVector.at(iHierarchy - 1).get());
+	case 3: // 4->3
+	{
+		vZeroPos = m_vPlayingStarWorld4Pos / m_pKernelData->fUnitArray->at(4);
+		qRotate = m_pSolarSystem->GetSolarRotate();
 	}
-	if (!(GM_Root->containsNode(m_pHierarchyRootVector.at(iHierarchy).get())))
+	break;
+	case 2: // 3->2
 	{
-		GM_Root->addChild(m_pHierarchyRootVector.at(iHierarchy).get());
+		SGMVector3 vPlanetPos;
+		double fOrbitalPeriod;
+		m_pSolarSystem->GetCelestialBody(vPlanetPos, fOrbitalPeriod);
+		vZeroPos = osg::Vec3d(vPlanetPos.x, vPlanetPos.y, vPlanetPos.z) / m_pKernelData->fUnitArray->at(3);
 	}
-	if (iHierarchy < 6 && GM_Root->containsNode(m_pHierarchyRootVector.at(iHierarchy + 1).get()))
-	{
-		GM_Root->removeChild(m_pHierarchyRootVector.at(iHierarchy + 1).get());
+	break;
+	default:
+		break;
 	}
 
-	switch (iHierarchy)
+	if (1 < m_pKernelData->iHierarchy)// 6->5->4->3->2
+	{
+		osg::Matrix mHierarchyMatrix = osg::Matrix();
+		mHierarchyMatrix.preMultScale(osg::Vec3d(GM_UNIT_SCALE, GM_UNIT_SCALE, GM_UNIT_SCALE));
+		mHierarchyMatrix.preMultRotate(qRotate.inverse());
+		mHierarchyMatrix.preMultTranslate(-vZeroPos);
+		return mHierarchyMatrix;
+	}
+	else // 0,1
+	{
+		return m_pSolarSystem->HierarchySubMatrix();
+	}
+}
+
+bool CGMGalaxy::GetNearestCelestialBody(const SGMVector3& vSearchHiePos,
+	SGMVector3& vPlanetHiePos, double& fOrbitalPeriod)
+{
+	return m_pSolarSystem->GetNearestCelestialBody(vSearchHiePos, vPlanetHiePos, fOrbitalPeriod);
+}
+
+void CGMGalaxy::GetCelestialBody(SGMVector3& vPlanetPos, double & fOrbitalPeriod)
+{
+	m_pSolarSystem->GetCelestialBody(vPlanetPos, fOrbitalPeriod);
+}
+
+double CGMGalaxy::GetCelestialMeanRadius() const
+{
+	return m_pSolarSystem->GetCelestialMeanRadius();
+}
+
+double CGMGalaxy::GetCelestialRadius(const double fLatitude) const
+{
+	return m_pSolarSystem->GetCelestialRadius(fLatitude);
+}
+
+SGMVector3 CGMGalaxy::GetCelestialNorth() const
+{
+	return m_pSolarSystem->GetCelestialNorth();
+}
+
+unsigned int CGMGalaxy::GetCelestialIndex() const
+{
+	return m_pSolarSystem->GetCelestialIndex();
+}
+
+double CGMGalaxy::GetEyeAltitude() const
+{
+	return m_pSolarSystem->GetEyeAltitude();
+}
+
+bool CGMGalaxy::UpdateHierarchy(int iHieNew)
+{
+	// ç§»é™¤ä¸‹ä¸€ç©ºé—´å±‚çº§
+	if (iHieNew > 0 && GM_Root->containsNode(m_pHierarchyRootVector.at(iHieNew - 1).get()))
+	{
+		GM_Root->removeChild(m_pHierarchyRootVector.at(iHieNew - 1).get());
+	}
+	// ç§»é™¤ä¸Šä¸€ç©ºé—´å±‚çº§
+	if (iHieNew < 6 && GM_Root->containsNode(m_pHierarchyRootVector.at(iHieNew + 1).get()))
+	{
+		GM_Root->removeChild(m_pHierarchyRootVector.at(iHieNew + 1).get());
+	}
+	// æ·»åŠ å½“å‰ç©ºé—´å±‚çº§
+	if (!(GM_Root->containsNode(m_pHierarchyRootVector.at(iHieNew).get())))
+	{
+		GM_Root->addChild(m_pHierarchyRootVector.at(iHieNew).get());
+	}
+
+	switch (iHieNew)
 	{
 	case 0:
 	{
-		if (m_pSupernovaTransform.valid() && GM_Root->containsNode(m_pSupernovaTransform.get()))
+		if (m_pBackgroundStarTransform.valid())
 		{
-			GM_Root->removeChild(m_pSupernovaTransform.get());
-		}
-		if (m_pGeodeStarCube.valid())
-		{
-			m_pGeodeStarCube->setNodeMask(~0);
-			m_pUnitRatioUniform->set(float(m_pKernelData->fUnitArray->at(0) / m_pKernelData->fUnitArray->at(3)));
-			m_pStarDistanceUniform->set(1.0f);
+			m_pBackgroundStarTransform->setNodeMask(~0);
+			m_fStarDistanceUniform->set(1.0f);
 		}
 	}
 	break;
 	case 1:
 	{
-		if (m_pSupernovaTransform.valid() && !GM_Root->containsNode(m_pSupernovaTransform.get()))
+		if (m_pBackgroundStarTransform.valid())
 		{
-			GM_Root->addChild(m_pSupernovaTransform.get());
-		}
-		if (m_pGeodeStarCube.valid())
-		{
-			m_pGeodeStarCube->setNodeMask(~0);
-			m_pUnitRatioUniform->set(float(m_pKernelData->fUnitArray->at(1) / m_pKernelData->fUnitArray->at(3)));
-			m_pStarDistanceUniform->set(1.0f);
+			m_pBackgroundStarTransform->setNodeMask(~0);
+			m_fStarDistanceUniform->set(1.0f);
 		}
 	}
 	break;
 	case 2:
 	{
-		if (m_pGeodeStarCube.valid())
+		if (m_pBackgroundStarTransform.valid())
 		{
-			m_pGeodeStarCube->setNodeMask(~0);
-			m_pUnitRatioUniform->set(float(m_pKernelData->fUnitArray->at(2) / m_pKernelData->fUnitArray->at(3)));
-			m_pStarDistanceUniform->set(1.0f);
+			m_pBackgroundStarTransform->setNodeMask(~0);
+			m_fStarDistanceUniform->set(1.0f);
 		}
-
-		if (m_pSunBloomTransform.valid())
-		{
-			m_pSunBloomTransform->setPosition(osg::Vec3d(0,0,0));
-		}
+		m_pCommonUniform->SetStarHiePos(osg::Vec3f(0, 0, 0)); // to do
 	}
 	break;
 	case 3:
 	{
-		osg::Vec3d vTargetHie = GM_ENGINE_PTR->GetHierarchyLastTargetPos(4);
-
-		double fCubeSize = GM_MIN_STARS_CUBE / m_pKernelData->fUnitArray->at(4);
 		osg::Vec3f vOffset = osg::Vec3f(
-			std::fmod(vTargetHie.x(), fCubeSize),
-			std::fmod(vTargetHie.y(), fCubeSize),
-			std::fmod(vTargetHie.z(), fCubeSize))
-			* GM_UNIT_SCALE;
+			std::fmod(m_vNearStarWorld4Pos.x(), GM_MIN_STARS_CUBE),
+			std::fmod(m_vNearStarWorld4Pos.y(), GM_MIN_STARS_CUBE),
+			std::fmod(m_vNearStarWorld4Pos.z(), GM_MIN_STARS_CUBE))
+			/ m_pKernelData->fUnitArray->at(3);
 		m_pCubeCenterUniform->set(vOffset);
 
-		osg::Vec3d vPosHie = m_vPlayingStarWorldPos / m_pKernelData->fUnitArray->at(4);
-		vPosHie = (vPosHie - vTargetHie)*GM_UNIT_SCALE;
-		if (m_pSupernovaTransform.valid())
+		m_pSolarSystem->SetSupernovaHiePos(osg::Vec3(0, 0, 0));
+
+		if (m_pBackgroundStarTransform.valid())
 		{
-			m_pSupernovaTransform->setPosition(vPosHie);
+			m_pBackgroundStarTransform->setNodeMask(~0);
 		}
-		if (m_pStar_3_Transform.valid())
-		{
-			m_pStar_3_Transform->asPositionAttitudeTransform()->setPosition(vPosHie);
-		}
-		
-		if (m_pGeodeStarCube.valid())
-		{
-			m_pGeodeStarCube->setNodeMask(~0);
-			m_pUnitRatioUniform->set(1.0f);
-		}
-		m_pStarAlphaUniform->set(0.0f);
-		m_pStarHiePosUniform->set(osg::Vec3f(vPosHie));
+		m_fStarAlphaUniform->set(0.0f);
+		m_pCommonUniform->SetStarHiePos(osg::Vec3f(0,0,0));
 	}
 	break;
 	case 4:
 	{
-		osg::Vec3f vPosHierarchy = m_vPlayingStarWorldPos / m_pKernelData->fUnitArray->at(4);
-		if (m_pSupernovaTransform.valid())
+		osg::Vec3f vPosHierarchy = m_vPlayingStarWorld4Pos / m_pKernelData->fUnitArray->at(4);
+		m_pSolarSystem->SetSupernovaHiePos(vPosHierarchy);
+		if (m_pBackgroundStarTransform.valid())
 		{
-			m_pSupernovaTransform->setPosition(vPosHierarchy);
+			m_pBackgroundStarTransform->setNodeMask(0);
 		}
-		if (m_pGeodeStarCube.valid())
+		if (m_pStar_4_Transform.valid())
 		{
-			m_pGeodeStarCube->setNodeMask(0);
+			m_pStar_4_Transform->asPositionAttitudeTransform()->setPosition(vPosHierarchy);
 		}
-		if (m_pOort_4_Transform.valid())
-		{
-			m_pOort_4_Transform->asPositionAttitudeTransform()->setPosition(vPosHierarchy);
-		}
-		m_pStarDistanceUniform->set(4000.0f);
-		m_pStarHiePosUniform->set(vPosHierarchy);
+		m_fStarDistanceUniform->set(4000.0f);
+		m_pCommonUniform->SetStarHiePos(vPosHierarchy);
 	}
 	break;
 	case 5:
 	{
-		if (m_pSupernovaTransform.valid())
+		m_pSolarSystem->SetSupernovaHiePos(m_vPlayingStarWorld4Pos / m_pKernelData->fUnitArray->at(5));
+
+		if (m_pBackgroundStarTransform.valid())
 		{
-			if (!GM_Root->containsNode(m_pSupernovaTransform.get()))
-			{
-				GM_Root->addChild(m_pSupernovaTransform.get());
-			}
-			osg::Vec3f vPosHierarchy = m_vPlayingStarWorldPos / m_pKernelData->fUnitArray->at(5);
-			m_pSupernovaTransform->setPosition(vPosHierarchy);
-		}
-		if (m_pGeodeStarCube.valid())
-		{
-			m_pGeodeStarCube->setNodeMask(0);
+			m_pBackgroundStarTransform->setNodeMask(0);
 		}
 	}
 	break;
 	case 6:
 	{
-		if (m_pSupernovaTransform.valid() && GM_Root->containsNode(m_pSupernovaTransform.get()))
+		if (m_pBackgroundStarTransform.valid())
 		{
-			GM_Root->removeChild(m_pSupernovaTransform.get());
-		}
-		if (m_pGeodeStarCube.valid())
-		{
-			m_pGeodeStarCube->setNodeMask(0);
+			m_pBackgroundStarTransform->setNodeMask(0);
 		}
 	}
 	break;
 	default:
-		return false;
+		break;
 	}
+
+	if (iHieNew <= 4)
+	{
+		osg::Quat quat = osg::Quat();
+		for (int i = iHieNew; i < 4; i++)
+		{
+			// to do
+			if (3 == i)
+			{
+				quat = m_pSolarSystem->GetSolarRotate().inverse();
+			}
+		}
+		m_pBackgroundGalaxyTransform->asPositionAttitudeTransform()->setAttitude(quat);
+		m_pBackgroundStarTransform->asPositionAttitudeTransform()->setAttitude(quat);
+	}
+
+	m_pMilkyWay->UpdateHierarchy(iHieNew);
+	m_pSolarSystem->UpdateHierarchy(iHieNew);
 
 	return true;
 }
 
-bool CGMGalaxy::_CreateSupernova()
+SGMVector3 CGMGalaxy::UpdateCelestialBody(const SGMVector3& vTargetHiePos)
 {
-	m_pSupernovaTransform = new osg::AutoTransform();
-	m_pSupernovaTransform->setAutoRotateMode(osg::AutoTransform::ROTATE_TO_SCREEN);
-	m_pSupernovaTransform->setAutoScaleToScreen(true);
-	GM_Root->addChild(m_pSupernovaTransform.get());
+	return m_pSolarSystem->UpdateCelestialBody(vTargetHiePos);
+}
 
-	osg::ref_ptr<osg::Geode> pGeodeSupernova = new osg::Geode();
-	osg::Geometry* pGeometry = new osg::Geometry();
+void CGMGalaxy::RefreshNearStarWorldPos()
+{
+	// è¿™ä¸¤ä¸ªå€¼ä¸ä¸€å®šç›¸åŒï¼šæ­£åœ¨åˆ‡æ¢æ­Œæ›²æ—¶ï¼Œè¿™ä¸¤ä¸ªå€¼ä¸åŒ
+	m_vNearStarWorld4Pos = m_vPlayingStarWorld4Pos;
+}
 
-	// ¶¥µã
-	osg::ref_ptr<osg::Vec3Array> verArray = new osg::Vec3Array;
-	// ¹âÈ¦
-	float fHalfWidth = 32;
-	float fHalfHeight = 32;
-	verArray->push_back(osg::Vec3(-fHalfWidth, -fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, -fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(-fHalfWidth, -fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(-fHalfWidth, fHalfHeight, 0.0f));
-	// ºáÁÁÏß
-	fHalfWidth = 100;
-	fHalfHeight = 2;
-	verArray->push_back(osg::Vec3(-fHalfWidth, -fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, -fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(-fHalfWidth, -fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(-fHalfWidth, fHalfHeight, 0.0f));
-	// ÊúÁÁÏß
-	fHalfWidth = 2;
-	fHalfHeight = 60;
-	verArray->push_back(osg::Vec3(fHalfWidth, -fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(-fHalfWidth, fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, -fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(-fHalfWidth, fHalfHeight, 0.0f));
-	verArray->push_back(osg::Vec3(-fHalfWidth, -fHalfHeight, 0.0f));
-	pGeometry->setVertexArray(verArray);
+osg::Quat CGMGalaxy::GetNearStarRotate() const
+{
+	return m_pSolarSystem->GetSolarRotate();
+}
 
-	// UV£ºÁÁÏßÍ¼Æ¬128*8ÏñËØ£¬ÔÚÉÏ¶Ë£»¹âÈ¦Í¼Æ¬100*100ÏñËØ£¬ÔÚÏÂÃæ£¬ËÄÖÜÁô°×10ÏñËØ
-	osg::ref_ptr<osg::Vec2Array> textArray = new osg::Vec2Array;
-	// ¹âÈ¦
-	osg::Vec2 vLD = osg::Vec2(13.5f / 128.0f, 9.5f / 128.0f);
-	float fDeltaU = 101.0f / 128.0f;
-	float fDeltaV = 101.0f / 128.0f;
-	textArray->push_back(vLD);
-	textArray->push_back(vLD + osg::Vec2(fDeltaU, 0));
-	textArray->push_back(vLD + osg::Vec2(fDeltaU, fDeltaV));
-	textArray->push_back(vLD);
-	textArray->push_back(vLD + osg::Vec2(fDeltaU, fDeltaV));
-	textArray->push_back(vLD + osg::Vec2(0, fDeltaV));
-	// ÁÁÏß£¬ºáÊúÁÁÏßµÄUVË³ĞòÍêÈ«Ò»Ñù
-	vLD = osg::Vec2(0.0f, 120.5f / 128.0f);
-	fDeltaU = 1.0f;
-	fDeltaV = 7.0f / 128.0f;
-	// ºáÁÁÏß
-	textArray->push_back(vLD);
-	textArray->push_back(vLD + osg::Vec2(fDeltaU, 0));
-	textArray->push_back(vLD + osg::Vec2(fDeltaU, fDeltaV));
-	textArray->push_back(vLD);
-	textArray->push_back(vLD + osg::Vec2(fDeltaU, fDeltaV));
-	textArray->push_back(vLD + osg::Vec2(0, fDeltaV));
-	// ÊúÁÁÏß
-	textArray->push_back(vLD);
-	textArray->push_back(vLD + osg::Vec2(fDeltaU, 0));
-	textArray->push_back(vLD + osg::Vec2(fDeltaU, fDeltaV));
-	textArray->push_back(vLD);
-	textArray->push_back(vLD + osg::Vec2(fDeltaU, fDeltaV));
-	textArray->push_back(vLD + osg::Vec2(0, fDeltaV));
-	pGeometry->setTexCoordArray(0, textArray);
-
-	// ·¨Ïß
-	osg::ref_ptr<osg::Vec3Array> normal = new osg::Vec3Array;
-	normal->push_back(osg::Vec3(0, 0, 1));
-	pGeometry->setNormalArray(normal);
-	pGeometry->setNormalBinding(osg::Geometry::BIND_OVERALL);
-	// Primitive
-	pGeometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 18));
-
-	pGeometry->setUseVertexBufferObjects(true);
-	pGeometry->setUseDisplayList(false);
-	pGeometry->setDataVariance(osg::Object::DYNAMIC);
-
-	pGeodeSupernova->addDrawable(pGeometry);
-	m_pSupernovaTransform->addChild(pGeodeSupernova.get());
-	osg::ref_ptr<osg::StateSet> pSSS = m_pSupernovaTransform->getOrCreateStateSet();
-
-	pSSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSS->setMode(GL_BLEND, osg::StateAttribute::ON);
-	osg::ref_ptr<osg::BlendEquation> blendEqua = new osg::BlendEquation(osg::BlendEquation::RGBA_MAX);
-	pSSS->setAttributeAndModes(blendEqua.get(), osg::StateAttribute::ON);
-	pSSS->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
-	pSSS->setRenderBinDetails(BIN_SUPERNOVA, "DepthSortedBin");
-
-	std::string strGalaxyTexPath = m_pConfigData->strCorePath + m_strGalaxyTexPath;
-	osg::ref_ptr<osg::Texture> _supernovaTex = _CreateTexture2D(strGalaxyTexPath + "supernova.jpg", 3);
-	int iUnit = 0;
-	pSSS->setTextureAttributeAndModes(iUnit, _supernovaTex.get());
-	pSSS->addUniform(new osg::Uniform("supernovaTex", iUnit));
-	iUnit++;
-
-	pSSS->addUniform(m_pStarColorUniform.get());
-	pSSS->addUniform(m_pLevelArrayUniform.get());
-	pSSS->addUniform(m_pSupernovaLightUniform.get());
-
-	// Ìí¼Óshader
-	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SupernovaVert.glsl";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SupernovaFrag.glsl";
-	return CGMKit::LoadShader(pSSS.get(), strVertPath, strFragPath);
+void CGMGalaxy::_InitBackground()
+{
+	m_pCosmosBoxNode = new CCosmosBox();
+	m_pKernelData->pBackgroundCam->addChild(m_pCosmosBoxNode.get());
 }
 
 bool CGMGalaxy::_CreateStarCube()
 {
+	m_pBackgroundStarTransform = new osg::PositionAttitudeTransform();
+	m_pBackgroundStarTransform->setNodeMask(0);
+	osg::ref_ptr<osg::StateSet> pSS = m_pBackgroundStarTransform->getOrCreateStateSet();
+	pSS->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
+	pSS->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
+	pSS->setMode(GL_BLEND, osg::StateAttribute::ON);
+	pSS->setAttributeAndModes(new osg::BlendFunc(
+		GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_DST_ALPHA, GL_ONE), osg::StateAttribute::ON);
+	pSS->setRenderBinDetails(BIN_STARS_1, "DepthSortedBin");
+
+	pSS->addUniform(m_pCubeCenterUniform.get());
+	pSS->addUniform(m_pCommonUniform->GetUnit());
+	pSS->addUniform(m_fStarDistanceUniform.get());
+	pSS->addUniform(m_pCommonUniform->GetStarColor());
+
+	// æ·»åŠ shader
+	std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_Vert.glsl";
+	std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_Frag.glsl";
+	CGMKit::LoadShader(pSS.get(), strStarVertPath, strStarFragPath, "StarCube");
+
 	float fCubeSize = GM_MIN_STARS_CUBE / m_pKernelData->fUnitArray->at(3);
-
-	if (!m_pGeodeStarCube.valid())
-	{
-		m_pGeodeStarCube = new osg::Geode();
-		m_pGeodeStarCube->setNodeMask(0);
-		m_pCosmosBoxNode->addChild(m_pGeodeStarCube.get());
-		osg::ref_ptr<osg::StateSet> pSS_3 = m_pGeodeStarCube->getOrCreateStateSet();
-
-		pSS_3->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
-		pSS_3->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
-		pSS_3->setRenderBinDetails(BIN_STARS, "DepthSortedBin");
-
-		pSS_3->addUniform(m_pCubeCenterUniform.get());
-		pSS_3->addUniform(m_pUnitRatioUniform.get());
-		pSS_3->addUniform(m_pStarDistanceUniform.get());
-		pSS_3->addUniform(m_pStarColorUniform.get());
-
-		// Ìí¼Óshader
-		std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_Vert.glsl";
-		std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_Frag.glsl";
-		CGMKit::LoadShader(pSS_3.get(), strStarVertPath, strStarFragPath);
-	}
-
 	size_t iNum = m_pCubeVertArray->size();
 	osg::ref_ptr<osg::Vec4Array> vertArray = new osg::Vec4Array;
 	vertArray->reserve(iNum);
@@ -1044,360 +1282,55 @@ bool CGMGalaxy::_CreateStarCube()
 	pGeometry->setUseDisplayList(false);
 	pGeometry->setDataVariance(osg::Object::DYNAMIC);
 
-	m_pGeodeStarCube->addDrawable(pGeometry.get());
+	osg::ref_ptr<osg::Geode> pGeodeStarCube = new osg::Geode();
+	pGeodeStarCube->addDrawable(pGeometry.get());
+	m_pBackgroundStarTransform->addChild(pGeodeStarCube.get());
+	m_pCosmosBoxNode->addChild(m_pBackgroundStarTransform.get());
 	return true;
 }
 
-bool CGMGalaxy::_CreateSun()
+bool CGMGalaxy::_CreateHandle()
 {
-	// ´´½¨Ì«Ñô¹âÇò
-	// Ì«Ñô°ë¾¶£º6.963e8 Ã×
-	double fSunRadius2 = 6.963e8 / m_pKernelData->fUnitArray->at(2);
-	m_pGeodeSun_2 = new osg::Geode;
-	osg::ref_ptr<const osg::EllipsoidModel>	_sunModel_2 = new osg::EllipsoidModel(fSunRadius2, fSunRadius2);
-	osg::ref_ptr<osg::Geometry> pDrawable_2 = _MakeEllipsoidGeometry(_sunModel_2, 32, 16, 0, true, true);
-	m_pGeodeSun_2->addDrawable(pDrawable_2.get());
-	m_pStar_2_Transform->addChild(m_pGeodeSun_2.get());
+	m_pHandleSwitch = new osg::Switch;
+	m_pStar_4_Transform->addChild(m_pHandleSwitch.get());
+	osg::ref_ptr<osg::StateSet>	pStateSet = m_pHandleSwitch->getOrCreateStateSet();
+	pStateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+	pStateSet->setMode(GL_BLEND, osg::StateAttribute::ON);
+	pStateSet->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
+	pStateSet->setRenderBinDetails(BIN_HANDLE, "DepthSortedBin");
+	// æ·»åŠ shader
+	std::string strHandleVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Handle_Vert.glsl";
+	std::string strHandleFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Handle_Frag.glsl";
+	CGMKit::LoadShader(pStateSet.get(), strHandleVertPath, strHandleFragPath, "Handle");
 
-	osg::ref_ptr<osg::StateSet>	pSS_2 = m_pGeodeSun_2->getOrCreateStateSet();
-	pSS_2->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSS_2->setMode(GL_BLEND, osg::StateAttribute::OFF);
-	pSS_2->setAttributeAndModes(new osg::CullFace());
-	pSS_2->setRenderBinDetails(BIN_STAR_PLAYING, "DepthSortedBin");
-	pSS_2->addUniform(m_pStarColorUniform.get());
-	pSS_2->addUniform(m_pLevelArrayUniform.get());
-	pSS_2->addUniform(m_pTimesUniform.get());
-	int iUnit2 = 0;
-	pSS_2->setTextureAttributeAndModes(iUnit2, m_3DShapeTex_128.get());
-	pSS_2->addUniform(new osg::Uniform("shapeNoiseTex", iUnit2));
-	iUnit2++;
-
-	// Ìí¼Óshader
-	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SunVert.glsl";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SunFrag.glsl";
-	CGMKit::LoadShader(pSS_2.get(), strVertPath, strFragPath);
-
-	// ´´½¨Ì«Ñô»Ô¹â
-	m_pSunBloomTransform = new osg::AutoTransform();
-	m_pSunBloomTransform->setAutoRotateMode(osg::AutoTransform::ROTATE_TO_SCREEN);
-	m_pHierarchyRootVector.at(2)->addChild(m_pSunBloomTransform.get());
-
-	osg::ref_ptr<osg::Geode> pGeodeSunBloom = new osg::Geode();
-	osg::Geometry* pBloomGeometry = new osg::Geometry();
-	double fHalfWidth = 9 * fSunRadius2;
-	// ¶¥µã
-	osg::ref_ptr<osg::Vec3Array> verArray = new osg::Vec3Array;
-	verArray->reserve(6);
-	verArray->push_back(osg::Vec3(-fHalfWidth, -fHalfWidth, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, -fHalfWidth, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, fHalfWidth, 0.0f));
-	verArray->push_back(osg::Vec3(-fHalfWidth, -fHalfWidth, 0.0f));
-	verArray->push_back(osg::Vec3(fHalfWidth, fHalfWidth, 0.0f));
-	verArray->push_back(osg::Vec3(-fHalfWidth, fHalfWidth, 0.0f));
-	pBloomGeometry->setVertexArray(verArray);
-	// UV
-	osg::ref_ptr<osg::Vec2Array> textArray = new osg::Vec2Array;
-	verArray->reserve(6);
-	textArray->push_back(osg::Vec2(-1, -1));
-	textArray->push_back(osg::Vec2(1, -1));
-	textArray->push_back(osg::Vec2(1, 1));
-	textArray->push_back(osg::Vec2(-1, -1));
-	textArray->push_back(osg::Vec2(1, 1));
-	textArray->push_back(osg::Vec2(-1, 1));
-	pBloomGeometry->setTexCoordArray(0, textArray);
-	// ·¨Ïß
-	osg::ref_ptr<osg::Vec3Array> normal = new osg::Vec3Array;
-	normal->push_back(osg::Vec3(0, 0, 1));
-	pBloomGeometry->setNormalArray(normal);
-	pBloomGeometry->setNormalBinding(osg::Geometry::BIND_OVERALL);
-	// Primitive
-	pBloomGeometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 6));
-	pGeodeSunBloom->addDrawable(pBloomGeometry);
-	m_pSunBloomTransform->addChild(pGeodeSunBloom.get());
-	osg::ref_ptr<osg::StateSet> pSSS = m_pSunBloomTransform->getOrCreateStateSet();
-
-	pSSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSS->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSSS->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
-	pSSS->setRenderBinDetails(BIN_SUN_BLOOM, "DepthSortedBin");
-
-	int iUnitBloom = 0;
 	std::string strGalaxyTexPath = m_pConfigData->strCorePath + m_strGalaxyTexPath;
-	pSSS->setTextureAttributeAndModes(iUnitBloom, _CreateTexture2D(strGalaxyTexPath + "sunNoise.jpg", 1));
-	pSSS->addUniform(new osg::Uniform("sunNoiseTex", iUnitBloom));
-	iUnitBloom++;
 
-	pSSS->addUniform(m_pStarColorUniform.get());
-	pSSS->addUniform(m_pLevelArrayUniform.get());
-	pSSS->addUniform(m_pTimesUniform.get());
+	const float fWidth = 2.0f*GM_HANDLE_RADIUS;
+	osg::ref_ptr<osg::Geode> pHandleGeode = new osg::Geode();
+	pHandleGeode->addDrawable(_CreateSquareGeometry(fWidth));
+	osg::ref_ptr<osg::StateSet>	pSSHandle = pHandleGeode->getOrCreateStateSet();
+	osg::ref_ptr<osg::Texture> pHandleTex = _CreateTexture2D(strGalaxyTexPath + "handle.tga", 4);
+	pSSHandle->setTextureAttributeAndModes(0, pHandleTex.get());
+	pSSHandle->addUniform(new osg::Uniform("baseTex", 0));
+	m_pHandleSwitch->insertChild(ID_HANDLE, pHandleGeode.get(), false);
 
-	// Ìí¼Óshader
-	std::string strBloomVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SunBloomVert.glsl";
-	std::string strBloomFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SunBloomFrag.glsl";
-	return CGMKit::LoadShader(pSSS.get(), strBloomVertPath, strBloomFragPath);
-}
+	osg::ref_ptr<osg::Geode> pHandleHoverGeode = new osg::Geode();
+	pHandleHoverGeode->addDrawable(_CreateSquareGeometry(fWidth));
+	osg::ref_ptr<osg::StateSet>	pSSHandleHover = pHandleHoverGeode->getOrCreateStateSet();
+	osg::ref_ptr<osg::Texture> pHandleHoverTex = _CreateTexture2D(strGalaxyTexPath + "handle_hover.tga", 4);
+	pSSHandleHover->setTextureAttributeAndModes(0, pHandleHoverTex.get());
+	pSSHandleHover->addUniform(new osg::Uniform("baseTex", 0));
+	m_pHandleSwitch->insertChild(ID_HANDLE_HOVER, pHandleHoverGeode.get(), false);
 
-bool CGMGalaxy::_CreatePlanets()
-{
-	m_iPlanetCount = 0;
-	const double fAU = 1.496e11;
-
-	// step_1.0 - ĞĞĞÇ¹ì¼£Ïß³õÊ¼»¯
-	// ÕâÀïÓĞ¸öÇ±ÔÚµÄbug£¬Ã¿ÌõĞĞĞÇ¹ì¼£ÏßÓĞ256¸ö¶¥µã£¬µ±ĞĞĞÇÊıÁ¿´óÓÚ256¿ÅÊ±£¬¶¥µãÊıÁ¿»á³¬³öÕâ¸ö×î´óÖµ
-	const size_t iMaxNum = 65536;
-
-	std::string strLineVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "PlanetLineVert.glsl";
-	std::string strLineFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "PlanetLineFrag.glsl";
-
-	osg::ref_ptr<osg::LineWidth> pLineWidth = new osg::LineWidth;
-	pLineWidth->setWidth(1);
-
-	// µÚ2²ã¼¶ĞĞĞÇ¹ì¼£Ïß
-	m_pGeodePlanetsLine_2 = new osg::Geode();
-	m_pStar_2_Transform->addChild(m_pGeodePlanetsLine_2.get());
-	osg::ref_ptr<osg::Geometry> pPlanetLineGeom_2 = new osg::Geometry();
-	pPlanetLineGeom_2->setUseVertexBufferObjects(true);
-	pPlanetLineGeom_2->setUseDisplayList(false);
-	pPlanetLineGeom_2->setDataVariance(osg::Object::STATIC);
-
-	m_pPlanetLineVerts_2 = new osg::Vec3Array();
-	m_pPlanetLineVerts_2->reserve(iMaxNum);
-	m_pPlanetLineCoords_2 = new osg::Vec3Array;
-	m_pPlanetLineCoords_2->reserve(iMaxNum);
-	m_pPlanetLineElement_2 = new osg::DrawElementsUShort(GL_LINES);
-	m_pPlanetLineElement_2->reserve(iMaxNum);
-
-	osg::ref_ptr<osg::StateSet> pLineSS2 = m_pGeodePlanetsLine_2->getOrCreateStateSet();
-	pLineSS2->setAttributeAndModes(pLineWidth.get(), osg::StateAttribute::ON);
-	pLineSS2->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pLineSS2->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pLineSS2->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
-	pLineSS2->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
-	pLineSS2->setRenderBinDetails(BIN_PLANET_LINE, "DepthSortedBin");
-	pLineSS2->addUniform(m_pTimesUniform.get());
-	CGMKit::LoadShader(pLineSS2.get(), strLineVertPath, strLineFragPath);
-
-	// µÚ3²ã¼¶ĞĞĞÇ¹ì¼£Ïß
-	m_pGeodePlanetsLine_3 = new osg::Geode();
-	m_pStar_3_Transform->addChild(m_pGeodePlanetsLine_3.get());
-	osg::ref_ptr<osg::Geometry> pPlanetLineGeom_3 = new osg::Geometry();
-	pPlanetLineGeom_3->setUseVertexBufferObjects(true);
-	pPlanetLineGeom_3->setUseDisplayList(false);
-	pPlanetLineGeom_3->setDataVariance(osg::Object::STATIC);
-
-	m_pPlanetLineVerts_3 = new osg::Vec3Array();
-	m_pPlanetLineVerts_3->reserve(iMaxNum);
-	m_pPlanetLineCoords_3 = new osg::Vec3Array;
-	m_pPlanetLineCoords_3->reserve(iMaxNum);
-	m_pPlanetLineElement_3 = new osg::DrawElementsUShort(GL_LINES);
-	m_pPlanetLineElement_3->reserve(iMaxNum);
-
-	osg::ref_ptr<osg::StateSet> pLineSS3 = m_pGeodePlanetsLine_3->getOrCreateStateSet();
-	pLineSS3->setAttributeAndModes(pLineWidth.get(), osg::StateAttribute::ON);
-	pLineSS3->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pLineSS3->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pLineSS3->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
-	pLineSS3->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
-	pLineSS3->setRenderBinDetails(BIN_PLANET_LINE, "DepthSortedBin");
-	pLineSS3->addUniform(m_pTimesUniform.get());
-	CGMKit::LoadShader(pLineSS3.get(), strLineVertPath, strLineFragPath);
-
-	// step_1.5 - ĞĞĞÇ³õÊ¼»¯
-	// ĞĞĞÇµã¾«ÁéÊıÁ¿ÉÏÏŞ
-	const size_t iMaxPointNum = 256;
-	std::string strPlanetVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Planets_Vert.glsl";
-	std::string strPlanetFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Planets_Frag.glsl";
-
-	// µÚ2²ã¼¶ĞĞĞÇ
-	m_pGeodePlanets_2 = new osg::Geode();
-	m_pStar_2_Transform->addChild(m_pGeodePlanets_2.get());
-	osg::ref_ptr<osg::Geometry> pPlanetGeom_2 = new osg::Geometry();
-	pPlanetGeom_2->setUseVertexBufferObjects(true);
-	pPlanetGeom_2->setUseDisplayList(false);
-	pPlanetGeom_2->setDataVariance(osg::Object::STATIC);
-
-	m_pPlanetVertArray_2 = new osg::Vec4Array;
-	m_pPlanetElement_2 = new osg::DrawElementsUShort(GL_POINTS);
-	m_pPlanetVertArray_2->reserve(iMaxPointNum);
-	m_pPlanetElement_2->reserve(iMaxPointNum);
-	m_pPlanetVertArray_2->push_back(osg::Vec4(0, 0, 0, 1));
-	m_pPlanetElement_2->push_back(0);
-
-	osg::ref_ptr<osg::StateSet> pSSPlanets_2 = m_pGeodePlanets_2->getOrCreateStateSet();
-	pSSPlanets_2->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
-	pSSPlanets_2->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
-	pSSPlanets_2->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSPlanets_2->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSSPlanets_2->setRenderBinDetails(BIN_PLANETS, "DepthSortedBin");
-	pSSPlanets_2->addUniform(m_pTimesUniform.get());
-	pSSPlanets_2->addUniform(m_pUnitRatioUniform.get());
-	CGMKit::LoadShader(pSSPlanets_2.get(), strPlanetVertPath, strPlanetFragPath);
-
-	// µÚ3²ã¼¶ĞĞĞÇ
-	m_pGeodePlanets_3 = new osg::Geode();
-	m_pStar_3_Transform->addChild(m_pGeodePlanets_3.get());
-	osg::ref_ptr<osg::Geometry> pPlanetGeom_3 = new osg::Geometry();
-	pPlanetGeom_3->setUseVertexBufferObjects(true);
-	pPlanetGeom_3->setUseDisplayList(false);
-	pPlanetGeom_3->setDataVariance(osg::Object::STATIC);
-
-	m_pPlanetVertArray_3 = new osg::Vec4Array;
-	m_pPlanetElement_3 = new osg::DrawElementsUShort(GL_POINTS);
-	m_pPlanetVertArray_3->reserve(iMaxPointNum);
-	m_pPlanetElement_3->reserve(iMaxPointNum);
-	m_pPlanetVertArray_3->push_back(osg::Vec4(0, 0, 0, 1));
-	m_pPlanetElement_3->push_back(0);
-
-	osg::ref_ptr<osg::StateSet> pSSPlanets_3 = m_pGeodePlanets_3->getOrCreateStateSet();
-	pSSPlanets_3->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
-	pSSPlanets_3->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
-	pSSPlanets_3->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSPlanets_3->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSSPlanets_3->setRenderBinDetails(BIN_PLANETS, "DepthSortedBin");
-	pSSPlanets_3->addUniform(m_pTimesUniform.get());
-	pSSPlanets_3->addUniform(m_pUnitRatioUniform.get());
-	CGMKit::LoadShader(pSSPlanets_3.get(), strPlanetVertPath, strPlanetFragPath);
-
-	// step_2.0 - Ìí¼ÓĞĞĞÇ
-	// Ë®ĞÇ
-	_AddPlanet(fAU*0.3871, 0.241, 0);
-	// ½ğĞÇ
-	_AddPlanet(fAU*0.7233, 0.616, 1);
-	// µØÇò
-	_AddPlanet(fAU, 1.0, 3);
-	// »ğĞÇ
-	_AddPlanet(fAU*1.52, 1.882, 5);
-	// Ä¾ĞÇ
-	_AddPlanet(fAU*5.20, 11.86, 7);
-	// ÍÁĞÇ
-	_AddPlanet(fAU*9.55, 29.46, 11);
-	// ÌìÍõĞÇ
-	_AddPlanet(fAU*19.22, 84.01, 13);
-	// º£ÍõĞÇ
-	_AddPlanet(fAU*30.11, 164.82, 17);
-
-	// step_3.0 - Ìí¼Ó½áÊøºó£¬½«ĞĞĞÇ¹ì¼£Ïß¹Òµ½¶ÔÓ¦½ÚµãÏÂ
-	pPlanetLineGeom_2->setVertexArray(m_pPlanetLineVerts_2.get());
-	pPlanetLineGeom_2->setTexCoordArray(0, m_pPlanetLineCoords_2.get());
-	pPlanetLineGeom_2->addPrimitiveSet(m_pPlanetLineElement_2.get());
-	m_pGeodePlanetsLine_2->addDrawable(pPlanetLineGeom_2.get());
-
-	pPlanetLineGeom_3->setVertexArray(m_pPlanetLineVerts_3.get());
-	pPlanetLineGeom_3->setTexCoordArray(0, m_pPlanetLineCoords_3.get());
-	pPlanetLineGeom_3->addPrimitiveSet(m_pPlanetLineElement_3.get());
-	m_pGeodePlanetsLine_3->addDrawable(pPlanetLineGeom_3.get());
-
-	// step_3.5 - Ìí¼Ó½áÊøºó£¬½«ĞĞĞÇ¹Òµ½¶ÔÓ¦½ÚµãÏÂ
-	pPlanetGeom_2->setVertexArray(m_pPlanetVertArray_2.get());
-	pPlanetGeom_2->addPrimitiveSet(m_pPlanetElement_2.get());
-	m_pGeodePlanets_2->addDrawable(pPlanetGeom_2.get());
-
-	pPlanetGeom_3->setVertexArray(m_pPlanetVertArray_3.get());
-	pPlanetGeom_3->addPrimitiveSet(m_pPlanetElement_3.get());
-	m_pGeodePlanets_3->addDrawable(pPlanetGeom_3.get());
-
-	return true;
-}
-
-bool CGMGalaxy::_AddPlanet(const double fRadius, const double fOrbitalPeriod, const double fStartPos)
-{
-	double fR2 = fRadius / m_pKernelData->fUnitArray->at(2);
-	double fR3 = fRadius / m_pKernelData->fUnitArray->at(3);
-
-	// Ìí¼ÓĞĞĞÇ¹ì¼£Ïß
-	const int iAngleSegments = 128;	// ½Ç¶È·Ö¶ÎÊı
-	const int iVertex = iAngleSegments * 2;	// ¶¥µãÊıÁ¿
-	float fAngleEach = osg::PI * 2.0 / float(iAngleSegments);
-	for (int x = 0; x < iAngleSegments; x++)
-	{
-		for (int i = 0; i < 2; i++)
-		{
-			float f = x + i;
-			float fX = cos(fAngleEach * f + fStartPos);
-			float fY = sin(fAngleEach * f + fStartPos);
-
-			m_pPlanetLineVerts_2->push_back(osg::Vec3(fR2*fX, fR2*fY, 0));
-			m_pPlanetLineCoords_2->push_back(osg::Vec3f(f / float(iAngleSegments), fOrbitalPeriod, float(m_iPlanetCount)));
-			m_pPlanetLineElement_2->push_back(m_iPlanetCount * iVertex + 2 * x + i);
-
-			m_pPlanetLineVerts_3->push_back(osg::Vec3(fR3*fX, fR3*fY, 0));
-			m_pPlanetLineCoords_3->push_back(osg::Vec3f(f / float(iAngleSegments), fOrbitalPeriod, float(m_iPlanetCount)));
-			m_pPlanetLineElement_3->push_back(m_iPlanetCount * iVertex + 2 * x + i);
-		}
-	}
-
-	// Ìí¼ÓĞĞĞÇµã¾«Áé
-	float fStartX = cos(fStartPos);
-	float fStartY = sin(fStartPos);
-	m_pPlanetVertArray_2->push_back(osg::Vec4(fR2 * fStartX, fR2 * fStartY, float(1 + m_iPlanetCount), fOrbitalPeriod));
-	m_pPlanetElement_2->push_back(1 + m_iPlanetCount);
-	m_pPlanetVertArray_3->push_back(osg::Vec4(fR3 * fStartX, fR3 * fStartY, float(1 + m_iPlanetCount), fOrbitalPeriod));
-	m_pPlanetElement_3->push_back(1 + m_iPlanetCount);
-
-	m_iPlanetCount++;
-	return true;
-}
-
-bool CGMGalaxy::_CreateOortCloud()
-{
-	m_pOort_4_Transform = new osg::PositionAttitudeTransform();
-	m_pHierarchyRootVector.at(4)->addChild(m_pOort_4_Transform.get());
-
-	m_pOortCloudGeode_3 = new osg::Geode;
-	osg::ref_ptr<const osg::EllipsoidModel>	_ellipsoidModel_3 = new osg::EllipsoidModel(20.0, 20.0);
-	osg::ref_ptr<osg::Geometry> pDrawable_3 = _MakeEllipsoidGeometry(_ellipsoidModel_3, 32, 16, 0, true, true, true);
-	m_pOortCloudGeode_3->addDrawable(pDrawable_3.get());
-	m_pStar_3_Transform->addChild(m_pOortCloudGeode_3.get());
-
-	osg::ref_ptr<osg::Geode> pOortCloudGeode_4 = new osg::Geode;
-	osg::ref_ptr<const osg::EllipsoidModel>	_ellipsoidModel_4 = new osg::EllipsoidModel(2e-4, 2e-4);
-	osg::ref_ptr<osg::Geometry> pDrawable_4 = _MakeEllipsoidGeometry(_ellipsoidModel_4, 32, 16, 0, true, true, true);
-	pOortCloudGeode_4->addDrawable(pDrawable_4.get());
-	m_pOort_4_Transform->addChild(pOortCloudGeode_4.get());
-
-	osg::ref_ptr<osg::StateSet>	pSS_3 = m_pOortCloudGeode_3->getOrCreateStateSet();
-	pSS_3->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSS_3->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSS_3->setAttributeAndModes(new osg::CullFace());
-	pSS_3->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
-	pSS_3->setRenderBinDetails(BIN_STAR_PLAYING, "DepthSortedBin");
-	pSS_3->addUniform(m_pStarColorUniform.get());
-	pSS_3->addUniform(m_pStarHiePosUniform.get());
-	pSS_3->addUniform(m_vScreenSizeUniform.get());
-	pSS_3->addUniform(m_pLevelArrayUniform.get());
-	pSS_3->addUniform(m_pTimesUniform.get());
-	int iUnit3 = 0;
-	pSS_3->setTextureAttributeAndModes(iUnit3, m_3DShapeTex_128.get());
-	pSS_3->addUniform(new osg::Uniform("shapeNoiseTex", iUnit3));
-	iUnit3++;
-	pSS_3->setTextureAttributeAndModes(iUnit3, m_blueNoiseTex.get());
-	pSS_3->addUniform(new osg::Uniform("blueNoiseSampler", iUnit3));
-	iUnit3++;
-
-	osg::ref_ptr<osg::StateSet>	pSS_4 = m_pOort_4_Transform->getOrCreateStateSet();
-	pSS_4->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSS_4->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSS_4->setAttributeAndModes(new osg::CullFace());
-	pSS_4->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
-	pSS_4->setRenderBinDetails(BIN_STAR_PLAYING, "DepthSortedBin");
-	pSS_4->addUniform(m_pStarColorUniform.get());
-	pSS_4->addUniform(m_pStarHiePosUniform.get());
-	pSS_4->addUniform(m_vScreenSizeUniform.get());
-	pSS_4->addUniform(m_pLevelArrayUniform.get());
-	pSS_4->addUniform(m_pTimesUniform.get());
-	int iUnit4 = 0;
-	pSS_4->setTextureAttributeAndModes(iUnit4, m_3DShapeTex_128.get());
-	pSS_4->addUniform(new osg::Uniform("shapeNoiseTex", iUnit4));
-	iUnit4++;
-	pSS_4->setTextureAttributeAndModes(iUnit4, m_blueNoiseTex.get());
-	pSS_4->addUniform(new osg::Uniform("blueNoiseSampler", iUnit4));
-	iUnit4++;
-
-	// Ìí¼Óshader
-	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "OortCloudVert.glsl";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "OortCloudFrag.glsl";
-	CGMKit::LoadShader(pSS_3.get(), strVertPath, strFragPath);
-	CGMKit::LoadShader(pSS_4.get(), strVertPath, strFragPath);
+	osg::ref_ptr<osg::Geode> pArrowGeode = new osg::Geode();
+	pArrowGeode->addDrawable(_CreateSquareGeometry(GM_HANDLE_RADIUS, true));
+	osg::ref_ptr<osg::StateSet>	pSSArrow = pArrowGeode->getOrCreateStateSet();
+	osg::ref_ptr<osg::Texture> pArrowTex = _CreateTexture2D(strGalaxyTexPath + "handle_arrow.tga", 4);
+	pSSArrow->setTextureAttributeAndModes(0, pArrowTex.get());
+	pSSArrow->addUniform(new osg::Uniform("baseTex", 0));
+	m_pHandleSwitch->insertChild(ID_ARROW, pArrowGeode.get(), false);
 
 	return true;
 }
@@ -1407,12 +1340,12 @@ bool CGMGalaxy::_CreateAudioPoints()
 	m_pGeodeAudio = new osg::Geode();
 	m_pHierarchyRootVector.at(4)->addChild(m_pGeodeAudio.get());
 
-	// ÒôÆµÎÄ¼şµÄĞÇ³½×ø±êVector
-	std::vector<SGMStarCoord> coordVector;
-	GM_ENGINE_PTR->GetDataManager()->GetStarCoordVector(coordVector);
+	// éŸ³é¢‘æ•°æ®
+	std::map<unsigned int, SGMAudioData> audioDataMap;
+	m_pDataManager->GetAudioDataMap(audioDataMap);
 
-	// ´ÓÊı¾İ¹ÜÀíÄ£¿é¶ÁÈ¡Êı¾İ£¬´´½¨Î´¼¤»î×´Ì¬µÄÒôÆµĞÇ¼¸ºÎÌå
-	osg::ref_ptr<osg::Geometry> pGeomAudio = _CreateAudioGeometry(coordVector);
+	// ä»æ•°æ®ç®¡ç†æ¨¡å—è¯»å–æ•°æ®ï¼Œåˆ›å»ºæœªæ¿€æ´»çŠ¶æ€çš„éŸ³é¢‘æ˜Ÿå‡ ä½•ä½“
+	osg::ref_ptr<osg::Geometry> pGeomAudio = _CreateAudioGeometry(audioDataMap);
 	if (!pGeomAudio.valid()) return false;
 	m_pGeodeAudio->addDrawable(pGeomAudio.get());
 
@@ -1421,24 +1354,26 @@ bool CGMGalaxy::_CreateAudioPoints()
 	pStateSetAudio->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
 	pStateSetAudio->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	pStateSetAudio->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pStateSetAudio->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
+	pStateSetAudio->setAttributeAndModes(new osg::BlendFunc(
+		GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
 	pStateSetAudio->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
 	pStateSetAudio->setRenderBinDetails(BIN_AUDIO_POINT, "DepthSortedBin");
 
 	pStateSetAudio->addUniform(m_pMousePosUniform.get());
-	pStateSetAudio->addUniform(m_pStarHiePosUniform.get());
-	pStateSetAudio->addUniform(m_pLevelArrayUniform.get());
-	pStateSetAudio->addUniform(m_pStarAlphaUniform.get());
+	pStateSetAudio->addUniform(m_pCommonUniform->GetStarHiePos());
+	pStateSetAudio->addUniform(m_pCommonUniform->GetLevelArray());
+	pStateSetAudio->addUniform(m_fStarAlphaUniform.get());
 
-	// Ìí¼Óshader
+	// æ·»åŠ shader
 	std::string strAudioVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "AudioVert.glsl";
 	std::string strAudioFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "AudioFrag.glsl";
-	return CGMKit::LoadShader(pStateSetAudio.get(), strAudioVertPath, strAudioFragPath);
+	return CGMKit::LoadShader(pStateSetAudio.get(), strAudioVertPath, strAudioFragPath, "Audio");
 }
 
 bool CGMGalaxy::_CreateGalaxyPoints()
 {
-	// 4¼¶¿Õ¼äÏÂµÄĞÇÏµ°ë¾¶
+	// 4çº§ç©ºé—´ä¸‹çš„æ˜Ÿç³»åŠå¾„
 	double fGalaxyRadius4 = m_fGalaxyRadius / m_pKernelData->fUnitArray->at(4);
 
 	osg::ref_ptr<osg::Geode> pGalaxyPointsGeode = new osg::Geode();
@@ -1447,8 +1382,8 @@ bool CGMGalaxy::_CreateGalaxyPoints()
 	osg::ref_ptr<osg::Geometry> pGeometry = new osg::Geometry();
 
 	size_t iNum = 65536;
-	osg::ref_ptr<osg::Vec3Array> vertArray = new osg::Vec3Array;
-	osg::ref_ptr<osg::Vec2Array> texcoordArray = new osg::Vec2Array;
+	osg::ref_ptr<osg::Vec3Array> vertArray = new osg::Vec3Array();
+	osg::ref_ptr<osg::Vec2Array> texcoordArray = new osg::Vec2Array();
 	osg::ref_ptr<osg::Vec4Array> colorArray = new osg::Vec4Array();
 	osg::ref_ptr<osg::DrawElementsUShort> el = new osg::DrawElementsUShort(GL_POINTS);
 	vertArray->reserve(iNum);
@@ -1456,39 +1391,48 @@ bool CGMGalaxy::_CreateGalaxyPoints()
 	colorArray->reserve(iNum);
 	el->reserve(iNum);
 
+	if (!m_pGalaxyHeightImage.valid())
+	{
+		std::string strFile = m_pConfigData->strCorePath + m_strGalaxyTexPath + "milkyWay_height.tga";
+		m_pGalaxyHeightImage = osgDB::readImageFile(strFile);
+	}
+
+	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
+
 	int x = 0;
 	while (x < iNum)
 	{
-		float fRandomX = (m_iRandom() % 10000)*0.0001f - 0.5f;
-		float fRandomY = (m_iRandom() % 10000)*0.0001f - 0.5f;
-		float fRandomAlpha = (m_iRandom() % 1000)*0.001f;
+		float fRandomX = iPseudoNoise(m_iRandom)*1e-4f - 0.5f;
+		float fRandomY = iPseudoNoise(m_iRandom)*1e-4f - 0.5f;
+		float fRandomAlpha = iPseudoNoise(m_iRandom)*1e-4f;
 		float fX = fGalaxyRadius4 * 2.0f * fRandomX;
 		float fY = fGalaxyRadius4 * 2.0f * fRandomY;
 		float fU = fRandomX + 0.5f;
 		float fV = fRandomY + 0.5f;
 
-		float fA = _GetGalaxyValue(fU, fV, 3);
+		float fA = CGMKit::GetImageColor(m_pGalaxyImage.get(), fU, fV).a();
 		if (fRandomAlpha < fA)
 		{
-			float fRandomR = (m_iRandom() % 100)*0.01f - 0.5f;
-			float fR = max(0.0f, _GetGalaxyValue(fU, fV, 0) + fRandomR * fRandomR * fRandomR);
-			float fG = _GetGalaxyValue(fU, fV, 1);
-			float fB = _GetGalaxyValue(fU, fV, 2);
+			float fRandomR = iPseudoNoise(m_iRandom)*1e-4f - 0.5f;
+			float fR = max(0.0f, CGMKit::GetImageColor(m_pGalaxyImage.get(), fU, fV).r() + fRandomR * fRandomR * fRandomR);
+			float fG = CGMKit::GetImageColor(m_pGalaxyImage.get(), fU, fV).g();
+			float fB = CGMKit::GetImageColor(m_pGalaxyImage.get(), fU, fV).b();
 
 			float fRGBMax = max(max(max(fR, fG), fB), 1e-5);
 			fR /= fRGBMax;
 			fG /= fRGBMax;
 			fB /= fRGBMax;
 
-			float fRandomZ = (m_iRandom() % 1000)*0.002f - 1.0f;
+			float fRandomZ = iPseudoNoise(m_iRandom)*2e-4f - 1.0f;
 			float fSignZ = (fRandomZ > 0) ? 1.0f : -1.0f;
 			float fSmooth = fSignZ * (3 * fRandomZ*fRandomZ - 2 * abs(fRandomZ*fRandomZ*fRandomZ));
 			float fZ = (fRandomAlpha + 0.2f)*0.05f*fGalaxyRadius4*fSmooth;
-			float fRandomRadius = (m_iRandom() % 1000)*0.001f;
-			fRandomRadius = (fA + _GetGalaxyHeight(fU, fV)) * fRandomRadius * fRandomRadius;
+			float fRandomRadius = iPseudoNoise(m_iRandom)*1e-4f;
+			fRandomRadius = (fA + CGMKit::GetImageColor(m_pGalaxyHeightImage.get(), fU, fV, true).z())
+				* fRandomRadius * fRandomRadius;
 			float fRadiusNow = osg::Vec2(fRandomX, fRandomY).length();
 			float fTmp = pow(min(1.0f, 1.03f*(1.0f - fRadiusNow)), 11);
-			fZ = fZ * (0.5 + 3 * fTmp*fTmp - 2 * fTmp*fTmp*fTmp);
+			fZ *= 0.5 + 3 * fTmp*fTmp - 2 * fTmp*fTmp*fTmp;
 			vertArray->push_back(osg::Vec3(fX, fY, fZ));
 			texcoordArray->push_back(osg::Vec2(fU, fV));
 			colorArray->push_back(osg::Vec4(fR, fG, fB, fRandomRadius));
@@ -1520,30 +1464,29 @@ bool CGMGalaxy::_CreateGalaxyPoints()
 	m_pStateSetGalaxy->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
 	m_pStateSetGalaxy->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	m_pStateSetGalaxy->setMode(GL_BLEND, osg::StateAttribute::ON);
-	osg::ref_ptr<osg::BlendEquation> blendEqua = new osg::BlendEquation(osg::BlendEquation::RGBA_MAX);
-	m_pStateSetGalaxy->setAttributeAndModes(blendEqua.get(), osg::StateAttribute::ON);
+	m_pStateSetGalaxy->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
 	m_pStateSetGalaxy->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
-	m_pStateSetGalaxy->setRenderBinDetails(BIN_STARS, "DepthSortedBin");
+	m_pStateSetGalaxy->setRenderBinDetails(BIN_STARS_0, "DepthSortedBin");
 
-	if (m_pConfigData->bHighQuality)
+	int iUnit = 0;
+	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
 	{
 		m_pStateSetGalaxy->setDefine("HIGH_QUALITY", osg::StateAttribute::ON);
-
-		m_pStateSetGalaxy->setTextureAttributeAndModes(1, m_TAADistanceMap_0.get());
-		m_pStateSetGalaxy->addUniform(new osg::Uniform("distanceTex", 1));
-
-		m_pStateSetGalaxy->addUniform(m_vScreenSizeUniform.get());
+		CGMKit::AddTexture(m_pStateSetGalaxy.get(), m_pMilkyWay->GetDistanceMap(), "distanceTex", iUnit++);
+		m_pStateSetGalaxy->addUniform(m_pCommonUniform->GetScreenSize());
 	}
 
-	m_pStateSetGalaxy->addUniform(m_pStarHiePosUniform.get());
-	m_pStateSetGalaxy->addUniform(m_pLevelArrayUniform.get());
-	m_pStateSetGalaxy->addUniform(m_pStarColorUniform.get());
-	m_pStateSetGalaxy->addUniform(m_pStarAlphaUniform.get());
+	m_pStateSetGalaxy->addUniform(m_pCommonUniform->GetStarHiePos());
+	m_pStateSetGalaxy->addUniform(m_pCommonUniform->GetLevelArray());
+	m_pStateSetGalaxy->addUniform(m_pCommonUniform->GetStarColor());
+	m_pStateSetGalaxy->addUniform(m_fStarAlphaUniform.get());
 
-	// Ìí¼Óshader
+	// æ·»åŠ shader
 	std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyStarVert.glsl";
 	std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyStarFrag.glsl";
-	return CGMKit::LoadShader(m_pStateSetGalaxy.get(), strStarVertPath, strStarFragPath);
+	return CGMKit::LoadShader(m_pStateSetGalaxy.get(), strStarVertPath, strStarFragPath, "GalaxyStar");
 }
 
 bool CGMGalaxy::_CreateStarCube_4()
@@ -1560,39 +1503,38 @@ bool CGMGalaxy::_CreateStarCube_4()
 		pSS_4->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
 		pSS_4->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 		pSS_4->setMode(GL_BLEND, osg::StateAttribute::ON);
-		osg::ref_ptr<osg::BlendEquation> blendEqua = new osg::BlendEquation(osg::BlendEquation::RGBA_MAX);
-		pSS_4->setAttributeAndModes(blendEqua.get(), osg::StateAttribute::ON);
+		pSS_4->setAttributeAndModes(new osg::BlendFunc(
+			GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_DST_ALPHA, GL_ONE), osg::StateAttribute::ON);
 		pSS_4->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
-		pSS_4->setRenderBinDetails(BIN_STARS, "DepthSortedBin");
+		pSS_4->setRenderBinDetails(BIN_STARS_1, "DepthSortedBin");
 
 		// x = cubeMinSize, y = targetDistance
 		m_pStarsCubeInfoUniform = new osg::Uniform("cubeInfo", osg::Vec2f(fCubeMinSize, 1.0f));
 		pSS_4->addUniform(m_pStarsCubeInfoUniform.get());
-		pSS_4->addUniform(m_pStarColorUniform.get());
+		pSS_4->addUniform(m_fGalaxyHeightUniform.get());
+		pSS_4->addUniform(m_pCommonUniform->GetStarColor());
 		pSS_4->addUniform(m_pShapeUVWUniform.get());
-		pSS_4->addUniform(m_pStarAlphaUniform.get());
+		pSS_4->addUniform(m_fStarAlphaUniform.get());
 
 		int iUnit = 1;
-		pSS_4->setTextureAttributeAndModes(iUnit, m_3DShapeTex_128.get());
-		pSS_4->addUniform(new osg::Uniform("shapeNoiseTex", iUnit));
-		iUnit++;
+		CGMKit::AddTexture(pSS_4.get(), m_3DShapeTex.get(), "shapeNoiseTex", iUnit++);
 
-		// Ìí¼Óshader
+		// æ·»åŠ shader
 		std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_4_Vert.glsl";
 		std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_4_Frag.glsl";
-		CGMKit::LoadShader(pSS_4.get(), strStarVertPath, strStarFragPath);	
+		CGMKit::LoadShader(pSS_4.get(), strStarVertPath, strStarFragPath, "StarCube_4");
 	}
 
 	size_t iNum = m_pCubeVertArray->size();
 	for (int i = 0; i < 4; i++)
 	{
-		float fCubeSize = fCubeMinSize * std::pow(2,float(i));
+		float fCubeSize = fCubeMinSize * std::pow(2, float(i));
 
 		osg::ref_ptr<osg::Vec4Array> vertArray = new osg::Vec4Array;
 		vertArray->reserve(iNum);
-		for (size_t i = 0; i < iNum; i++)
+		for (size_t j = 0; j < iNum; j++)
 		{
-			osg::Vec4 vert = m_pCubeVertArray->at(i);
+			osg::Vec4 vert = m_pCubeVertArray->at(j);
 			vertArray->push_back(vert*fCubeSize);
 		}
 
@@ -1622,10 +1564,10 @@ bool CGMGalaxy::_CreateStarCube_4()
 bool CGMGalaxy::_CreateGalaxyPointsN_4(int iDens)
 {
 	/**
-	* ´´½¨N±¶ÃÜ¶ÈµÄPointSpriteĞÇÏµµãÕó
-	* ËäÈ»×îÖÕäÖÈ¾µÄ·¶Î§ÊÇ1/N¸öĞÇÏµµÄ³ß´ç
-	* È»ºóÔÚvertex shaderÖĞ½øĞĞÆ½ÒÆºÍËõ·Å
-	* µãÕóµÄÎ»ÖÃ¸ù¾İÈıÎ¬ÎÆÀíÉèÖÃ£¬±£Ö¤¿´²»³öÖØ¸´¸Ğ
+	* åˆ›å»ºNå€å¯†åº¦çš„PointSpriteæ˜Ÿç³»ç‚¹é˜µ
+	* è™½ç„¶æœ€ç»ˆæ¸²æŸ“çš„èŒƒå›´æ˜¯1/Nä¸ªæ˜Ÿç³»çš„å°ºå¯¸
+	* ç„¶ååœ¨vertex shaderä¸­è¿›è¡Œå¹³ç§»å’Œç¼©æ”¾
+	* ç‚¹é˜µçš„ä½ç½®æ ¹æ®ä¸‰ç»´çº¹ç†è®¾ç½®ï¼Œä¿è¯çœ‹ä¸å‡ºé‡å¤æ„Ÿ
 	*/
 	if (!m_pGeodePointsN_4.valid())
 	{
@@ -1637,42 +1579,38 @@ bool CGMGalaxy::_CreateGalaxyPointsN_4(int iDens)
 		pSSN->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
 		pSSN->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 		pSSN->setMode(GL_BLEND, osg::StateAttribute::ON);
-		osg::ref_ptr<osg::BlendEquation> blendEqua = new osg::BlendEquation(osg::BlendEquation::RGBA_MAX);
-		pSSN->setAttributeAndModes(blendEqua.get(), osg::StateAttribute::ON);
+		pSSN->setAttributeAndModes(new osg::BlendFunc(
+			GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+		), osg::StateAttribute::ON);
 		pSSN->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
-		pSSN->setRenderBinDetails(BIN_STARS, "DepthSortedBin");
+		pSSN->setRenderBinDetails(BIN_STARS_1, "DepthSortedBin");
 
-		int iUnit = 1;
-		if (m_pConfigData->bHighQuality)
+		int iUnit = 0;
+		if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
 		{
 			pSSN->setDefine("HIGH_QUALITY", osg::StateAttribute::ON);
-
-			pSSN->setTextureAttributeAndModes(iUnit, m_TAADistanceMap_0.get());
-			pSSN->addUniform(new osg::Uniform("distanceTex", iUnit));
-			iUnit++;
-			pSSN->addUniform(m_vScreenSizeUniform.get());
+			CGMKit::AddTexture(pSSN.get(), m_pMilkyWay->GetDistanceMap(), "distanceTex", iUnit++);
+			pSSN->addUniform(m_pCommonUniform->GetScreenSize());
 		}
-		pSSN->setTextureAttributeAndModes(iUnit, m_pGalaxyColorTex.get());
-		pSSN->addUniform(new osg::Uniform("galaxyTex", iUnit));
-		iUnit++;
+		CGMKit::AddTexture(pSSN.get(), m_pGalaxyColorTex.get(), "galaxyTex", iUnit++);
 
-		pSSN->addUniform(m_pStarHiePosUniform.get());
-		pSSN->addUniform(m_pLevelArrayUniform.get());
-		pSSN->addUniform(m_pStarColorUniform.get());
+		pSSN->addUniform(m_pCommonUniform->GetStarHiePos());
+		pSSN->addUniform(m_pCommonUniform->GetLevelArray());
+		pSSN->addUniform(m_pCommonUniform->GetStarColor());
 		pSSN->addUniform(m_pGalaxyRadiusUniform.get());
-		pSSN->addUniform(m_pStarAlphaUniform.get());
+		pSSN->addUniform(m_fStarAlphaUniform.get());
 
-		// Ìí¼Óshader
+		// æ·»åŠ shader
 		std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarNVert.glsl";
 		std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarNFrag.glsl";
-		CGMKit::LoadShader(pSSN.get(), strStarVertPath, strStarFragPath);
+		CGMKit::LoadShader(pSSN.get(), strStarVertPath, strStarFragPath, "StarN");
 	}
 
 	osg::Vec3f vUVW;
 	m_pShapeUVWUniform->get(vUVW);
 
-	float fDens = float(osg::clampBetween(iDens, 2, 16));
-	// 4¼¶¿Õ¼äÏÂµÄĞÇÏµ°ë¾¶
+	float fDens = float(osg::clampBetween(iDens, 2, 8));
+	// 4çº§ç©ºé—´ä¸‹çš„æ˜Ÿç³»åŠå¾„
 	double fGalaxyRadius4 = m_fGalaxyRadius / m_pKernelData->fUnitArray->at(4);
 	osg::ref_ptr<osg::Geometry> pGeometry = new osg::Geometry();
 	size_t iNum = 65536;
@@ -1683,13 +1621,15 @@ bool CGMGalaxy::_CreateGalaxyPointsN_4(int iDens)
 	texcoordArray->reserve(iNum);
 	el->reserve(iNum);
 
+	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
+
 	float fMinAlpha = 0.25f;
 	int x = 0;
 	while (x < iNum)
 	{
-		float fU = (m_iRandom() % 10000)*1e-4f;
-		float fV = (m_iRandom() % 10000)*1e-4f;
-		float fW = (m_iRandom() % 10000)*1e-4f;
+		float fU = iPseudoNoise(m_iRandom)*1e-4f;
+		float fV = iPseudoNoise(m_iRandom)*1e-4f;
+		float fW = iPseudoNoise(m_iRandom)*1e-4f;
 		float fDiameter = fGalaxyRadius4 * 2.0f;
 		float fUScale = fDiameter * vUVW.x() / fDens;
 		float fVScale = fDiameter * vUVW.y() / fDens;
@@ -1705,8 +1645,8 @@ bool CGMGalaxy::_CreateGalaxyPointsN_4(int iDens)
 			float fZ = fRandomZ / vUVW.z();
 
 			vertArray->push_back(osg::Vec3(fX, fY, fZ));
-			// fU¡¢fV²»ĞèÒª´«Èë£¬ËùÒÔÔÚUVµÄÎ»ÖÃÉÏ´æ·ÅËõ·ÅÏµÊı
-			texcoordArray->push_back(osg::Vec4(fDens, fDens, fW, (fAlpha - fMinAlpha)/(1.0f - fMinAlpha)));
+			// fUã€fVä¸éœ€è¦ä¼ å…¥ï¼Œæ‰€ä»¥åœ¨UVçš„ä½ç½®ä¸Šå­˜æ”¾ç¼©æ”¾ç³»æ•°
+			texcoordArray->push_back(osg::Vec4(fDens, fDens, fW, (fAlpha - fMinAlpha) / (1.0f - fMinAlpha)));
 			el->push_back(x);
 			x++;
 		}
@@ -1726,13 +1666,13 @@ bool CGMGalaxy::_CreateGalaxyPointsN_4(int iDens)
 	pGeometry->setDataVariance(osg::Object::DYNAMIC);
 
 	m_pGeodePointsN_4->addDrawable(pGeometry.get());
-	
+
 	return true;
 }
 
 bool CGMGalaxy::_CreateGalaxyPlane_4()
 {
-	// 4¼¶¿Õ¼äÏÂµÄĞÇÏµ°ë¾¶
+	// 4çº§ç©ºé—´ä¸‹çš„æ˜Ÿç³»åŠå¾„
 	double fGalaxyRadius4 = m_fGalaxyRadius / m_pKernelData->fUnitArray->at(4);
 
 	osg::ref_ptr<osg::Geode> pGalaxyPlaneGeode = new osg::Geode();
@@ -1770,21 +1710,21 @@ bool CGMGalaxy::_CreateGalaxyPlane_4()
 	m_pStateSetPlane->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	m_pStateSetPlane->setMode(GL_BLEND, osg::StateAttribute::ON);
 	m_pStateSetPlane->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
-	m_pStateSetPlane->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
+	m_pStateSetPlane->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
 	m_pStateSetPlane->setRenderBinDetails(BIN_GALAXY_PLANE, "DepthSortedBin");
 
 	int iUnit = 0;
-	m_pStateSetPlane->setTextureAttributeAndModes(iUnit, m_pGalaxyColorTex.get());
-	m_pStateSetPlane->addUniform(new osg::Uniform("galaxyTex", iUnit));
-	iUnit++;
+	CGMKit::AddTexture(m_pStateSetPlane.get(), m_pGalaxyColorTex.get(), "galaxyTex", iUnit++);
 
-	m_pStateSetPlane->addUniform(m_pLevelArrayUniform.get());
+	m_pStateSetPlane->addUniform(m_pCommonUniform->GetLevelArray());
 	m_pStateSetPlane->addUniform(m_pMousePosUniform.get());
 
-	// Ìí¼Óshader
+	// æ·»åŠ shader
 	std::string strGalaxyPlaneVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyPlaneVert.glsl";
 	std::string strGalaxyPlaneFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyPlaneFrag.glsl";
-	return CGMKit::LoadShader(m_pStateSetPlane.get(), strGalaxyPlaneVertPath, strGalaxyPlaneFragPath);
+	return CGMKit::LoadShader(m_pStateSetPlane.get(), strGalaxyPlaneVertPath, strGalaxyPlaneFragPath, "GalaxyPlane");
 }
 
 bool CGMGalaxy::_CreateGalaxies_4()
@@ -1801,22 +1741,21 @@ bool CGMGalaxy::_CreateGalaxies_4()
 		pSSG_4->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
 		pSSG_4->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 		pSSG_4->setMode(GL_BLEND, osg::StateAttribute::ON);
-		osg::ref_ptr<osg::BlendEquation> blendEqua = new osg::BlendEquation(osg::BlendEquation::RGBA_MAX);
-		pSSG_4->setAttributeAndModes(blendEqua.get(), osg::StateAttribute::ON);
+		pSSG_4->setAttributeAndModes(new osg::BlendFunc(
+			GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+		), osg::StateAttribute::ON);
 		pSSG_4->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
 		pSSG_4->setRenderBinDetails(BIN_GALAXIES, "DepthSortedBin");
 
-		pSSG_4->addUniform(m_pStarAlphaUniform.get());
+		pSSG_4->addUniform(m_fStarAlphaUniform.get());
 
 		int iUnit = 1;
-		pSSG_4->setTextureAttributeAndModes(iUnit, m_pGalaxiesTex.get());
-		pSSG_4->addUniform(new osg::Uniform("galaxiesTex", iUnit));
-		iUnit++;
+		CGMKit::AddTexture(pSSG_4.get(), m_pGalaxiesTex.get(), "galaxiesTex", iUnit++);
 
-		// Ìí¼Óshader
+		// æ·»åŠ shader
 		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_4_Vert.glsl";
 		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_4_Frag.glsl";
-		CGMKit::LoadShader(pSSG_4.get(), strVertPath, strFragPath);
+		CGMKit::LoadShader(pSSG_4.get(), strVertPath, strFragPath, "Galaxies_4");
 	}
 
 	osg::ref_ptr<osg::Vec4Array> vertArray = new osg::Vec4Array;
@@ -1862,7 +1801,7 @@ bool CGMGalaxy::_CreateGalaxies_4()
 
 bool CGMGalaxy::_CreateGalaxyPlane_5()
 {
-	// 5¼¶¿Õ¼äÏÂµÄĞÇÏµ°ë¾¶
+	// 5çº§ç©ºé—´ä¸‹çš„æ˜Ÿç³»åŠå¾„
 	double fGalaxyRadius5 = m_fGalaxyRadius / m_pKernelData->fUnitArray->at(5);
 
 	osg::ref_ptr<osg::Geode> pGalaxy_5_Geode = new osg::Geode();
@@ -1896,24 +1835,23 @@ bool CGMGalaxy::_CreateGalaxyPlane_5()
 
 	pGalaxy_5_Geode->addDrawable(pGeometry.get());
 
-	//!< 5¼¶¿Õ¼äÏÂÒøºÓÅÌÃæµÄ×´Ì¬¼¯
+	//!< 5çº§ç©ºé—´ä¸‹é“¶æ²³ç›˜é¢çš„çŠ¶æ€é›†
 	osg::ref_ptr<osg::StateSet>	pStateSet_5 = pGalaxy_5_Geode->getOrCreateStateSet();
 	pStateSet_5->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	pStateSet_5->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pStateSet_5->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
+	pStateSet_5->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
 	pStateSet_5->setRenderBinDetails(BIN_GALAXY_PLANE, "DepthSortedBin");
 
-	std::string strGalaxyTexPath = m_pConfigData->strCorePath + m_strGalaxyTexPath;
-	osg::ref_ptr<osg::Texture> _galaxyTex = _CreateTexture2D(strGalaxyTexPath + "milkyWay.tga", 4);
 	int iUnit = 0;
-	pStateSet_5->setTextureAttributeAndModes(iUnit, _galaxyTex.get());
-	pStateSet_5->addUniform(new osg::Uniform("galaxyTex", iUnit));
-	iUnit++;
+	std::string strGalaxyTexPath = m_pConfigData->strCorePath + m_strGalaxyTexPath;
+	CGMKit::AddTexture(pStateSet_5.get(), _CreateTexture2D(m_pGalaxyImage.get(), 4), "galaxyTex", iUnit++);
 
-	// Ìí¼Óshader
+	// æ·»åŠ shader
 	std::string strGalaxyPlaneVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxy_5_Vert.glsl";
 	std::string strGalaxyPlaneFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxy_5_Frag.glsl";
-	return CGMKit::LoadShader(pStateSet_5.get(), strGalaxyPlaneVertPath, strGalaxyPlaneFragPath);
+	return CGMKit::LoadShader(pStateSet_5.get(), strGalaxyPlaneVertPath, strGalaxyPlaneFragPath, "Galaxy_5");
 }
 
 bool CGMGalaxy::_CreateGalaxies_5()
@@ -1928,7 +1866,7 @@ bool CGMGalaxy::_CreateGalaxies_5()
 	double fCubeMinSize = GM_MIN_GALAXIES_CUBE / m_pKernelData->fUnitArray->at(5);
 	m_pGalaxiesInfoUniform = new osg::Uniform("cubeInfo", osg::Vec2f(fCubeMinSize, 1.0f));
 
-	// µÚ0²ãĞÇÏµÈº£¬µ¥¶À´¦Àí
+	// ç¬¬0å±‚æ˜Ÿç³»ç¾¤ï¼Œå•ç‹¬å¤„ç†
 	if (!m_pGalaxyGroup_Transform.valid())
 	{
 		m_pGalaxyGroup_Transform = new osg::PositionAttitudeTransform();
@@ -1942,22 +1880,21 @@ bool CGMGalaxy::_CreateGalaxies_5()
 		pSSGroup->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
 		pSSGroup->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 		pSSGroup->setMode(GL_BLEND, osg::StateAttribute::ON);
-		osg::ref_ptr<osg::BlendEquation> blendEqua = new osg::BlendEquation(osg::BlendEquation::RGBA_MAX);
-		pSSGroup->setAttributeAndModes(blendEqua.get(), osg::StateAttribute::ON);
+		pSSGroup->setAttributeAndModes(new osg::BlendFunc(
+			GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+		), osg::StateAttribute::ON);
 		pSSGroup->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
 		pSSGroup->setRenderBinDetails(BIN_GALAXIES, "DepthSortedBin");
 
 		pSSGroup->addUniform(m_pGalaxiesInfoUniform.get());
 
 		int iUnit = 1;
-		pSSGroup->setTextureAttributeAndModes(iUnit, m_pGalaxiesTex.get());
-		pSSGroup->addUniform(new osg::Uniform("galaxiesTex", iUnit));
-		iUnit++;
+		CGMKit::AddTexture(pSSGroup.get(), m_pGalaxiesTex.get(), "galaxiesTex", iUnit++);
 
-		// Ìí¼Óshader
+		// æ·»åŠ shader
 		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_5_Vert.glsl";
 		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_5_Frag.glsl";
-		CGMKit::LoadShader(pSSGroup.get(), strVertPath, strFragPath);
+		CGMKit::LoadShader(pSSGroup.get(), strVertPath, strFragPath, "Galaxies_5");
 
 		osg::ref_ptr<osg::Vec4Array> vertArray = new osg::Vec4Array;
 		vertArray->reserve(iNum);
@@ -1983,7 +1920,7 @@ bool CGMGalaxy::_CreateGalaxies_5()
 		pGeometry->setUseDisplayList(false);
 		pGeometry->setDataVariance(osg::Object::DYNAMIC);
 
-		// ×¢Òâ£ºÕâÀï±ØĞëÊÇ½«×îĞ¡ĞÇÏµÈº·ÅÔÚµÚÒ»¸öÎ»ÖÃ£¬·ñÔòÏÔÓ°»á³öÎÊÌâ
+		// æ³¨æ„ï¼šè¿™é‡Œå¿…é¡»æ˜¯å°†æœ€å°æ˜Ÿç³»ç¾¤æ”¾åœ¨ç¬¬ä¸€ä¸ªä½ç½®ï¼Œå¦åˆ™æ˜¾å½±ä¼šå‡ºé—®é¢˜
 		m_pGalaxiesGeomVector.push_back(pGeometry);
 		m_pGeodeGalaxyGroup_5->addDrawable(pGeometry.get());
 	}
@@ -1998,28 +1935,27 @@ bool CGMGalaxy::_CreateGalaxies_5()
 		pSSG_5->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
 		pSSG_5->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 		pSSG_5->setMode(GL_BLEND, osg::StateAttribute::ON);
-		osg::ref_ptr<osg::BlendEquation> blendEqua = new osg::BlendEquation(osg::BlendEquation::RGBA_MAX);
-		pSSG_5->setAttributeAndModes(blendEqua.get(), osg::StateAttribute::ON);
+		pSSG_5->setAttributeAndModes(new osg::BlendFunc(
+			GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+		), osg::StateAttribute::ON);
 		pSSG_5->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
 		pSSG_5->setRenderBinDetails(BIN_GALAXIES, "DepthSortedBin");
 
 		pSSG_5->addUniform(m_pGalaxiesInfoUniform.get());
 
 		int iUnit = 1;
-		pSSG_5->setTextureAttributeAndModes(iUnit, m_pGalaxiesTex.get());
-		pSSG_5->addUniform(new osg::Uniform("galaxiesTex", iUnit));
-		iUnit++;
+		CGMKit::AddTexture(pSSG_5.get(), m_pGalaxiesTex.get(), "galaxiesTex", iUnit++);
 
-		// Ìí¼Óshader
+		// æ·»åŠ shader
 		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_5_Vert.glsl";
 		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_5_Frag.glsl";
-		CGMKit::LoadShader(pSSG_5.get(), strVertPath, strFragPath);
+		CGMKit::LoadShader(pSSG_5.get(), strVertPath, strFragPath, "Galaxies_5");
 	}
 
-	// ÔÚÑÛµã±ä»»½ÚµãÏÂ£¬Ö»´´½¨µÚ1¡¢2¡¢3²ãĞÇÏµÈº£¬µÚ0²ãĞÇÏµÈº£¬µ¥¶À´¦Àí
+	// åœ¨çœ¼ç‚¹å˜æ¢èŠ‚ç‚¹ä¸‹ï¼Œåªåˆ›å»ºç¬¬1ã€2ã€3å±‚æ˜Ÿç³»ç¾¤ï¼Œç¬¬0å±‚æ˜Ÿç³»ç¾¤ï¼Œå•ç‹¬å¤„ç†
 	for (int i = 1; i < 4; i++)
 	{
-		float fCubeSize = fCubeMinSize*std::pow(2, float(i));
+		float fCubeSize = fCubeMinSize * std::pow(2, float(i));
 
 		osg::ref_ptr<osg::Vec4Array> vertArray = new osg::Vec4Array;
 		vertArray->reserve(iNum);
@@ -2057,46 +1993,34 @@ bool CGMGalaxy::_CreateSupercluster()
 	const float fSuperclusterSize = 0.5f;
 
 	m_pGeodeSupercluster = new osg::Geode;
-	m_pGeodeSupercluster->setNodeMask(0);// Ä¬ÈÏÏÈÒş²Ø
-	m_pGeodeSupercluster->addDrawable(MakeBoxGeometry(fSuperclusterSize, fSuperclusterSize, fSuperclusterSize));
+	m_pGeodeSupercluster->setNodeMask(0);// é»˜è®¤å…ˆéšè—
+	m_pGeodeSupercluster->addDrawable(_MakeBoxGeometry(fSuperclusterSize, fSuperclusterSize, fSuperclusterSize));
 	m_pHierarchyRootVector.at(5)->addChild(m_pGeodeSupercluster.get());
 
 	osg::ref_ptr<osg::StateSet> pSS = m_pGeodeSupercluster->getOrCreateStateSet();
 	pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	pSS->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSS->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
+	pSS->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
 	pSS->setAttributeAndModes(new osg::CullFace());
 	pSS->setRenderBinDetails(BIN_SUPERCLUSTER, "DepthSortedBin");
 
-	SGMVolumeRange sVR;
-	sVR.fXMin = - fSuperclusterSize * 0.5f;
-	sVR.fXMax = fSuperclusterSize * 0.5f;
-	sVR.fYMin = -fSuperclusterSize * 0.5f;
-	sVR.fYMax = fSuperclusterSize * 0.5f;
-	sVR.fZMin = -fSuperclusterSize * 0.5f;
-	sVR.fZMax = fSuperclusterSize * 0.5f;
+	osg::Vec3f vRangeMax = osg::Vec3f(0.5, 0.5, 0.5)*fSuperclusterSize;
+	pSS->addUniform(new osg::Uniform("rangeMax", vRangeMax));
+	osg::Vec3f vRangeMin = -vRangeMax;
+	pSS->addUniform(new osg::Uniform("rangeMin", vRangeMin));
 
-	osg::Vec3f vRangeMin = osg::Vec3f(sVR.fXMin, sVR.fYMin, sVR.fZMin);
-	osg::ref_ptr<osg::Uniform> pRangeMin = new osg::Uniform("rangeMin", vRangeMin);
-	pSS->addUniform(pRangeMin.get());
-	osg::Vec3f vRangeMax = osg::Vec3f(sVR.fXMax, sVR.fYMax, sVR.fZMax);
-	osg::ref_ptr<osg::Uniform> pRangeMax = new osg::Uniform("rangeMax", vRangeMax);
-	pSS->addUniform(pRangeMax.get());
-
-	pSS->addUniform(m_vScreenSizeUniform.get());
+	pSS->addUniform(m_pCommonUniform->GetScreenSize());
 
 	int iUnit = 0;
-	pSS->setTextureAttributeAndModes(iUnit, m_3DShapeTex_128.get());
-	pSS->addUniform(new osg::Uniform("shapeNoiseTex", iUnit));
-	iUnit++;
-	pSS->setTextureAttributeAndModes(iUnit, m_blueNoiseTex.get());
-	pSS->addUniform(new osg::Uniform("blueNoiseSampler", iUnit));
-	iUnit++;
+	CGMKit::AddTexture(pSS.get(), m_3DShapeTex.get(), "shapeNoiseTex", iUnit++);
+	//CGMKit::AddTexture(pSS.get(), m_blueNoiseTex.get(), "blueNoiseTex", iUnit++);
 
-	// Ìí¼Óshader
+	// æ·»åŠ shader
 	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SuperclusterVert.glsl";
 	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SuperclusterFrag.glsl";
-	return CGMKit::LoadShader(pSS.get(), strVertPath, strFragPath);
+	return CGMKit::LoadShader(pSS.get(), strVertPath, strFragPath, "Supercluster");
 }
 
 bool CGMGalaxy::_CreateUltracluster()
@@ -2104,47 +2028,35 @@ bool CGMGalaxy::_CreateUltracluster()
 	const float fUltraclusterSize = 0.5f / 0.11f;
 
 	m_pGeodeUltracluster = new osg::Geode;
-	m_pGeodeUltracluster->setNodeMask(0);// Ä¬ÈÏÏÈÒş²Ø
-	m_pGeodeUltracluster->addDrawable(MakeBoxGeometry(fUltraclusterSize, fUltraclusterSize, fUltraclusterSize));
+	m_pGeodeUltracluster->setNodeMask(0);// é»˜è®¤å…ˆéšè—
+	m_pGeodeUltracluster->addDrawable(_MakeBoxGeometry(fUltraclusterSize, fUltraclusterSize, fUltraclusterSize));
 	m_pHierarchyRootVector.at(5)->addChild(m_pGeodeUltracluster.get());
 
 	osg::ref_ptr<osg::StateSet> pSS = m_pGeodeUltracluster->getOrCreateStateSet();
 	pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	pSS->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSS->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
+	pSS->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
 	pSS->setAttributeAndModes(new osg::CullFace());
 	pSS->setRenderBinDetails(BIN_ULTRACLUSTER, "DepthSortedBin");
 	pSS->setDefine("ULTRA", osg::StateAttribute::ON);
 
-	SGMVolumeRange sVR;
-	sVR.fXMin = -fUltraclusterSize * 0.5f;
-	sVR.fXMax = fUltraclusterSize * 0.5f;
-	sVR.fYMin = -fUltraclusterSize * 0.5f;
-	sVR.fYMax = fUltraclusterSize * 0.5f;
-	sVR.fZMin = -fUltraclusterSize * 0.5f;
-	sVR.fZMax = fUltraclusterSize * 0.5f;
+	osg::Vec3f vRangeMax = osg::Vec3f(0.5, 0.5, 0.5)*fUltraclusterSize;
+	pSS->addUniform(new osg::Uniform("rangeMax", vRangeMax));
+	osg::Vec3f vRangeMin = -vRangeMax;
+	pSS->addUniform(new osg::Uniform("rangeMin", vRangeMin));
 
-	osg::Vec3f vRangeMin = osg::Vec3f(sVR.fXMin, sVR.fYMin, sVR.fZMin);
-	osg::ref_ptr<osg::Uniform> pRangeMin = new osg::Uniform("rangeMin", vRangeMin);
-	pSS->addUniform(pRangeMin.get());
-	osg::Vec3f vRangeMax = osg::Vec3f(sVR.fXMax, sVR.fYMax, sVR.fZMax);
-	osg::ref_ptr<osg::Uniform> pRangeMax = new osg::Uniform("rangeMax", vRangeMax);
-	pSS->addUniform(pRangeMax.get());
-
-	pSS->addUniform(m_vScreenSizeUniform.get());
+	pSS->addUniform(m_pCommonUniform->GetScreenSize());
 
 	int iUnit = 0;
-	pSS->setTextureAttributeAndModes(iUnit, m_3DShapeTex_128.get());
-	pSS->addUniform(new osg::Uniform("shapeNoiseTex", iUnit));
-	iUnit++;
-	pSS->setTextureAttributeAndModes(iUnit, m_blueNoiseTex.get());
-	pSS->addUniform(new osg::Uniform("blueNoiseSampler", iUnit));
-	iUnit++;
+	CGMKit::AddTexture(pSS.get(), m_3DShapeTex.get(), "shapeNoiseTex", iUnit++);
+	//CGMKit::AddTexture(pSS.get(), m_blueNoiseTex.get(), "blueNoiseTex", iUnit++);
 
-	// Ìí¼Óshader
+	// æ·»åŠ shader
 	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SuperclusterVert.glsl";
 	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SuperclusterFrag.glsl";
-	return CGMKit::LoadShader(pSS.get(), strVertPath, strFragPath);
+	return CGMKit::LoadShader(pSS.get(), strVertPath, strFragPath, "Supercluster");
 }
 
 bool CGMGalaxy::_CreateMyWorld()
@@ -2161,15 +2073,15 @@ bool CGMGalaxy::_CreateMyWorld()
 	m_pGeodeMyWorld_6 = new osg::Geode();
 	m_pMyWorld_6_AutoTrans->addChild(m_pGeodeMyWorld_6.get());
 
-	// ´´½¨ÎÒµÄÊÀ½çµÄµã×´¼¸ºÎÌå
+	// åˆ›å»ºæˆ‘çš„ä¸–ç•Œçš„ç‚¹çŠ¶å‡ ä½•ä½“
 	osg::ref_ptr<osg::Geometry> pGeometry_5 = new osg::Geometry();
 	osg::ref_ptr<osg::Geometry> pGeometry_6 = new osg::Geometry();
 
-	// ¼ÆËãÊÀ½ç³ß´çºÍÏà»ú²ÎÊı
+	// è®¡ç®—ä¸–ç•Œå°ºå¯¸å’Œç›¸æœºå‚æ•°
 	float fWorldSize = 200.0f;
-	float fFovy = osg::inDegrees(40.0f);
+	float fFovy = osg::inDegrees(m_pConfigData->fFovy);
 	float fTan = std::tan(fFovy*0.5f);
-	// Ïà»úÔÚÖÕ¼«Ê±¿ÌµÄÄ¿±ê°ë¾¶£¨5¼¶¿Õ¼äÏÂ£©
+	// ç›¸æœºåœ¨ç»ˆææ—¶åˆ»çš„ç›®æ ‡åŠå¾„ï¼ˆ5çº§ç©ºé—´ä¸‹ï¼‰
 	float fCameraFinalRadius_5 = fWorldSize * 0.5f / fTan - fWorldSize * 0.5f;
 
 	size_t iNum = 65536;
@@ -2184,23 +2096,30 @@ bool CGMGalaxy::_CreateMyWorld()
 	colorArray->reserve(iNum);
 	el->reserve(iNum);
 
+	if (!m_pPhotoImage.valid())
+	{
+		std::string strPath = m_pConfigData->strCorePath + m_strGalaxyTexPath + "photo.tga";
+		m_pPhotoImage = osgDB::readImageFile(strPath);
+	}
+
+	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
 	int x = 0;
 	while (x < iNum)
 	{
-		float fRandomX = (m_iRandom() % 10000)*0.0001f - 0.5f;
-		float fRandomY = (m_iRandom() % 10000)*0.0001f - 0.5f;
-		float fRandomZ = (m_iRandom() % 10000)*0.0001f - 0.5f;
-		float fRandomAlpha = (m_iRandom() % 1000)*0.001f;
+		float fRandomX = iPseudoNoise(m_iRandom)*1e-4f - 0.5f;
+		float fRandomY = iPseudoNoise(m_iRandom)*1e-4f - 0.5f;
+		float fRandomZ = iPseudoNoise(m_iRandom)*1e-4f - 0.5f;
+		float fRandomAlpha = iPseudoNoise(m_iRandom)*1e-4f;
 		float fX = fWorldSize * fRandomX;
 		float fY = fWorldSize * fRandomY;
 		float fZ = fWorldSize * fRandomZ;
 
 		osg::Vec3 vViewDir = osg::Vec3(fX, fY, fZ - fCameraFinalRadius_5);
-		// Ïà»úÖĞÖáÏß·½Ïò¾àÀëÏà»ú1¸öµ¥Î»µÄÆ½ÃæÉÏµÄÏòÁ¿
+		// ç›¸æœºä¸­è½´çº¿æ–¹å‘è·ç¦»ç›¸æœº1ä¸ªå•ä½çš„å¹³é¢ä¸Šçš„å‘é‡
 		osg::Vec3 vNear = vViewDir / abs(vViewDir.z());
 		float fProjU = 0.5f * vNear.x() / fTan + 0.5f;
 		float fProjV = 0.5f * vNear.y() / fTan + 0.5f;
-		// Èç¹û¶¥µãÔÚ»­ÃæÄÚ
+		// å¦‚æœé¡¶ç‚¹åœ¨ç”»é¢å†…
 		if (fProjU <= 1.0f && fProjU >= 0.0f && fProjV <= 1.0f && fProjV >= 0.0f)
 		{
 			float fU = fRandomX + 0.5f;
@@ -2212,7 +2131,7 @@ bool CGMGalaxy::_CreateMyWorld()
 				std::fmod(4 * fW, 1.0f));
 			if (fHole < 0.45)
 			{
-				osg::Vec4f vColor = _GetPhotoColor(fProjU, fProjV);
+				osg::Vec4f vColor = CGMKit::GetImageColor(m_pPhotoImage.get(), fProjU, fProjV);
 				if (vColor.a() > 0.0f)
 				{
 					vertArray_5->push_back(osg::Vec3(fX, fY, fZ));
@@ -2222,7 +2141,7 @@ bool CGMGalaxy::_CreateMyWorld()
 					x++;
 				}
 			}
-		}	
+		}
 	}
 
 	int y = 0;
@@ -2266,7 +2185,7 @@ bool CGMGalaxy::_CreateMyWorld()
 
 	m_pGeodeMyWorld_6->addDrawable(pGeometry_6.get());
 
-	// ×´Ì¬¼¯
+	// çŠ¶æ€é›†
 	osg::ref_ptr<osg::StateSet> pSS_5 = m_pGeodeMyWorld_5->getOrCreateStateSet();
 	osg::ref_ptr<osg::StateSet> pSS_6 = m_pGeodeMyWorld_6->getOrCreateStateSet();
 
@@ -2274,71 +2193,81 @@ bool CGMGalaxy::_CreateMyWorld()
 	pSS_5->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
 	pSS_5->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	pSS_5->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSS_5->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
+	pSS_5->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
 	pSS_5->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
 	pSS_5->setRenderBinDetails(BIN_GALAXIES, "DepthSortedBin");
-	pSS_5->addUniform(m_pMyWorldAlphaUniform.get());
+	pSS_5->addUniform(m_fMyWorldAlphaUniform.get());
 	int iUnit_5 = 0;
-	pSS_5->setTextureAttributeAndModes(iUnit_5, m_2DNoiseTex.get());
-	pSS_5->addUniform(new osg::Uniform("noise2DTex", iUnit_5));
-	iUnit_5++;
+	//CGMKit::AddTexture(pSS_5.get(), m_2DNoiseTex.get(), "noise2DTex", iUnit_5++);
 
 	pSS_6->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
 	pSS_6->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
 	pSS_6->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	pSS_6->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSS_6->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
+	pSS_6->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
 	pSS_6->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
 	pSS_6->setRenderBinDetails(BIN_GALAXIES, "DepthSortedBin");
-	pSS_6->addUniform(m_pMyWorldAlphaUniform.get());
+	pSS_6->addUniform(m_fMyWorldAlphaUniform.get());
 	int iUnit_6 = 0;
-	pSS_6->setTextureAttributeAndModes(iUnit_6, m_2DNoiseTex.get());
-	pSS_6->addUniform(new osg::Uniform("noise2DTex", iUnit_6));
-	iUnit_6++;
+	//CGMKit::AddTexture(pSS_6.get(), m_2DNoiseTex.get(), "noise2DTex", iUnit_6++);
 
-	// Ìí¼Óshader
+	// æ·»åŠ shader
 	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "MyWorldVert.glsl";
 	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "MyWorldFrag.glsl";
-	CGMKit::LoadShader(pSS_5.get(), strVertPath, strFragPath);
-	CGMKit::LoadShader(pSS_6.get(), strVertPath, strFragPath);
+	CGMKit::LoadShader(pSS_5.get(), strVertPath, strFragPath, "MyWorld5");
+	CGMKit::LoadShader(pSS_6.get(), strVertPath, strFragPath, "MyWorld6");
 
 	return true;
 }
 
-bool CGMGalaxy::_CreateGalaxyBackground()
+bool CGMGalaxy::_CreateBackgroundGalaxy()
 {
-	m_pGalaxyBackgroundGeode = new osg::Geode;
-	m_pGalaxyBackgroundGeode->setNodeMask(0);
-	osg::ref_ptr<const osg::EllipsoidModel>	_ellipsoidModel = new osg::EllipsoidModel(1.0,1.0);
-	osg::ref_ptr<osg::Geometry> pDrawable = _MakeEllipsoidGeometry(_ellipsoidModel, 32, 8, 0, true, true, true, -180.0f, 180.0f, -45.0f, 45.0f);
-	m_pGalaxyBackgroundGeode->addDrawable(pDrawable.get());
-	m_pCosmosBoxNode->addChild(m_pGalaxyBackgroundGeode.get());
+	osg::ref_ptr<osg::Geode> pGalaxyBackgroundGeode = new osg::Geode;
+	osg::ref_ptr<const osg::EllipsoidModel>	_ellipsoidModel = new osg::EllipsoidModel(1.0, 1.0);
+	osg::ref_ptr<osg::Geometry> pDrawable = _MakeEllipsoidGeometry(_ellipsoidModel, 32, 8, 0, true, true, true, -45.0f, 45.0f);
+	pGalaxyBackgroundGeode->addDrawable(pDrawable.get());
 
-	osg::ref_ptr<osg::StateSet>	pSSGalaxyBackground = m_pGalaxyBackgroundGeode->getOrCreateStateSet();
-	pSSGalaxyBackground->setRenderBinDetails(BIN_GALAXY_BACKGROUND, "RenderBin");
+	m_pBackgroundGalaxyTransform = new osg::PositionAttitudeTransform();
+	m_pBackgroundGalaxyTransform->setNodeMask(0);
+	m_pBackgroundGalaxyTransform->addChild(pGalaxyBackgroundGeode.get());
+	m_pCosmosBoxNode->addChild(m_pBackgroundGalaxyTransform.get());
+
+	osg::ref_ptr<osg::StateSet>	pSSGalaxyBackground = m_pBackgroundGalaxyTransform->getOrCreateStateSet();
+	pSSGalaxyBackground->setRenderBinDetails(BIN_BACKGROUND_GALAXY, "RenderBin");
+
+	// é“¶æ²³ç³»èƒŒæ™¯çº¹ç†
+	std::string strTexPath = m_pConfigData->strCorePath + m_strGalaxyTexPath;
+	osg::ref_ptr<osg::Texture2D> pGalaxyBackgroundTex = new osg::Texture2D();
+	pGalaxyBackgroundTex->setImage(osgDB::readImageFile(strTexPath + "galaxyBackground.dds", m_pDDSOptions.get()));
+	pGalaxyBackgroundTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	pGalaxyBackgroundTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	pGalaxyBackgroundTex->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+	pGalaxyBackgroundTex->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+	pGalaxyBackgroundTex->setInternalFormat(GL_COMPRESSED_RGBA_S3TC_DXT5_EXT);
+	pGalaxyBackgroundTex->setSourceFormat(GL_RGBA);
+	pGalaxyBackgroundTex->setSourceType(GL_UNSIGNED_BYTE);
 
 	int iUnit = 0;
-	std::string strTexPath = m_pConfigData->strCorePath + m_strGalaxyTexPath;
-	pSSGalaxyBackground->setTextureAttributeAndModes(iUnit, _CreateTexture2D(strTexPath + "galaxyBackground.jpg", 3));
-	pSSGalaxyBackground->addUniform(new osg::Uniform("galaxyBackgroundTex", iUnit));
-	iUnit++;
-	pSSGalaxyBackground->setTextureAttributeAndModes(iUnit, _CreateTexture2D(strTexPath + "starNoise.tga", 4));
-	pSSGalaxyBackground->addUniform(new osg::Uniform("noiseTex", iUnit));
-	iUnit++;
+	CGMKit::AddTexture(pSSGalaxyBackground.get(), pGalaxyBackgroundTex.get(), "galaxyBackgroundTex", iUnit++);
+	CGMKit::AddTexture(pSSGalaxyBackground.get(), _CreateTexture2D(strTexPath + "starNoise.tga", 4), "noiseTex", iUnit++);
 
-	pSSGalaxyBackground->addUniform(m_pStarAlphaUniform.get());
+	pSSGalaxyBackground->addUniform(m_fStarAlphaUniform.get());
 	pSSGalaxyBackground->addUniform(m_pEyePos4Uniform.get());
 
-	// Ìí¼Óshader
+	// æ·»åŠ shader
 	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyBackgroundVert.glsl";
 	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyBackgroundFrag.glsl";
-	return CGMKit::LoadShader(pSSGalaxyBackground.get(), strVertPath, strFragPath);
+	return CGMKit::LoadShader(pSSGalaxyBackground.get(), strVertPath, strFragPath, "GalaxyBackground");
 }
 
 bool CGMGalaxy::_CreateCosmosBox()
 {
 	m_pCosmosBoxGeode = new osg::Geode();
-	m_pCosmosBoxGeode->addDrawable(MakeBoxGeometry(2,2,2));
+	m_pCosmosBoxGeode->addDrawable(_MakeBoxGeometry(2, 2, 2));
 	m_pCosmosBoxNode->addChild(m_pCosmosBoxGeode.get());
 
 	std::string strCubeMapPath = m_pConfigData->strCorePath + m_strGalaxyTexPath + "Skybox/";
@@ -2349,115 +2278,98 @@ bool CGMGalaxy::_CreateCosmosBox()
 	pStateSetCosmosBox->setRenderBinDetails(BIN_COSMOS, "RenderBin");
 
 	int iUnit = 0;
-	pStateSetCosmosBox->setTextureAttributeAndModes(iUnit, pCubeMapTex.get());
-	pStateSetCosmosBox->addUniform(new osg::Uniform("cubeMapTex", iUnit));
-	iUnit++;
+	CGMKit::AddTexture(pStateSetCosmosBox.get(), pCubeMapTex.get(), "cubeMapTex", iUnit++);
+	CGMKit::AddTexture(pStateSetCosmosBox.get(), m_3DShapeTex.get(), "shapeNoiseTex", iUnit++);
 
-	pStateSetCosmosBox->setTextureAttributeAndModes(iUnit, m_3DShapeTex_128.get());
-	pStateSetCosmosBox->addUniform(new osg::Uniform("shapeNoiseTex", iUnit));
-	iUnit++;
+	pStateSetCosmosBox->addUniform(m_fStarAlphaUniform.get());
+	pStateSetCosmosBox->addUniform(m_pCommonUniform->GetTime());
+	pStateSetCosmosBox->addUniform(m_fMyWorldAlphaUniform.get());
 
-	pStateSetCosmosBox->addUniform(m_pStarAlphaUniform.get());
-	pStateSetCosmosBox->addUniform(m_pTimesUniform.get());
-	pStateSetCosmosBox->addUniform(m_pMyWorldAlphaUniform.get());
-
-	// Ìí¼Óshader
+	// æ·»åŠ shader
 	std::string strCosmosBoxVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "CosmosBoxVert.glsl";
 	std::string strCosmosBoxFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "CosmosBoxFrag.glsl";
-	return CGMKit::LoadShader(pStateSetCosmosBox.get(), strCosmosBoxVertPath, strCosmosBoxFragPath);
+	return CGMKit::LoadShader(pStateSetCosmosBox.get(), strCosmosBoxVertPath, strCosmosBoxFragPath, "CosmosBox");
 }
 
 bool CGMGalaxy::_DetachAudioPoints()
 {
-	SGMStarCoord vStarCoord = GM_ENGINE_PTR->GetDataManager()->GetStarCoord(m_strPlayingStarName);
-	m_vPlayingAudioCoord = GM_ENGINE_PTR->GetDataManager()->GetAudioCoord(m_strPlayingStarName);
-	m_pStarAudioPosUniform->set(osg::Vec2f(m_vPlayingAudioCoord.radius, m_vPlayingAudioCoord.angle));
+	m_vPlayingAudioCoord = m_pDataManager->GetAudioCoord(m_strPlayingStarName);
+	m_iPlayingAudioUID = m_pDataManager->GetUID(m_strPlayingStarName);
 
-	// ÒôÆµÎÄ¼şµÄĞÇ³½×ø±êVector
-	std::vector<SGMStarCoord> coordVector;
-	GM_ENGINE_PTR->GetDataManager()->GetStarCoordVector(coordVector);
-
-	std::vector<SGMStarCoord> newCoordVector;
-	for (auto itr = coordVector.begin(); itr != coordVector.end(); itr++)
-	{
-		if (vStarCoord != *itr)
-		{
-			newCoordVector.push_back(*itr);
-		}
-	}
-	if (newCoordVector.size() != (coordVector.size()-1))
-	{
-		return false;
-	}
+	// éŸ³é¢‘æ•°æ®
+	std::map<unsigned int, SGMAudioData> audioDataMap;
+	m_pDataManager->GetAudioDataMap(audioDataMap);
 
 	osg::Geometry* pGeometry = dynamic_cast<osg::Geometry*>(m_pGeodeAudio->getDrawable(0));
 	if (pGeometry)
 	{
 		m_pGeodeAudio->removeChild(pGeometry);
 	}
-	// ´ÓĞŞ¸Ä¹ıµÄÊı¾İ¹ÜÀíÄ£¿é¶ÁÈ¡Êı¾İ£¬ÖØĞÂ´´½¨Î´¼¤»î×´Ì¬µÄÒôÆµĞÇ¼¸ºÎÌå
-	osg::ref_ptr<osg::Geometry> pGeomAudio = _CreateAudioGeometry(newCoordVector);
+	// ä»ä¿®æ”¹è¿‡çš„æ•°æ®ç®¡ç†æ¨¡å—è¯»å–æ•°æ®ï¼Œé‡æ–°åˆ›å»ºæœªæ¿€æ´»çŠ¶æ€çš„éŸ³é¢‘æ˜Ÿå‡ ä½•ä½“
+	osg::ref_ptr<osg::Geometry> pGeomAudio = _CreateAudioGeometry(audioDataMap, m_iPlayingAudioUID);
 	if (!pGeomAudio.valid()) return false;
 	m_pGeodeAudio->addDrawable(pGeomAudio.get());
 
-	// ´´½¨¼¤»îµÄÒôÆµĞÇ
-	if (!m_pPlayingStarTransform.valid())
+	// åˆ›å»ºæ¿€æ´»çš„éŸ³é¢‘æ˜Ÿ
+	if (!m_pStarInfoTransform.valid())
 	{
-		m_pPlayingStarTransform = new osg::PositionAttitudeTransform();
+		m_pStarInfoTransform = new osg::PositionAttitudeTransform();
 		osg::Geode* pGeode = new osg::Geode();
 		osg::Geometry* pGeom = _CreateConeGeometry();
 		pGeode->addDrawable(pGeom);
-		m_pPlayingStarTransform->addChild(pGeode);
-		m_pHierarchyRootVector.at(4)->addChild(m_pPlayingStarTransform.get());
+		m_pStarInfoTransform->addChild(pGeode);
+		m_pHierarchyRootVector.at(4)->addChild(m_pStarInfoTransform.get());
 
-		osg::ref_ptr<osg::StateSet> pSS = m_pPlayingStarTransform->getOrCreateStateSet();
+		osg::ref_ptr<osg::StateSet> pSS = m_pStarInfoTransform->getOrCreateStateSet();
 
 		pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 		pSS->setMode(GL_BLEND, osg::StateAttribute::ON);
-		pSS->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
+		pSS->setAttributeAndModes(new osg::BlendFunc(
+			GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+		), osg::StateAttribute::ON);
 		pSS->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
 		pSS->setRenderBinDetails(BIN_STAR_PLAYING, "DepthSortedBin");
 
-		pSS->addUniform(m_pStarColorUniform.get());
+		pSS->addUniform(m_pCommonUniform->GetStarColor());
 
-		// Ìí¼Óshader
+		// æ·»åŠ shader
 		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "PlayingStarVert.glsl";
 		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "PlayingStarFrag.glsl";
-		CGMKit::LoadShader(pSS.get(), strVertPath, strFragPath);
+		CGMKit::LoadShader(pSS.get(), strVertPath, strFragPath, "PlayingStar");
 	}
 	osg::Vec3f vPos;
-	m_pStarHiePosUniform->get(vPos);
-	m_pPlayingStarTransform->asPositionAttitudeTransform()->setPosition(vPos);
-	//m_pPlayingStarTransform->setNodeMask(~0);
-	m_pPlayingStarTransform->setNodeMask(0);
+	m_pCommonUniform->SetStarHiePos(vPos);
+	m_pStarInfoTransform->asPositionAttitudeTransform()->setPosition(vPos);
+	//m_pStarInfoTransform->setNodeMask(~0);
+	m_pStarInfoTransform->setNodeMask(0);
 
-	// ´´½¨ÒôÆµ¿Õ¼ä×ø±êÖ¸Ê¾Ïß
-	if (!m_pGeodeHelpLine.valid())
+	// åˆ›å»ºéŸ³é¢‘åŒºåŸŸ
+	if (!m_pGeodeRegion.valid())
 	{
-		m_pGeodeHelpLine = new osg::Geode();
-		osg::Geometry* pLineGeometry = _CreateHelpLineGeometry();
-		m_pGeodeHelpLine->addDrawable(pLineGeometry);
-		m_pHierarchyRootVector.at(4)->addChild(m_pGeodeHelpLine.get());
+		m_pGeodeRegion = new osg::Geode();
+		osg::Geometry* pRegionGeometry = _CreateRegionGeometry();
+		m_pGeodeRegion->addDrawable(pRegionGeometry);
+		m_pHierarchyRootVector.at(4)->addChild(m_pGeodeRegion.get());
 
-		osg::ref_ptr<osg::StateSet> pLineSS = m_pGeodeHelpLine->getOrCreateStateSet();
-		osg::ref_ptr<osg::LineWidth> pLineWidth = new osg::LineWidth;
-		pLineWidth->setWidth(1);
-		pLineSS->setAttributeAndModes(pLineWidth.get(), osg::StateAttribute::ON);
-		pLineSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-		pLineSS->setMode(GL_BLEND, osg::StateAttribute::ON);
-		pLineSS->setAttributeAndModes(new osg::BlendFunc(), osg::StateAttribute::ON);
-		pLineSS->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
-		pLineSS->setRenderBinDetails(BIN_HELP_LINE, "DepthSortedBin");
+		osg::ref_ptr<osg::StateSet> pRegionSS = m_pGeodeRegion->getOrCreateStateSet();
+		pRegionSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+		pRegionSS->setMode(GL_BLEND, osg::StateAttribute::ON);
+		pRegionSS->setAttributeAndModes(new osg::BlendFunc(
+			GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+		), osg::StateAttribute::ON);
+		pRegionSS->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
+		pRegionSS->setRenderBinDetails(BIN_REGION, "DepthSortedBin");
 
-		pLineSS->addUniform(m_pStarAudioPosUniform.get());
-		pLineSS->addUniform(m_pTimesUniform.get());
+		pRegionSS->addUniform(m_pMousePosUniform.get());
+		pRegionSS->addUniform(m_pAudioUVUniform.get());
+		pRegionSS->addUniform(m_pCommonUniform->GetTime());
 
-		// Ìí¼Óshader
-		std::string strLineVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "HelpLineVert.glsl";
-		std::string strLineFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "HelpLineFrag.glsl";
-		CGMKit::LoadShader(pLineSS.get(), strLineVertPath, strLineFragPath);
+		// æ·»åŠ shader
+		std::string strAudioRegionVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "AudioRegionVert.glsl";
+		std::string strAudioRegionFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "AudioRegionFrag.glsl";
+		CGMKit::LoadShader(pRegionSS.get(), strAudioRegionVertPath, strAudioRegionFragPath, "AudioRegion");
 	}
-	m_pGeodeHelpLine->setNodeMask(~0);
+	m_pGeodeRegion->setNodeMask(~0);
 
 	return true;
 }
@@ -2465,44 +2377,81 @@ bool CGMGalaxy::_DetachAudioPoints()
 bool CGMGalaxy::_AttachAudioPoints()
 {
 	SGMAudioData sData;
+	sData.UID = m_iPlayingAudioUID;
 	sData.name = m_strPlayingStarName;
 	sData.audioCoord = m_vPlayingAudioCoord;
-	GM_ENGINE_PTR->GetDataManager()->SetAudioData(sData);
+	sData.galaxyCoord = m_pDataManager->AudioCoord2GalaxyCoord(m_vPlayingAudioCoord);
+	// è®¾ç½®éŸ³é¢‘æ•°æ®ï¼Œå¦‚æœä½ç½®ä¸å·²çŸ¥éŸ³é¢‘æœ‰é‡åˆï¼Œåˆ™è‡ªåŠ¨è¿ç§»åˆ°åˆé€‚ä½ç½®
+	m_pDataManager->EditAudioData(sData);
+	// ä½ç½®è¿ç§»åå†å›ä¼ ç»™æœ¬æ¨¡å—çš„éŸ³é¢‘åæ ‡
+	m_vPlayingAudioCoord = sData.audioCoord;
 
-	// ÒôÆµÎÄ¼şµÄĞÇ³½×ø±êVector
-	std::vector<SGMStarCoord> coordVector;
-	GM_ENGINE_PTR->GetDataManager()->GetStarCoordVector(coordVector);
+	// éŸ³é¢‘æ•°æ®
+	std::map<unsigned int, SGMAudioData> audioDataMap;
+	m_pDataManager->GetAudioDataMap(audioDataMap);
 	osg::Geometry* pGeometry = dynamic_cast<osg::Geometry*>(m_pGeodeAudio->getDrawable(0));
 	if (pGeometry)
 	{
 		m_pGeodeAudio->removeChild(pGeometry);
 	}
-	// ´ÓĞŞ¸Ä¹ıµÄÊı¾İ¹ÜÀíÄ£¿é¶ÁÈ¡Êı¾İ£¬ÖØĞÂ´´½¨Î´¼¤»î×´Ì¬µÄÒôÆµĞÇ¼¸ºÎÌå
-	osg::ref_ptr<osg::Geometry> pGeomAudio = _CreateAudioGeometry(coordVector);
+	// ä»ä¿®æ”¹è¿‡çš„æ•°æ®ç®¡ç†æ¨¡å—è¯»å–æ•°æ®ï¼Œé‡æ–°åˆ›å»ºæœªæ¿€æ´»çŠ¶æ€çš„éŸ³é¢‘æ˜Ÿå‡ ä½•ä½“
+	osg::ref_ptr<osg::Geometry> pGeomAudio = _CreateAudioGeometry(audioDataMap);
 	if (!pGeomAudio.valid()) return false;
 	m_pGeodeAudio->addDrawable(pGeomAudio.get());
 
-	// Òş²Ø¼¤»îµÄÒôÆµĞÇ
-	if (m_pPlayingStarTransform.valid())
+	// éšè—æ¿€æ´»çš„éŸ³é¢‘æ˜Ÿ
+	if (m_pStarInfoTransform.valid())
 	{
-		m_pPlayingStarTransform->setNodeMask(0);
+		m_pStarInfoTransform->setNodeMask(0);
 	}
-	if (m_pGeodeHelpLine.valid())
+	if (m_pGeodeRegion.valid())
 	{
-		m_pGeodeHelpLine->setNodeMask(0);
+		m_pGeodeRegion->setNodeMask(0);
 	}
 	return true;
 }
 
-osg::Geometry* CGMGalaxy::_CreateAudioGeometry(std::vector<SGMStarCoord>& coordVector)
+bool CGMGalaxy::_UpdatePlayingStarInformation(const SGMAudioCoord& sAudioCoord)
 {
-	// 4¼¶¿Õ¼äÏÂµÄĞÇÏµ°ë¾¶
+	if (sAudioCoord.angle < 0.0 ||
+		sAudioCoord.angle >= (osg::PI*2.0) ||
+		sAudioCoord.BPM < m_pConfigData->fMinBPM)
+	{
+		return false;
+	}
+	if (4 == m_pKernelData->iHierarchy)
+	{
+		SGMGalaxyCoord vGC = m_pDataManager->AudioCoord2GalaxyCoord(sAudioCoord);
+		m_vPlayingStarWorld4Pos = osg::Vec3d(vGC.x, vGC.y, vGC.z) * m_fGalaxyRadius;
+
+		osg::Vec3f vPosHierarchy = m_vPlayingStarWorld4Pos / m_pKernelData->fUnitArray->at(4);
+		m_pSolarSystem->SetSupernovaHiePos(vPosHierarchy);
+		m_pCommonUniform->SetStarHiePos(vPosHierarchy);
+		// è®¾ç½®å½“å‰éŸ³é¢‘æ˜Ÿé¢œè‰²
+		m_pCommonUniform->SetStarColor(m_pDataManager->GetAudioColor(sAudioCoord));
+
+		// æ›´æ–°éŸ³é¢‘çš„UV
+		m_pAudioUVUniform->set(_AudioCoord2UV(sAudioCoord));
+
+		osg::Quat quat = osg::Quat(m_fArrowAngle, osg::Vec3d(0, 0, 1));
+		m_pStar_4_Transform->asPositionAttitudeTransform()->setAttitude(quat);
+		m_pStar_4_Transform->asPositionAttitudeTransform()->setPosition(vPosHierarchy);
+	}
+	return true;
+}
+
+osg::Geometry* CGMGalaxy::_CreateAudioGeometry(
+	std::map<unsigned int, SGMAudioData>& audioMap,
+	const unsigned int iDiscardUID)
+{
+	// 4çº§ç©ºé—´ä¸‹çš„æ˜Ÿç³»åŠå¾„
 	double fGalaxyRadius4 = m_fGalaxyRadius / m_pKernelData->fUnitArray->at(4);
 
 	osg::Geometry* pGeomAudio = new osg::Geometry();
 
-	size_t iNum = coordVector.size();
-	if (0 == iNum) return nullptr;
+	size_t iNum = audioMap.size();
+	if (0 != iDiscardUID) iNum--;
+	if (0 >= iNum) return nullptr;
 
 	osg::ref_ptr<osg::Vec3Array> vertArray = new osg::Vec3Array;
 	osg::ref_ptr<osg::Vec4Array> colorArray = new osg::Vec4Array();
@@ -2512,13 +2461,15 @@ osg::Geometry* CGMGalaxy::_CreateAudioGeometry(std::vector<SGMStarCoord>& coordV
 	el->reserve(iNum);
 
 	int x = 0;
-	for (auto itr : coordVector)
+	for (auto& itr : audioMap)
 	{
-		float fX = float(itr.x) / GM_COORD_MAX;
-		float fY = float(itr.y) / GM_COORD_MAX;
-		float fZ = float(itr.z) / GM_COORD_MAX;
+		if (iDiscardUID == itr.first) continue;
 
-		osg::Vec4f vColor = GM_ENGINE_PTR->GetDataManager()->GetAudioColor(itr);
+		float fX = itr.second.galaxyCoord.x;
+		float fY = itr.second.galaxyCoord.y;
+		float fZ = itr.second.galaxyCoord.z;
+
+		osg::Vec4f vColor = m_pDataManager->GetAudioColor(itr.first);
 
 		fX *= fGalaxyRadius4;
 		fY *= fGalaxyRadius4;
@@ -2585,7 +2536,7 @@ osg::Geometry* CGMGalaxy::_CreateConeGeometry()
 
 	for (int i = 0; i < segments; ++i)
 	{
-		double angle = deltaAngle * float(i+1);
+		double angle = deltaAngle * float(i + 1);
 		double cosA = cos(angle);
 		double sinA = sin(angle);
 		double x = fRadius * cosA;
@@ -2599,16 +2550,61 @@ osg::Geometry* CGMGalaxy::_CreateConeGeometry()
 	return geom;
 }
 
-osg::Geometry* CGMGalaxy::_CreateHelpLineGeometry()
+osg::Geometry* CGMGalaxy::_CreateSquareGeometry(const float fWidth, const bool bCorner)
 {
-	// 4¼¶¿Õ¼äÏÂµÄĞÇÏµ°ë¾¶
+	osg::ref_ptr<osg::Geometry> pGeometry = new osg::Geometry();
+	osg::ref_ptr<osg::Vec3Array> verArray = new osg::Vec3Array;
+
+	if (bCorner)
+	{
+		const float fSqrt2 = std::sqrt(2.0f);
+		float fRadius = fWidth / fSqrt2;
+		verArray->push_back(osg::Vec3(0, 0, 0));
+		verArray->push_back(osg::Vec3(fRadius, -fRadius, 0));
+		verArray->push_back(osg::Vec3(fWidth * fSqrt2, 0, 0));
+		verArray->push_back(osg::Vec3(fRadius, fRadius, 0));
+	}
+	else
+	{
+		float fRadius = fWidth * 0.5f;
+		verArray->push_back(osg::Vec3(-fRadius, fRadius, 0));
+		verArray->push_back(osg::Vec3(-fRadius, -fRadius, 0));
+		verArray->push_back(osg::Vec3(fRadius, -fRadius, 0));
+		verArray->push_back(osg::Vec3(fRadius, fRadius, 0));
+	}
+	pGeometry->setVertexArray(verArray);
+
+	osg::ref_ptr<osg::Vec2Array> textArray = new osg::Vec2Array;
+	textArray->push_back(osg::Vec2(0, 0));
+	textArray->push_back(osg::Vec2(1, 0));
+	textArray->push_back(osg::Vec2(1, 1));
+	textArray->push_back(osg::Vec2(0, 1));
+	pGeometry->setTexCoordArray(0, textArray);
+
+	osg::ref_ptr< osg::Vec3Array> normal = new osg::Vec3Array;
+	normal->push_back(osg::Vec3(0, 0, 1));
+	pGeometry->setNormalArray(normal);
+	pGeometry->setNormalBinding(osg::Geometry::BIND_OVERALL);
+
+	pGeometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS, 0, 4));
+
+	pGeometry->setUseVertexBufferObjects(true);
+	pGeometry->setUseDisplayList(false);
+	pGeometry->setDataVariance(osg::Object::DYNAMIC);
+
+	return pGeometry.release();
+}
+
+osg::Geometry* CGMGalaxy::_CreateRegionGeometry()
+{
+	// 4çº§ç©ºé—´ä¸‹çš„æ˜Ÿç³»åŠå¾„
 	double fGalaxyRadius4 = m_fGalaxyRadius / m_pKernelData->fUnitArray->at(4);
 
-	// ½Ç¶È·Ö¶ÎÊı
-	int iAngleSegments = 128;
-	// °ë¾¶·Ö¶ÎÊı
-	int iRadiusSegments = 128;
-	int iVertexNum = 2 * (iAngleSegments + iRadiusSegments);
+	// è§’åº¦åˆ†æ®µæ•°
+	int iAngleSegments = 32;
+	// åŠå¾„åˆ†æ®µæ•°
+	int iRadiusSegments = 256;
+	int iVertexNum = 2 * (iAngleSegments+1)*(iRadiusSegments+1);
 
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
@@ -2616,36 +2612,57 @@ osg::Geometry* CGMGalaxy::_CreateHelpLineGeometry()
 	geom->setDataVariance(osg::Object::DYNAMIC);
 
 	osg::ref_ptr<osg::Vec3Array> verts = new osg::Vec3Array();
-	verts->reserve(iVertexNum);
-	geom->setVertexArray(verts.get());
-
+	osg::ref_ptr<osg::Vec4Array> colorArray = new osg::Vec4Array();
 	osg::ref_ptr<osg::Vec3Array> coordArray = new osg::Vec3Array;
-	coordArray->reserve(iVertexNum);
-	geom->setTexCoordArray(0, coordArray.get());
+	osg::ref_ptr<osg::DrawElementsUInt> el = new osg::DrawElementsUInt(GL_TRIANGLES);
 
-	osg::ref_ptr<osg::DrawElementsUShort> el = new osg::DrawElementsUShort(GL_LINES);
-	el->reserve(iVertexNum);
+	verts->reserve(iVertexNum);
+	colorArray->reserve(iVertexNum);
+	coordArray->reserve(iVertexNum);
+	el->reserve(12 * iAngleSegments * iRadiusSegments);
+
+	geom->setVertexArray(verts.get());
+	geom->setColorArray(colorArray.get());
+	geom->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+	geom->setTexCoordArray(0, coordArray.get());
 	geom->addPrimitiveSet(el.get());
 
-	// ½Ç¶È¸¨ÖúÏß
-	float fAngleEach = osg::PI * 2.0 / float(iAngleSegments);
-	for (int x = 0; x < 2 * iAngleSegments; x++)
+	for (int i = 0; i < 2; i++)
 	{
-		float fMod2 = float(x % 2);
-		float fX = fGalaxyRadius4 * cos(fAngleEach * x * 0.5);
-		float fY = fGalaxyRadius4 * sin(fAngleEach * x * 0.5);
-		verts->push_back(osg::Vec3(fX, fY, 0));
-		coordArray->push_back(osg::Vec3(0.0f, (float(x) - fMod2 * 0.4 + 0.5) / float(2 * iAngleSegments), 1.0f - fMod2));
-		el->push_back(x);
-	}
+		for (int x = 0; x <= iAngleSegments; x++)
+		{
+			double fU = double(x) / double(iAngleSegments);
+			// è¾¹ç¼˜ä½ç½®ä¼šå‡ºé”™ï¼Œæ‰€ä»¥ç¼©å° 0.01%ï¼ˆä¸‡åˆ†ä¹‹ä¸€ ï¼‰ç»˜åˆ¶
+			double fAngle = (osg::PI * fU - osg::PI_4)*0.9999 + i*osg::PI;
+			if (fAngle < 0)
+			{
+				fAngle += osg::PI * 2;
+			}
+			for (int y = 0; y <= iRadiusSegments; y++)
+			{
+				double fV = double(y) / double(iRadiusSegments);
+				// ä¸èƒ½è®©BPMå¤ªå¤§ï¼Œå¦åˆ™åœ¨ä¸­å¿ƒä½ç½®ä¼šå˜å½¢ï¼Œæ‰€ä»¥ä»æœ€å°BPMçš„25å€ï¼Œå¼€å§‹ç»˜åˆ¶
+				double fBPM = 1 / ((1-fV) / (m_pConfigData->fMinBPM * MAX_BPM_RATIO) + fV / m_pConfigData->fMinBPM);
+				SGMAudioCoord vAudioCoord = SGMAudioCoord(fBPM, fAngle);
+				SGMGalaxyCoord vGC = m_pDataManager->AudioCoord2GalaxyCoord(vAudioCoord);
+				osg::Vec3d vWorldPos = osg::Vec3d(vGC.x, vGC.y, vGC.z) * fGalaxyRadius4;
+				osg::Vec4f vColor = m_pDataManager->GetAudioColor(vAudioCoord);
 
-	// °ë¾¶¸¨ÖúÏß
-	float fRadiusEach = fGalaxyRadius4 / float(iRadiusSegments);
-	for (int y = 0; y < 2 * iRadiusSegments; y++)
-	{
-		verts->push_back(osg::Vec3(0, fGalaxyRadius4*0.5*float(y)/float(iRadiusSegments), 0));
-		coordArray->push_back(osg::Vec3((float(y + y % 2) + 0.5) / float(2 * iRadiusSegments), 0, 0));
-		el->push_back(2 * iAngleSegments + y);
+				verts->push_back(vWorldPos);
+				colorArray->push_back(vColor);
+				coordArray->push_back(osg::Vec3(fU, fV, i));
+
+				if (x < iAngleSegments && y < iRadiusSegments)
+				{
+					el->push_back(iVertexNum * 0.5 * i + x * (iRadiusSegments + 1) + y);
+					el->push_back(iVertexNum * 0.5 * i + (x + 1) * (iRadiusSegments + 1) + y);
+					el->push_back(iVertexNum * 0.5 * i + x * (iRadiusSegments + 1) + y + 1);
+					el->push_back(iVertexNum * 0.5 * i + x * (iRadiusSegments + 1) + y + 1);
+					el->push_back(iVertexNum * 0.5 * i + (x + 1) * (iRadiusSegments + 1) + y);
+					el->push_back(iVertexNum * 0.5 * i + (x + 1) * (iRadiusSegments + 1) + y + 1);
+				}
+			}
+		}
 	}
 
 	return geom;
@@ -2656,8 +2673,7 @@ osg::Geometry* CGMGalaxy::_MakeEllipsoidGeometry(
 	int iLonSegments, int iLatSegments,
 	float fHae, bool bGenTexCoords,
 	bool bWholeMap, bool bFlipNormal,
-	float fLonStart, float fLonEnd,
-	float fLatStart, float fLatEnd)
+	float fLatStart, float fLatEnd) const
 {
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
@@ -2668,19 +2684,12 @@ osg::Geometry* CGMGalaxy::_MakeEllipsoidGeometry(
 		fLatEnd = fLatStart;
 		fLatStart = tmp;
 	}
-	if (fLonEnd < fLonStart)
-	{
-		float tmp = fLonEnd;
-		fLonEnd = fLonStart;
-		fLonStart = tmp;
-	}
-	fLonStart = (fLonStart < -180.0) ? -180.0 : fLonStart;
-	fLonEnd = (fLonEnd > 180.0) ? 180.0 : fLonEnd;
+
 	fLatStart = (fLatStart < -90.0) ? -90.0 : fLatStart;
 	fLatEnd = (fLatEnd > 90.0) ? 90.0 : fLatEnd;
 
 	double latSegmentSize = (fLatEnd - fLatStart) / (double)iLatSegments; // degrees
-	double lonSegmentSize = (fLonEnd - fLonStart) / (double)iLonSegments; // degrees
+	double lonSegmentSize = 360.0 / (double)iLonSegments; // degrees
 
 	osg::Vec3Array* verts = new osg::Vec3Array();
 	verts->reserve(iLatSegments * iLonSegments);
@@ -2772,146 +2781,94 @@ osg::Geometry* CGMGalaxy::_MakeEllipsoidGeometry(
 	return geom;
 }
 
-float CGMGalaxy::_GetGalaxyValue(float fX, float fY, int iChannel, bool bLinear)
+osg::Geometry* CGMGalaxy::_MakeBoxGeometry(
+	const float fLength,
+	const float fWidth,
+	const float fHeight) const
 {
-	if (!m_pGalaxyImage.valid())
-	{
-		std::string strFile = m_pConfigData->strCorePath + m_strGalaxyTexPath + "milkyWay.tga";
-		m_pGalaxyImage = osgDB::readImageFile(strFile);
-	}
-	if (m_pGalaxyImage.valid())
-	{
-		unsigned int iWidth = m_pGalaxyImage->s();
-		unsigned int iHeight = m_pGalaxyImage->t();
+	osg::Geometry* geom = new osg::Geometry();
+	geom->setUseVertexBufferObjects(true);
 
-		float fS = fX*iWidth;
-		float fT = fY*iHeight;
+	osg::Vec3Array* verts = new osg::Vec3Array();
+	verts->reserve(8);
 
-		float fDeltaS = fS - (int)fS;
-		float fDeltaT = fT - (int)fT;
-		unsigned int s = (unsigned int)fS;
-		unsigned int t = (unsigned int)fT;
-		unsigned int s_next = (s == iWidth) ? iWidth : (s + 1);
-		unsigned int t_next = (t == iHeight) ? iHeight : (t + 1);
+	osg::Vec3Array* texCoords = new osg::Vec3Array();
+	texCoords->reserve(8);
 
-		float fValue_00 = 0;
-		float fValue_10 = 0;
-		float fValue_01 = 0;
-		float fValue_11 = 0;
+	osg::DrawElementsUShort* el = new osg::DrawElementsUShort(GL_TRIANGLES);
+	el->reserve(36);
 
-		switch (iChannel)
-		{
-		case 0:
-		{
-			fValue_00 = m_pGalaxyImage->getColor(s, t).r();
-		}
-		break;
-		case 1:
-		{
-			fValue_00 = m_pGalaxyImage->getColor(s, t).g();
-		}
-		break;
-		case 2:
-		{
-			fValue_00 = m_pGalaxyImage->getColor(s, t).b();
-		}
-		break;
-		case 3:
-		{
-			fValue_00 = m_pGalaxyImage->getColor(s, t).a();
-		}
-		break;
-		default: {}
-		}
+	float fHalfLength = 0.5 * fLength;
+	float fHalfWidth = 0.5 * fWidth;
+	float fHalfHeight = 0.5 * fHeight;
 
-		if (bLinear)
-		{
-			switch (iChannel)
-			{
-			case 0:
-			{
-				fValue_10 = m_pGalaxyImage->getColor(s_next, t).r();
-				fValue_01 = m_pGalaxyImage->getColor(s, t_next).r();
-				fValue_11 = m_pGalaxyImage->getColor(s_next, t_next).r();
-			}
-			break;
-			case 1:
-			{
-				fValue_10 = m_pGalaxyImage->getColor(s_next, t).g();
-				fValue_01 = m_pGalaxyImage->getColor(s, t_next).g();
-				fValue_11 = m_pGalaxyImage->getColor(s_next, t_next).g();
-			}
-			break;
-			case 2:
-			{
-				fValue_10 = m_pGalaxyImage->getColor(s_next, t).b();
-				fValue_01 = m_pGalaxyImage->getColor(s, t_next).b();
-				fValue_11 = m_pGalaxyImage->getColor(s_next, t_next).b();
-			}
-			break;
-			case 3:
-			{
-				fValue_10 = m_pGalaxyImage->getColor(s_next, t).a();
-				fValue_01 = m_pGalaxyImage->getColor(s, t_next).a();
-				fValue_11 = m_pGalaxyImage->getColor(s_next, t_next).a();
-			}
-			break;
-			default: {}
-			}
-		}
+	verts->push_back(osg::Vec3(-fHalfLength, -fHalfWidth, -fHalfHeight)); // 0
+	verts->push_back(osg::Vec3(fHalfLength, -fHalfWidth, -fHalfHeight)); // 1
+	verts->push_back(osg::Vec3(fHalfLength, fHalfWidth, -fHalfHeight)); // 2
+	verts->push_back(osg::Vec3(-fHalfLength, fHalfWidth, -fHalfHeight)); // 3
+	verts->push_back(osg::Vec3(-fHalfLength, -fHalfWidth, fHalfHeight)); // 4
+	verts->push_back(osg::Vec3(fHalfLength, -fHalfWidth, fHalfHeight)); // 5
+	verts->push_back(osg::Vec3(fHalfLength, fHalfWidth, fHalfHeight)); // 6
+	verts->push_back(osg::Vec3(-fHalfLength, fHalfWidth, fHalfHeight)); // 7
 
-		float fValue = fValue_00;
-		if (bLinear)
-		{
-			fValue =
-				fValue_00 * (1 - fDeltaS) * (1 - fDeltaT)
-				+ fValue_10 * fDeltaS * (1 - fDeltaT)
-				+ fValue_01 * (1 - fDeltaS) * fDeltaT
-				+ fValue_11 * fDeltaS * fDeltaT;
-		}
-		return fValue;
-	}
-	return 0.0f;
-}
 
-float CGMGalaxy::_GetGalaxyHeight(float fX, float fY)
-{
-	if (!m_pGalaxyHeightImage.valid())
-	{
-		std::string strFile = m_pConfigData->strCorePath + m_strCoreNebulaTexPath + "milkyWay_height.tga";
-		m_pGalaxyHeightImage = osgDB::readImageFile(strFile);
-	}
-	if (m_pGalaxyHeightImage.valid())
-	{
-		unsigned int iWidth = m_pGalaxyHeightImage->s();
-		unsigned int iHeight = m_pGalaxyHeightImage->t();
+	texCoords->push_back(osg::Vec3(0, 0, 0)); // 0
+	texCoords->push_back(osg::Vec3(1, 0, 0)); // 1
+	texCoords->push_back(osg::Vec3(1, 1, 0)); // 2
+	texCoords->push_back(osg::Vec3(0, 1, 0)); // 3
+	texCoords->push_back(osg::Vec3(0, 0, 1)); // 4
+	texCoords->push_back(osg::Vec3(1, 0, 1)); // 5
+	texCoords->push_back(osg::Vec3(1, 1, 1)); // 6
+	texCoords->push_back(osg::Vec3(0, 1, 1)); // 7
 
-		float fS = fX*iWidth;
-		float fT = fY*iHeight;
+	// bottom z = -1
+	el->push_back(0);
+	el->push_back(1);
+	el->push_back(2);
+	el->push_back(0);
+	el->push_back(2);
+	el->push_back(3);
+	// front x = 1
+	el->push_back(1);
+	el->push_back(6);
+	el->push_back(2);
+	el->push_back(1);
+	el->push_back(5);
+	el->push_back(6);
+	// top z = 1
+	el->push_back(4);
+	el->push_back(6);
+	el->push_back(5);
+	el->push_back(4);
+	el->push_back(7);
+	el->push_back(6);
+	// back x = -1
+	el->push_back(0);
+	el->push_back(3);
+	el->push_back(7);
+	el->push_back(0);
+	el->push_back(7);
+	el->push_back(4);
+	// left y = 1
+	el->push_back(2);
+	el->push_back(6);
+	el->push_back(7);
+	el->push_back(2);
+	el->push_back(7);
+	el->push_back(3);
+	// right y = -1
+	el->push_back(0);
+	el->push_back(4);
+	el->push_back(5);
+	el->push_back(0);
+	el->push_back(5);
+	el->push_back(1);
 
-		float fDeltaS = fS - (int)fS;
-		float fDeltaT = fT - (int)fT;
-		unsigned int s = (unsigned int)fS;
-		unsigned int t = (unsigned int)fT;
-		unsigned int s_next = (s == iWidth) ? iWidth : (s + 1);
-		unsigned int t_next = (t == iHeight) ? iHeight : (t + 1);
+	geom->setVertexArray(verts);
+	geom->setTexCoordArray(0, texCoords);
+	geom->addPrimitiveSet(el);
 
-		float fValue_00 = 0;
-		float fValue_10 = 0;
-		float fValue_01 = 0;
-		float fValue_11 = 0;
-
-		fValue_00 = m_pGalaxyHeightImage->getColor(s, t).b();
-		fValue_10 = m_pGalaxyHeightImage->getColor(s_next, t).b();
-		fValue_01 = m_pGalaxyHeightImage->getColor(s, t_next).b();
-		fValue_11 = m_pGalaxyHeightImage->getColor(s_next, t_next).b();
-
-		return fValue_00 * (1 - fDeltaS) * (1 - fDeltaT)
-			+ fValue_10 * fDeltaS * (1 - fDeltaT)
-			+ fValue_01 * (1 - fDeltaS) * fDeltaT
-			+ fValue_11 * fDeltaS * fDeltaT;
-	}
-	return 0.0f;
+	return geom;
 }
 
 float CGMGalaxy::_Get3DValue(float fX, float fY, float fZ)
@@ -2937,28 +2894,28 @@ float CGMGalaxy::_Get3DValue(float fX, float fY, float fZ)
 		unsigned int s = (unsigned int)fS;
 		unsigned int t = (unsigned int)fT;
 		unsigned int r = (unsigned int)fR;
-		unsigned int s_next = (s == iWidth-1) ? 0 : (s + 1);
-		unsigned int t_next = (t == iHeight-1) ? 0 : (t + 1);
-		unsigned int r_next = (r == iDepth-1) ? 0 : (r + 1);
+		unsigned int s_next = (s == iWidth - 1) ? 0 : (s + 1);
+		unsigned int t_next = (t == iHeight - 1) ? 0 : (t + 1);
+		unsigned int r_next = (r == iDepth - 1) ? 0 : (r + 1);
 
-		float fValue_000 = _Get3DValue(s,		t,		r		);
-		float fValue_100 = _Get3DValue(s_next,	t,		r		);
-		float fValue_010 = _Get3DValue(s,		t_next,	r		);
-		float fValue_110 = _Get3DValue(s_next,	t_next,	r		);
-		float fValue_001 = _Get3DValue(s,		t,		r_next	);
-		float fValue_101 = _Get3DValue(s_next,	t,		r_next	);
-		float fValue_011 = _Get3DValue(s,		t_next,	r_next	);
-		float fValue_111 = _Get3DValue(s_next,	t_next,	r_next	);
+		float fValue_000 = _Get3DValue(s, t, r);
+		float fValue_100 = _Get3DValue(s_next, t, r);
+		float fValue_010 = _Get3DValue(s, t_next, r);
+		float fValue_110 = _Get3DValue(s_next, t_next, r);
+		float fValue_001 = _Get3DValue(s, t, r_next);
+		float fValue_101 = _Get3DValue(s_next, t, r_next);
+		float fValue_011 = _Get3DValue(s, t_next, r_next);
+		float fValue_111 = _Get3DValue(s_next, t_next, r_next);
 
-		float fValue = 
+		float fValue =
 			(fValue_000 * (1 - fDeltaS) * (1 - fDeltaT)
-			+ fValue_100 * fDeltaS * (1 - fDeltaT)
-			+ fValue_010 * (1 - fDeltaS) * fDeltaT
-			+ fValue_110 * fDeltaS * fDeltaT) * (1 - fDeltaR)
+				+ fValue_100 * fDeltaS * (1 - fDeltaT)
+				+ fValue_010 * (1 - fDeltaS) * fDeltaT
+				+ fValue_110 * fDeltaS * fDeltaT) * (1 - fDeltaR)
 			+ (fValue_001 * (1 - fDeltaS) * (1 - fDeltaT)
-			+ fValue_101 * fDeltaS * (1 - fDeltaT)
-			+ fValue_011 * (1 - fDeltaS) * fDeltaT
-			+ fValue_111 * fDeltaS * fDeltaT) * fDeltaR;
+				+ fValue_101 * fDeltaS * (1 - fDeltaT)
+				+ fValue_011 * (1 - fDeltaS) * fDeltaT
+				+ fValue_111 * fDeltaS * fDeltaT) * fDeltaR;
 		return fValue;
 	}
 	return 0.0f;
@@ -2999,42 +2956,28 @@ float CGMGalaxy::_Get3DValue(unsigned int iX, unsigned int iY, unsigned int iZ)
 	return 0.0f;
 }
 
-osg::Vec4f CGMGalaxy::_GetPhotoColor(float fX, float fY)
+osg::Vec2f CGMGalaxy::_AudioCoord2UV(const SGMAudioCoord & sAudioCoord) const
 {
-	if (!m_pPhotoImage.valid())
+	float fU = fmod((sAudioCoord.angle + osg::PI_4) / osg::PI, 2.0);
+	float fV = 0.0f;
+	if (0.0 != sAudioCoord.BPM)
 	{
-		std::string strPath = m_pConfigData->strCorePath + m_strGalaxyTexPath + "photo.tga";
-		m_pPhotoImage = osgDB::readImageFile(strPath);
+		fV = (m_pConfigData->fMinBPM * MAX_BPM_RATIO / sAudioCoord.BPM - 1) / (MAX_BPM_RATIO - 1);
 	}
-	if (m_pPhotoImage.valid())
-	{
-		unsigned int iWidth = m_pPhotoImage->s();
-		unsigned int iHeight = m_pPhotoImage->t();
-		unsigned int s = fX * iWidth;
-		unsigned int t = fY * iHeight;
-
-		return osg::Vec4f(
-			m_pPhotoImage->getColor(s, t).r(),
-			m_pPhotoImage->getColor(s, t).g(),
-			m_pPhotoImage->getColor(s, t).b(),
-			m_pPhotoImage->getColor(s, t).a());
-	}
-	return osg::Vec4f(0,0,0,0);
+	return osg::Vec2f(fU, fV);
 }
 
-/**
-* _CreateTexture2D
-* ¼ÓÔØ2DÎÆÀí
-* @author LiuTao
-* @since 2020.06.16
-* @param fileName: Í¼Æ¬ÎÄ¼şÂ·¾¶
-* @param iChannelNum: 1¡¢2¡¢3¡¢4·Ö±ğ´ú±íR¡¢RG¡¢RGB¡¢RGBA
-* @return osg::Texture* ·µ»ØÎÆÀíÖ¸Õë
-*/
-osg::Texture* CGMGalaxy::_CreateTexture2D(const std::string & fileName, const int iChannelNum)
+osg::Texture* CGMGalaxy::_CreateTexture2D(const std::string & fileName, const int iChannelNum) const
 {
+	return _CreateTexture2D(osgDB::readImageFile(fileName), iChannelNum);
+}
+
+osg::Texture* CGMGalaxy::_CreateTexture2D(osg::Image * pImg, const int iChannelNum) const
+{
+	if (!pImg) return nullptr;
+
 	osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D;
-	texture->setImage(osgDB::readImageFile(fileName));
+	texture->setImage(pImg);
 	texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
 	texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
 	texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
@@ -3076,7 +3019,28 @@ osg::Texture* CGMGalaxy::_CreateTexture2D(const std::string & fileName, const in
 	return texture.release();
 }
 
-osg::Texture* CGMGalaxy::_ReadCubeMap(const std::string& strFolder, const std::string& strFilePrefix)
+osg::Texture* CGMGalaxy::_CreateDDSTexture(const std::string& fileName,
+	osg::Texture::WrapMode eWrap_S, osg::Texture::WrapMode eWrap_T, bool bFlip) const
+{
+	osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D;
+	if (bFlip)
+	{
+		texture->setImage(osgDB::readImageFile(fileName, m_pDDSOptions.get()));
+	}
+	else
+	{
+		texture->setImage(osgDB::readImageFile(fileName));
+	}
+	texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR);
+	texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	texture->setWrap(osg::Texture::WRAP_S, eWrap_S);
+	texture->setWrap(osg::Texture::WRAP_T, eWrap_T);
+	texture->setBorderColor(osg::Vec4(0,0,0,0));
+	texture->setSourceType(GL_UNSIGNED_BYTE);
+	return texture.release();
+}
+
+osg::Texture* CGMGalaxy::_ReadCubeMap(const std::string& strFolder, const std::string& strFilePrefix) const
 {
 	osg::TextureCubeMap* cubemap = new osg::TextureCubeMap;
 
@@ -3112,15 +3076,84 @@ osg::Texture* CGMGalaxy::_ReadCubeMap(const std::string& strFolder, const std::s
 	return cubemap;
 }
 
-osg::Vec3f CGMGalaxy::_getRandomStarColor()
+osg::Vec3f CGMGalaxy::_GetRandomStarColor()
 {
-	// 0.0-4.0£¬·Ö³É¡°256*4¡±¶Î
-	float fCenter = (m_iRandom() % 1024) / 256.0f;
-	// 0.5-1.0£¬ÓÃÀ´Ëæ»úÉ«Ïà
-	float fScale = (m_iRandom() % 128) / 256.0f + 0.5f;
+	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
+
+	// 0.0-4.0
+	float fCenter = iPseudoNoise(m_iRandom)*4e-4f;
+	// 0.5-1.0ï¼Œç”¨æ¥éšæœºè‰²ç›¸
+	float fScale = iPseudoNoise(m_iRandom)*5e-5f + 0.5f;
 
 	float fR = osg::clampBetween(fScale * (2.0f - abs(1.0f - fCenter)), 0.0f, 1.0f);
 	float fG = osg::clampBetween(fScale * (2.0f - abs(2.0f - fCenter)), 0.0f, 1.0f);
 	float fB = osg::clampBetween(fScale * (2.0f - abs(3.0f - fCenter)), 0.0f, 1.0f);
 	return osg::Vec3f(fR, fG, fB);
+}
+
+double CGMGalaxy::_IncludedAngle(const double fA, const double fB) const
+{
+	double fC = fA - fB;
+	if (fC > osg::PI)
+	{
+		return fC - osg::PI * 2;
+	}
+	else if (fC <= -osg::PI)
+	{
+		return fC + osg::PI * 2;
+	}
+	return fC;
+}
+
+void CGMGalaxy::_MakePseudoNoise()
+{
+	int iW = 256;
+	int iH = 256;
+	int iSize = iW * iH * 4;
+	unsigned char* data = new unsigned char[iSize + 1];
+	data[iSize] = 0;
+
+	std::uniform_int_distribution<> iPseudoNoise(0,255);
+
+	for (int s = 0; s < iW; s++)
+	{
+		for (int t = 0; t < iH; t++)
+		{
+			unsigned int iAddress = 4 * (s*iH + t);
+
+			float fX = iPseudoNoise(m_iRandom);
+			float fY = iPseudoNoise(m_iRandom);
+			float fZ = iPseudoNoise(m_iRandom);
+			float fIntensity = iPseudoNoise(m_iRandom);
+
+			data[iAddress] = (unsigned char)(fX);
+			data[iAddress+1] = (unsigned char)(fY);
+			data[iAddress+2] = (unsigned char)(fZ);
+			data[iAddress+3] = (unsigned char)(fIntensity);
+		}
+	}
+
+	osg::ref_ptr<osg::Image> pPseudoNoiseImage = new osg::Image();
+	pPseudoNoiseImage->setImage(iW, iH, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, data, osg::Image::USE_NEW_DELETE);
+	std::string strGalaxyTexPath = m_pConfigData->strCorePath + m_strGalaxyTexPath;
+	//osgDB::writeImageFile(*(pPseudoNoiseImage.get()), strGalaxyTexPath + "PseudoNoise.tga");
+}
+
+osg::Texture* CGMGalaxy::_Load3DShapeNoise() const
+{
+	std::string strTexturePath = m_pConfigData->strCorePath + "Textures/Volume/noiseShape.raw";
+	osg::ref_ptr<osg::Image> shapeImg = osgDB::readImageFile(strTexturePath);
+	shapeImg->setImage(128, 128, 128, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, shapeImg->data(), osg::Image::NO_DELETE);
+	osg::Texture3D* tex3d = new osg::Texture3D;
+	tex3d->setImage(shapeImg.get());
+	tex3d->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	tex3d->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	tex3d->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+	tex3d->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+	tex3d->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
+	tex3d->setInternalFormat(GL_RGBA8);
+	tex3d->setSourceFormat(GL_RGBA);
+	tex3d->setSourceType(GL_UNSIGNED_BYTE);
+	tex3d->allocateMipmapLevels();
+	return tex3d;
 }

@@ -17,12 +17,12 @@ public:
 	int GetVolume();
 
 protected:
-	void leaveEvent(QEvent *);
+	void leaveEvent(QEvent* event);
 
 signals:
 	void _signalHideVolume();
 	void _signalSetVolume(int iVolume);
 
 private:
-	Ui::GMVolumeWidget	ui;
+	Ui::GMVolumeWidget		ui;
 };

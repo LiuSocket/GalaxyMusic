@@ -1,0 +1,17 @@
+﻿################################################################################
+# 此 .gitignore 文件已由 Microsoft(R) Visual Studio 自动创建。
+################################################################################
+
+/3RD
+/Data/Core/Textures/Sphere
+/Lib
+/OSG
+/Out/GalaxyMusic
+/Bin
+/.vs/GalaxyMusic
+/README.md
+/Data/Media/Music
+/GalaxyMusic/GeneratedFiles
+*.filters
+*.user
+*.psd

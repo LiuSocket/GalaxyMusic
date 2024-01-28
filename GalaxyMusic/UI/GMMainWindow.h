@@ -7,6 +7,8 @@
 Class
 *************************************************************************/
 class CGMVolumeWidget;
+class CGMListWidget;
+class CGMViewWidget;
 
 class CGMMainWindow : public QMainWindow
 {
@@ -18,112 +20,91 @@ public:
 
 	/** @brief 初始化 */
 	bool Init();
+	/** @brief 更新 */
+	void Update();
 
 	/**
-	* SetFullScreen
 	* @brief 界面全屏切换
-	* @author LiuTao
-	* @since 2021.09.05
 	* @param bFull true为全屏，false 为非全屏
-	* @return void
 	*/
 	void SetFullScreen(const bool bFull);
 	/**
-	* GetFullScreen
 	* @brief 获取界面全屏状态
-	* @author LiuTao
-	* @since 2021.10.23
 	* @return bool		是否处于全屏状态
 	*/
 	bool GetFullScreen();
 
 	/**
-	* UpdateAudioInfo
-	* 更新音频的所有信息
-	* @author LiuTao
-	* @since 2021.09.05
-	* @return void
+	* @brief 更新音频的所有信息
 	*/
 	void UpdateAudioInfo();
+
+	/**
+	* @brief 设置是否显示实时变化的音量
+	* @param bVisible 是否显示实时变化的音量
+	*/
+	void SetVolumeVisible(const bool bVisible);
 
 public slots:
 
 	/**
-	* _slotLast
 	* @brief 上一首
-	* @param void
-	* @return void
 	*/
 	void _slotLast();
 
 	/**
-	* _slotPlayOrPause
 	* @brief 播放/暂停
-	* @param void
-	* @return void
 	*/
 	void _slotPlayOrPause();
 
 	/**
-	* _slotNext
 	* @brief 下一首
-	* @param void
-	* @return void
 	*/
 	void _slotNext();
 
 	/**
-	* _slotMinimum
 	* @brief 最小化/还原
-	* @param void
-	* @return void
 	*/
 	void _slotMinimum();
 	/**
-	* _slotMaximum
 	* @brief 最大化/还原
-	* @param void
-	* @return void
 	*/
 	void _slotMaximum();
 	/**
-	* _slotClose
 	* @brief 关闭
-	* @param void
-	* @return void
 	*/
 	void _slotClose();
 
 	/** 
-	* _slotSetAudioTime
 	* @brief 设置音频当前的时间
 	* @param iTimeRatio: 当前时间与总时间的比值
-	* @return void
 	*/
 	void _slotSetAudioTime(int iTimeRatio);
 
 	/**
-	* _slotSetMute
 	* @brief 正常/静音
-	* @param void
-	* @return void
 	*/
 	void _slotSetMute();
 	/**
-	* _slotSetVolume
 	* @brief 设置音量
 	* @param iVolume	音量，[0, 100]
-	* @return void
 	*/
 	void _slotSetVolume(int iVolume);
 
 	/**
-	* _slotSetFullScreen
+	* @brief 设置播放列表的显示、隐藏
+	*/
+	void _slotListVisible();
+
+	/**
 	* @brief 启用全屏
-	* @param void
-	* @return void
 	*/
 	void _slotFullScreen();
+
+	/**
+	* @brief 进入三维界面
+	*/
+	void _slotEnter3D();
 
 protected:
 	void resizeEvent(QResizeEvent* event);
@@ -147,13 +128,24 @@ private:
 	*/
 	void _Million2MinutesSeconds(const int ms, int& minutes, int& seconds);
 
+	/**
+	* _SetPlayingListGeometry
+	* @brief 设置播放列表的位置、尺寸
+	* @param void
+	* @return void
+	*/
+	void _SetPlayingListGeometry();
+
 private:
 	Ui::GMMainWindow					ui;
 	CGMVolumeWidget*					m_pVolumeWidget;
+	CGMListWidget*						m_pListWidget;
+	CGMViewWidget*						m_pSceneWidget;
 
 	bool								m_bInit;
 	bool								m_bFull;				//!< 是否全屏
 	bool								m_bPressed;				//!< 是否按下鼠标
+	bool								m_bShowVolume;			//!< 是否显示实时变化的音量
 	QPoint								m_vPos;					//!< 窗口的位置
 	int									m_iAudioDuration;		//!< 音频总时长，单位：ms
 	QString								m_strName;				//!< 音频文件名称，包含后缀名

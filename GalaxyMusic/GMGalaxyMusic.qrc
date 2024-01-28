@@ -31,5 +31,14 @@
         <file>Resources/GM_logo.ico</file>
         <file>Resources/volumeLab.png</file>
         <file>Resources/default_Image.png</file>
+        <file>Resources/btn_list.png</file>
+        <file>Resources/btn_list_hover.png</file>
+        <file>Resources/SpinDown.png</file>
+        <file>Resources/SpinDown_Disable.png</file>
+        <file>Resources/SpinDown_Hover.png</file>
+        <file>Resources/SpinUp.png</file>
+        <file>Resources/SpinUp_Disable.png</file>
+        <file>Resources/SpinUp_Hover.png</file>
+        <file>Resources/Empty.qss</file>
     </qresource>
 </RCC>

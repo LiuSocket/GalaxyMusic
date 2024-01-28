@@ -13,8 +13,11 @@
 #include "GMEngine.h"
 #include "GMViewWidget.h"
 #include "GMDataManager.h"
+#include "GMCommonUniform.h"
+#include "GMXml.h"
 #include "GMGalaxy.h"
 #include "GMAudio.h"
+#include "GMPost.h"
 #include "GMCameraManipulator.h"
 #include <osgViewer/ViewerEventHandlers>
 #include <osgQt/GraphicsWindowQt>
@@ -25,8 +28,36 @@
 using namespace GM;
 
 /*************************************************************************
+Global Constants
+*************************************************************************/
+static const std::string g_strGMConfigFile = "GalaxyMusic.cfg";	//!< 配置文件名
+
+/*************************************************************************
+ Macro Defines
+*************************************************************************/
+#define GM_NEARFAR_RATIO			(1e-6)
+
+/*************************************************************************
  CGMEngine Methods
 *************************************************************************/
+
+class ResizeEventHandler : public osgGA::GUIEventHandler
+{
+public:
+	ResizeEventHandler(CGMEngine* pEngine): _pEngine(pEngine){}
+
+	bool handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter&)
+	{
+		if (ea.getEventType() == osgGA::GUIEventAdapter::RESIZE && _pEngine)
+		{
+			_pEngine->ResizeScreen(ea.getWindowWidth(), ea.getWindowHeight());
+			return true;
+		}
+		return false;
+	}
+private:
+	CGMEngine* _pEngine = nullptr;
+};
 
 template<> CGMEngine* CGMSingleton<CGMEngine>::msSingleton = nullptr;
 
@@ -49,10 +80,12 @@ CGMEngine* CGMEngine::getSingletonPtr(void)
 /** @brief 构造 */
 CGMEngine::CGMEngine():
 	m_pKernelData(nullptr), m_pConfigData(nullptr), m_pDataManager(nullptr), m_pManipulator(nullptr),
-	m_bInit(false), m_bDirty(false),
+	m_bInit(false),
 	m_dTimeLastFrame(0.0), m_fDeltaStep(0.0f), m_fConstantStep(0.1f),
 	m_fGalaxyDiameter(1e21),
-	m_pGalaxy(nullptr), m_pAudio(nullptr), m_ePlayMode(EGMA_MOD_CIRCLE)
+	m_pGalaxy(nullptr), m_pAudio(nullptr), m_pPost(nullptr),
+	m_ePlayMode(EGMA_MOD_CIRCLE),
+	m_pSceneTex(nullptr), m_pBackgroundTex(nullptr), m_pForegroundTex(nullptr)
 {
 	Init();
 }
@@ -68,12 +101,18 @@ bool CGMEngine::Init()
 {
 	if (m_bInit) return true;
 
+	m_iRandom.seed(time(0));
+
+	//!< 配置数据
+	_LoadConfig();
+
 	//!< 内核数据
 	m_pKernelData = new SGMKernelData();
 	//!< 当前空间层级编号默认4级，这样刚好看到银河系
 	m_pKernelData->iHierarchy = 4;
-	//!< 空间层级单位，不能修改，0级是整个宇宙，6级是人类尺度，级数编号越大，级数单位越小
+	//!< 空间层级单位，不能修改，6级是整个宇宙，0级是人类尺度，级数编号越大，级数单位越大
 	m_pKernelData->fUnitArray = new osg::DoubleArray;
+	m_pKernelData->fUnitArray->reserve(7);
 	m_pKernelData->fUnitArray->push_back(1.0);	// 0级空间层级单位
 	m_pKernelData->fUnitArray->push_back(1e5);	// 1级空间层级单位
 	m_pKernelData->fUnitArray->push_back(1e10);	// 2级空间层级单位
@@ -83,6 +122,7 @@ bool CGMEngine::Init()
 	m_pKernelData->fUnitArray->push_back(1e30);	// 6级空间层级单位
 	//!< 眼点最后时刻的空间坐标，默认都在(1,1,1)位置
 	m_pKernelData->vEyePosArray = new osg::Vec3dArray;
+	m_pKernelData->vEyePosArray->reserve(7);
 	m_pKernelData->vEyePosArray->push_back(osg::Vec3d(1, 1, 1));	// 0级空间
 	m_pKernelData->vEyePosArray->push_back(osg::Vec3d(1, 1, 1));	// 1级空间
 	m_pKernelData->vEyePosArray->push_back(osg::Vec3d(1, 1, 1));	// 2级空间
@@ -90,32 +130,41 @@ bool CGMEngine::Init()
 	m_pKernelData->vEyePosArray->push_back(osg::Vec3d(1, 1, 1));	// 4级空间
 	m_pKernelData->vEyePosArray->push_back(osg::Vec3d(1, 1, 1));	// 5级空间
 	m_pKernelData->vEyePosArray->push_back(osg::Vec3d(1, 1, 1));	// 6级空间
-	//!< 目标点最后时刻的空间坐标，默认都在(0,0,0)位置
-	m_pKernelData->vTargetPosArray = new osg::Vec3dArray;
-	m_pKernelData->vTargetPosArray->push_back(osg::Vec3d(0, 0, 0));	// 0级空间
-	m_pKernelData->vTargetPosArray->push_back(osg::Vec3d(0, 0, 0));	// 1级空间
-	m_pKernelData->vTargetPosArray->push_back(osg::Vec3d(0, 0, 0));	// 2级空间
-	m_pKernelData->vTargetPosArray->push_back(osg::Vec3d(0, 0, 0));	// 3级空间
-	m_pKernelData->vTargetPosArray->push_back(osg::Vec3d(0, 0, 0));	// 4级空间
-	m_pKernelData->vTargetPosArray->push_back(osg::Vec3d(0, 0, 0));	// 5级空间
-	m_pKernelData->vTargetPosArray->push_back(osg::Vec3d(0, 0, 0));	// 6级空间
-
-
 
 	GM_Root = new osg::Group();
 	GM_View = new osgViewer::View();
 	GM_View->setSceneData(GM_Root.get());
 
-	//!< 配置数据
-	m_pConfigData = new SGMConfigData();
+	m_pSceneTex = new osg::Texture2D();
+	m_pSceneTex->setTextureSize(m_pConfigData->iScreenWidth, m_pConfigData->iScreenHeight);
+	m_pSceneTex->setInternalFormat(GL_RGBA8);
+	m_pSceneTex->setSourceFormat(GL_RGBA);
+	m_pSceneTex->setSourceType(GL_UNSIGNED_BYTE);
+	m_pSceneTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	m_pSceneTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	m_pSceneTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+	m_pSceneTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+	m_pSceneTex->setBorderColor(osg::Vec4d(0, 0, 0, 0));
+	m_pSceneTex->setDataVariance(osg::Object::DYNAMIC);
+	m_pSceneTex->setResizeNonPowerOfTwoHint(false);
+
+	// 初始化背景相关节点
+	_InitBackground();
+	// 初始化前景相关节点
+	_InitForeground();
+
+	m_pCommonUniform = new CGMCommonUniform();
 	m_pManipulator = new CGMCameraManipulator();
 	m_pDataManager = new CGMDataManager();
 	m_pGalaxy = new CGMGalaxy();
 	m_pAudio = new CGMAudio();
+	m_pPost = new CGMPost();
 
-	m_pDataManager->Init(m_pConfigData);
-	m_pGalaxy->Init(m_pKernelData, m_pConfigData);
+	m_pCommonUniform->Init(m_pKernelData, m_pConfigData);
+	m_pDataManager->Init(m_pKernelData, m_pConfigData);
+	m_pGalaxy->Init(m_pKernelData, m_pConfigData, m_pCommonUniform, m_pDataManager);
 	m_pAudio->Init(m_pConfigData);
+	m_pPost->Init(m_pKernelData, m_pConfigData, m_pCommonUniform);
 
 	m_pGalaxy->CreateGalaxy(m_fGalaxyDiameter);
 
@@ -127,6 +176,8 @@ bool CGMEngine::Init()
 
 	m_bInit = true;
 	m_pKernelData->bInited = m_bInit;
+
+	GM_View->addEventHandler(new ResizeEventHandler(this));
 
 	return true;
 }
@@ -146,6 +197,7 @@ void CGMEngine::Release()
 	GM_DELETE(m_pGalaxy);
 
 	GM_DELETE(m_pDataManager);
+	GM_DELETE(m_pCommonUniform);
 	GM_DELETE(m_pConfigData);
 	GM_DELETE(m_pKernelData);
 	GM_DELETE(msSingleton);
@@ -176,23 +228,25 @@ bool CGMEngine::Update()
 		}
 		m_fDeltaStep = fInnerDeltaTime;
 
+		m_pCommonUniform->Update(deltaTime);
+		m_pDataManager->Update(deltaTime);
 		m_pGalaxy->Update(deltaTime);
 		m_pAudio->Update(deltaTime);
 
 		// 更新涟漪效果
-		m_pGalaxy->SetAudioLevel(m_pAudio->GetLevel());
+		m_pCommonUniform->SetAudioLevel(m_pAudio->GetLevel());
 
 		GM_Viewer->advance(deltaTime);
 		GM_Viewer->eventTraversal();
 		GM_Viewer->updateTraversal();
 
-		// 为实现TAA相机和其他相机同步抖动，需要每帧更新static成员变量m_iShakeCount
-		CGMVolumeBasic::AddShakeCount();
-		m_pGalaxy->UpdateLater(deltaTime);
-
-		_UpdateScenes();
+		// 在主相机改变位置后再更新
+		_UpdateLater(deltaTime);
 
 		GM_Viewer->renderingTraversals();
+
+		// 渲染结束后再更新场景层级信息，否则会在临界点闪烁
+		_UpdateScenes();
 	}
 	return true;
 }
@@ -201,6 +255,7 @@ bool CGMEngine::Update()
 bool CGMEngine::Load()
 {
 	m_pGalaxy->Load();
+	m_pPost->Load();
 	return true;
 }
 
@@ -211,9 +266,51 @@ bool CGMEngine::Save()
 	return false;
 }
 
+bool CGMEngine::SaveSolarData()
+{
+	m_pGalaxy->SaveSolarData();
+	return true;
+}
+
+void CGMEngine::ResizeScreen(const int iW, const int iH)
+{
+	osg::ref_ptr<osg::Camera> pMainCam = GM_View->getCamera();
+	if (pMainCam.valid())
+	{
+		double fovy, aspectRatio, zNear, zFar;
+		pMainCam->getProjectionMatrixAsPerspective(fovy, aspectRatio, zNear, zFar);
+
+		pMainCam->resize(iW, iH);
+		double fAspetRatio = double(iW) / double(iH);
+		pMainCam->setProjectionMatrixAsPerspective(fovy, fAspetRatio, zNear, zFar);
+		pMainCam->dirtyAttachmentMap();
+	}
+
+	if (m_pKernelData->pBackgroundCam.valid())
+		m_pKernelData->pBackgroundCam->resize(iW, iH);
+	if (m_pKernelData->pForegroundCam.valid())
+		m_pKernelData->pForegroundCam->resize(iW, iH);
+	if (m_pCommonUniform)
+		m_pCommonUniform->ResizeScreen(iW, iH);
+	if (m_pGalaxy)
+		m_pGalaxy->ResizeScreen(iW, iH);
+	if (m_pPost)
+		m_pPost->ResizeScreen(iW, iH);
+}
+
 void CGMEngine::SetEditMode(const bool bEnable)
 {
 	m_pGalaxy->SetEditMode(bEnable);
+}
+
+bool CGMEngine::GetEditMode() const
+{
+	return 	m_pGalaxy->GetEditMode();
+}
+
+void CGMEngine::SetHandleHover(const bool bHover)
+{
+	m_pGalaxy->SetHandleHover(bHover);
 }
 
 void CGMEngine::SetCapture(const bool bEnable)
@@ -229,8 +326,8 @@ bool CGMEngine::SetAudio(const double fX, const double fY)
 	double fGalaxyZ = 0.0f;
 	_World2GalaxyCoord(fX, fY, fGalaxyX, fGalaxyY);
 
-	std::wstring wstrName = m_pDataManager->FindAudio(fGalaxyX, fGalaxyY, fGalaxyZ);
-	if (L"" != wstrName)
+	std::wstring wstrName;
+	if (m_pDataManager->FindAudio(fGalaxyX, fGalaxyY, fGalaxyZ, wstrName))
 	{
 		m_pAudio->SetCurrentAudio(wstrName);
 		m_pAudio->AudioControl(EGMA_CMD_PLAY);
@@ -248,22 +345,20 @@ bool CGMEngine::SetAudio(const double fX, const double fY)
 
 bool CGMEngine::Play()
 {
-	if (L"" == m_pAudio->GetCurrentAudio())
+	std::wstring wstrCurrentFile = m_pAudio->GetCurrentAudio();
+	if (L"" == wstrCurrentFile)
 	{
-		// 说明是第一首歌
-		if (m_pGalaxy->GetEditMode())
-		{
-			_Next(EGMA_MOD_SINGLE);
-		}
-		else
-		{
-			_Next(m_ePlayMode);
-		}
+		// 第一次播放
+		wstrCurrentFile = m_pDataManager->GetCurrentAudio();
+		m_pAudio->SetCurrentAudio(wstrCurrentFile);
+
+		SGMGalaxyCoord vGC = m_pDataManager->GetGalaxyCoord(wstrCurrentFile);
+		double fWorldX, fWorldY;
+		_GalaxyCoord2World(vGC.x, vGC.y, fWorldX, fWorldY);
+		m_pGalaxy->SetCurrentStar(osg::Vec3f(fWorldX, fWorldY, 0.0f), wstrCurrentFile);
 	}
-	else
-	{
-		m_pAudio->AudioControl(EGMA_CMD_PLAY);
-	}
+
+	m_pAudio->AudioControl(EGMA_CMD_PLAY);
 
 	return true;
 }
@@ -284,20 +379,25 @@ bool CGMEngine::Stop()
 
 bool CGMEngine::Last()
 {
-	std::wstring wstrCurrentFile = m_pDataManager->FindLastAudio();
-	if (L"" == wstrCurrentFile) return false;
+	if (!m_pGalaxy->GetEditMode())
+	{
+		std::wstring wstrCurrentFile = m_pDataManager->GetLastAudio();
+		if (L"" == wstrCurrentFile) return false;
 
-	m_pAudio->AudioControl(EGMA_CMD_CLOSE);
-	m_pAudio->SetCurrentAudio(wstrCurrentFile);
-	m_pAudio->AudioControl(EGMA_CMD_OPEN);
-	m_pAudio->AudioControl(EGMA_CMD_PLAY);
+		m_pAudio->AudioControl(EGMA_CMD_CLOSE);
+		m_pAudio->SetCurrentAudio(wstrCurrentFile);
+		m_pAudio->AudioControl(EGMA_CMD_OPEN);
+		m_pAudio->AudioControl(EGMA_CMD_PLAY);
 
-	SGMStarCoord starCoord = m_pDataManager->GetStarCoord(wstrCurrentFile);
-	double fWorldX, fWorldY;
-	_StarCoord2World(starCoord, fWorldX, fWorldY);
-	m_pGalaxy->SetCurrentStar(osg::Vec3f(fWorldX, fWorldY, 0.0f), wstrCurrentFile);
+		SGMGalaxyCoord vGC = m_pDataManager->GetGalaxyCoord(wstrCurrentFile);
+		double fWorldX, fWorldY;
+		_GalaxyCoord2World(vGC.x, vGC.y, fWorldX, fWorldY);
+		m_pGalaxy->SetCurrentStar(osg::Vec3f(fWorldX, fWorldY, 0.0f), wstrCurrentFile);
 
-	return true;
+		return true;
+	}
+
+	return false;
 }
 
 /** @brief 下一首 */
@@ -315,12 +415,12 @@ bool CGMEngine::Next()
 	return true;
 }
 
-bool CGMEngine::SetVolume(float fVolume)
+bool CGMEngine::SetVolume(const float fVolume)
 {
 	return m_pAudio->SetVolume(osg::clampBetween(fVolume, 0.0f, 1.0f));
 }
 
-float CGMEngine::GetVolume()
+float CGMEngine::GetVolume() const
 {
 	return m_pAudio->GetVolume();
 }
@@ -331,27 +431,22 @@ bool CGMEngine::SetPlayMode(EGMA_MODE eMode)
 	return true;
 }
 
-EGMA_MODE CGMEngine::GetPlayMode()
-{
-	return m_ePlayMode;
-}
-
-std::wstring CGMEngine::GetAudioName()
+std::wstring CGMEngine::GetAudioName() const
 {
 	return m_pAudio->GetCurrentAudio();
 }
 
-bool CGMEngine::SetAudioCurrentTime(int iTime)
+bool CGMEngine::SetAudioCurrentTime(const int iTime)
 {	
 	return m_pAudio->SetAudioCurrentTime(iTime);
 }
 
-int CGMEngine::GetAudioCurrentTime()
+int CGMEngine::GetAudioCurrentTime() const
 {
 	return m_pAudio->GetAudioCurrentTime();
 }
 
-int CGMEngine::GetAudioDuration()
+int CGMEngine::GetAudioDuration() const
 {
 	return m_pAudio->GetAudioDuration();
 }
@@ -362,32 +457,49 @@ void CGMEngine::Welcome()
 	m_pAudio->Welcome();
 }
 
-bool CGMEngine::IsWelcomeFinished()
+bool CGMEngine::IsWelcomeFinished() const
 {
 	return m_pAudio->IsWelcomeFinished();
 }
 
-void CGMEngine::SetMousePosition(const osg::Vec3f& vHierarchyPos)
+const std::vector<std::wstring> GM::CGMEngine::GetPlayingOrder() const
 {
+	return m_pDataManager->GetPlayingOrder();
+}
+
+void CGMEngine::SetMousePosition(const SGMVector3& vHiePos)
+{
+	osg::Vec3d vHierarchyPos = osg::Vec3d(vHiePos.x, vHiePos.y, vHiePos.z);
 	m_pGalaxy->SetMousePosition(vHierarchyPos);
 }
 
-osg::Vec3d CGMEngine::GetCurrentStarWorldPos()
+void CGMEngine::SetCurrentStarAudioCoord(const SGMAudioCoord& vAudioCoord)
 {
-	return m_pGalaxy->GetStarWorldPos();
+	m_pGalaxy->SetPlayingStarAudioCoord(vAudioCoord);
 }
 
-double CGMEngine::GetGalaxyRadius()
+SGMAudioCoord CGMEngine::GetCurrentStarAudioCoord() const
 {
-	return m_fGalaxyDiameter*0.5;
+	return m_pGalaxy->GetPlayingStarAudioCoord();
 }
 
-double CGMEngine::GetHierarchyTargetDistance()
+SGMVector3 CGMEngine::GetCurrentStarWorldPos() const
+{
+	osg::Vec3d vPos = m_pGalaxy->GetStarWorldPos();
+	return SGMVector3(vPos.x(), vPos.y(), vPos.z());
+}
+
+SGMAudioCoord CGMEngine::GetAudioCoord(const std::wstring & strName) const
+{
+	return m_pDataManager->GetAudioCoord(strName);
+}
+
+double CGMEngine::GetHierarchyTargetDistance() const
 {
 	return m_pManipulator->GetHierarchyTargetDistance();
 }
 
-double CGMEngine::GetUnit(int iHierarchy)
+double CGMEngine::GetUnit(const int iHierarchy) const
 {
 	if (iHierarchy >= 0 && iHierarchy < m_pKernelData->fUnitArray->size())
 	{
@@ -399,21 +511,85 @@ double CGMEngine::GetUnit(int iHierarchy)
 	}
 }
 
-osg::Vec3d CGMEngine::GetHierarchyLastEyePos(int iHierarchy)
+bool CGMEngine::GetSmallerHierarchyCoord(SGMVector3 & vX, SGMVector3 & vY, SGMVector3 & vZ) const
 {
-	int iHie = (-1 == iHierarchy) ? m_pKernelData->iHierarchy : osg::clampBetween(iHierarchy, 0, 6);
-	return m_pKernelData->vEyePosArray->at(iHie);
+	vX = _OSG2GM(osg::Vec3d(1, 0, 0));
+	vY = _OSG2GM(osg::Vec3d(0, 1, 0));
+	vZ = _OSG2GM(osg::Vec3d(0, 0, 1));
+
+	int iHieSmaller = m_pKernelData->iHierarchy - 1;
+	switch (iHieSmaller)
+	{
+	case 1:	// 2->1
+	{
+	}
+	break;
+	case 3:	// 4->3
+	{
+		osg::Matrix mMatrix = osg::Matrix();
+		mMatrix.preMultRotate(m_pGalaxy->GetNearStarRotate());
+		vX = _OSG2GM(mMatrix.preMult(osg::Vec3d(1, 0, 0)));
+		vY = _OSG2GM(mMatrix.preMult(osg::Vec3d(0, 1, 0)));
+		vZ = _OSG2GM(mMatrix.preMult(osg::Vec3d(0, 0, 1)));
+		vX.Normalize();
+		vY.Normalize();
+		vZ.Normalize();
+	}
+	break;
+	case 0:	// 1->0
+	case 2:	// 3->2
+	case 4:	// 5->4
+	case 5: // 6->5
+
+	default:
+		return false;
+	}
+
+	return true;
 }
 
-osg::Vec3d CGMEngine::GetHierarchyLastTargetPos(int iHierarchy)
+bool CGMEngine::GetBiggerHierarchyCoord(SGMVector3& vX, SGMVector3& vY, SGMVector3& vZ) const
 {
-	int iHie = (-1 == iHierarchy) ? m_pKernelData->iHierarchy : osg::clampBetween(iHierarchy, 0, 6);
-	return m_pKernelData->vTargetPosArray->at(iHie);
+	vX = _OSG2GM(osg::Vec3d(1, 0, 0));
+	vY = _OSG2GM(osg::Vec3d(0, 1, 0));
+	vZ = _OSG2GM(osg::Vec3d(0, 0, 1));
+
+	int iHieBigger = m_pKernelData->iHierarchy + 1;
+	switch (iHieBigger)
+	{
+	case 2:	// 1->2
+	{
+	}
+	break;
+	case 4:	// 3->4
+	{
+		osg::Matrix mMatrix = osg::Matrix();
+		mMatrix.preMultRotate(m_pGalaxy->GetNearStarRotate().inverse());
+		vX = _OSG2GM(mMatrix.preMult(osg::Vec3d(1, 0, 0)));
+		vY = _OSG2GM(mMatrix.preMult(osg::Vec3d(0, 1, 0)));
+		vZ = _OSG2GM(mMatrix.preMult(osg::Vec3d(0, 0, 1)));
+		vX.Normalize();
+		vY.Normalize();
+		vZ.Normalize();
+	}
+	break;
+	case 1:	// 0->1
+	case 3:	// 2->3
+	case 5: // 4->5
+	case 6:	// 5->6
+	{
+	}
+	break;
+	default:
+		return false;
+	}
+
+	return true;
 }
 
-bool CGMEngine::AddHierarchy(const osg::Vec3d& vHierarchyEyePos, const osg::Vec3d& vHierarchyTargetPos)
+bool CGMEngine::AddHierarchy(const SGMVector3& vHieEyePos, const SGMVector3& vHieTargetPos)
 {
-	std::cout << "iHierarchy：" << m_pKernelData->iHierarchy << " ++" << std::endl;
+	std::cout << "iHierarchy：" << m_pKernelData->iHierarchy << " -> " << (m_pKernelData->iHierarchy + 1) << std::endl;
 
 	if (GM_HIERARCHY_MAX == m_pKernelData->iHierarchy)
 	{
@@ -421,108 +597,204 @@ bool CGMEngine::AddHierarchy(const osg::Vec3d& vHierarchyEyePos, const osg::Vec3
 	}
 	else
 	{
+		const osg::Vec3d vOldHierarchyEyePos = osg::Vec3d(vHieEyePos.x, vHieEyePos.y, vHieEyePos.z);
+		const osg::Vec3d vOldHierarchyTargetPos = osg::Vec3d(vHieTargetPos.x, vHieTargetPos.y, vHieTargetPos.z);
+
 		// 记录当前层级眼点空间坐标
-		m_pKernelData->vEyePosArray->at(m_pKernelData->iHierarchy) = vHierarchyEyePos;
-		// 记录当前层级目标点空间坐标
-		m_pKernelData->vTargetPosArray->at(m_pKernelData->iHierarchy) = vHierarchyTargetPos;
+		m_pKernelData->vEyePosArray->at(m_pKernelData->iHierarchy) = vOldHierarchyEyePos;
 
-		m_pKernelData->iHierarchy++;
-		int iHieNew = m_pKernelData->iHierarchy;
+		int iHieNew = ++(m_pKernelData->iHierarchy);
+		// 计算升级后空间的眼点空间坐标
+		m_pKernelData->vEyePosArray->at(iHieNew) = _AfterAddHierarchy(osg::Vec4d(vOldHierarchyEyePos, 1.0));
 
-		if (4 < iHieNew)
-		{
-			// 计算升级后空间的眼点空间坐标
-			m_pKernelData->vEyePosArray->at(iHieNew) = vHierarchyEyePos / GM_UNIT_SCALE;
-			// 计算升级后空间的目标点空间坐标
-			m_pKernelData->vTargetPosArray->at(iHieNew) = vHierarchyTargetPos / GM_UNIT_SCALE;
-
-		}
-		else
-		{
-			// 取出升级后空间的目标点空间坐标
-			osg::Vec3d vTargetOld = m_pKernelData->vTargetPosArray->at(iHieNew);
-			// 计算升级后空间的眼点空间坐标
-			m_pKernelData->vEyePosArray->at(iHieNew) = vTargetOld + vHierarchyEyePos / GM_UNIT_SCALE;
-			// 计算升级后空间的目标点空间坐标
-			m_pKernelData->vTargetPosArray->at(iHieNew) = vTargetOld + vHierarchyTargetPos / GM_UNIT_SCALE;
-		}
-
-		// 激活脏标记
-		m_bDirty = true;
 		return true;
 	}
 }
 
-bool CGMEngine::SubHierarchy(const osg::Vec3d& vHierarchyEyePos, const osg::Vec3d& vHierarchyTargetPos)
+bool CGMEngine::SubHierarchy(const SGMVector3& vHieEyePos, const SGMVector3& vHieTargetPos)
 {
-	std::cout << "iHierarchy：" << m_pKernelData->iHierarchy << " --" << std::endl;
+	std::cout << "iHierarchy：" << m_pKernelData->iHierarchy << " -> " << (m_pKernelData->iHierarchy - 1) << std::endl;
 
-	if (0 == m_pKernelData->iHierarchy)
+	if (0 >= m_pKernelData->iHierarchy)
 	{
 		return false;
 	}
 	else
 	{
+		const osg::Vec3d vOldHierarchyEyePos = osg::Vec3d(vHieEyePos.x, vHieEyePos.y, vHieEyePos.z);
+		const osg::Vec3d vOldHierarchyTargetPos = osg::Vec3d(vHieTargetPos.x, vHieTargetPos.y, vHieTargetPos.z);
+
 		// 记录当前层级眼点空间坐标
-		m_pKernelData->vEyePosArray->at(m_pKernelData->iHierarchy) = vHierarchyEyePos;
-		// 记录当前层级目标点空间坐标
-		m_pKernelData->vTargetPosArray->at(m_pKernelData->iHierarchy) = vHierarchyTargetPos;
+		m_pKernelData->vEyePosArray->at(m_pKernelData->iHierarchy) = vOldHierarchyEyePos;
 
-		m_pKernelData->iHierarchy--;
-		int iHieNew = m_pKernelData->iHierarchy;
+		int iHieNew = --(m_pKernelData->iHierarchy);
+		// 计算降级后空间的眼点空间坐标
+		m_pKernelData->vEyePosArray->at(iHieNew) = _AfterSubHierarchy(osg::Vec4d(vOldHierarchyEyePos, 1.0));
 
-		if (4 <= iHieNew)
-		{
-			// 计算降级后空间的目标点空间坐标
-			m_pKernelData->vTargetPosArray->at(iHieNew) = vHierarchyTargetPos * GM_UNIT_SCALE;
-			// 计算降级后空间的眼点空间坐标
-			m_pKernelData->vEyePosArray->at(iHieNew) = vHierarchyEyePos * GM_UNIT_SCALE;
-		}
-		else
-		{
-			// 计算降级后空间的目标点空间坐标
-			m_pKernelData->vTargetPosArray->at(iHieNew) = osg::Vec3d(0, 0, 0);
-			// 计算降级后空间的眼点空间坐标
-			m_pKernelData->vEyePosArray->at(iHieNew) = (vHierarchyEyePos - vHierarchyTargetPos) * GM_UNIT_SCALE;
-		}
-
-		// 激活脏标记
-		m_bDirty = true;
 		return true;
 	}
 }
 
-osg::Vec3d CGMEngine::Hierarchy2World(osg::Vec3d vHierarchy)
+SGMVector3 CGMEngine::AfterAddHierarchy(const SGMVector4& vBefore) const
 {
-	osg::Vec3d vWorldPos = vHierarchy * m_pKernelData->fUnitArray->at(m_pKernelData->iHierarchy);
-	//456层级的坐标原点都在银河系中心，所以不需要偏移，直接除以单位长度
-	//0123层级的坐标原点可以任意变动，需要乘以单位长度后叠加
-	for (int i = 4; i > m_pKernelData->iHierarchy; i--)
-	{
-		vWorldPos += m_pKernelData->vTargetPosArray->at(i) * m_pKernelData->fUnitArray->at(i);
-	}
-	return vWorldPos;
+	osg::Vec3d vPosAfterAdd = _AfterAddHierarchy(osg::Vec4d(vBefore.x, vBefore.y, vBefore.z, vBefore.w));
+	return SGMVector3(vPosAfterAdd.x(), vPosAfterAdd.y(), vPosAfterAdd.z());
 }
 
-osg::Vec3d CGMEngine::StarWorld2Hierarchy(osg::Vec3d vStarWorldPos)
+SGMVector3 CGMEngine::AfterSubHierarchy(const SGMVector4& vBefore) const
 {
-	osg::Vec3d vHierarchyCenterWorldPos = osg::Vec3d(0, 0, 0);
-	//456层级的坐标原点都在银河系中心，所以直接用世界坐标除以单位长度
-	//0123层级的坐标原点可以任意变动，需要减去坐标原点，再除以单位长度
-	for (int i = 4; i > m_pKernelData->iHierarchy; i--)
-	{
-		vHierarchyCenterWorldPos += m_pKernelData->vTargetPosArray->at(i)* m_pKernelData->fUnitArray->at(i);
-	}
-	return (vStarWorldPos - vHierarchyCenterWorldPos) / m_pKernelData->fUnitArray->at(m_pKernelData->iHierarchy);
+	osg::Vec3d vPosAfterSub = _AfterSubHierarchy(osg::Vec4d(vBefore.x, vBefore.y, vBefore.z, vBefore.w));
+	return SGMVector3(vPosAfterSub.x(), vPosAfterSub.y(), vPosAfterSub.z());
+}
+
+bool CGMEngine::GetNearestCelestialBody(const SGMVector3& vSearchHiePos,
+	SGMVector3& vPlanetHiePos, double& fOrbitalPeriod) const
+{
+	return m_pGalaxy->GetNearestCelestialBody(vSearchHiePos, vPlanetHiePos, fOrbitalPeriod);
+}
+
+void CGMEngine::GetCelestialBody(SGMVector3& vPlanetPos, double& fOrbitalPeriod) const
+{
+	m_pGalaxy->GetCelestialBody(vPlanetPos, fOrbitalPeriod);
+}
+
+double CGMEngine::GetCelestialMeanRadius() const
+{
+	return m_pGalaxy->GetCelestialMeanRadius();
+}
+
+double CGMEngine::GetCelestialRadius(const double fLatitude) const
+{
+	return m_pGalaxy->GetCelestialRadius(fLatitude);
+}
+
+SGMVector3 CGMEngine::GetCelestialNorth() const
+{
+	return m_pGalaxy->GetCelestialNorth();
+}
+
+unsigned int CGMEngine::GetCelestialIndex() const
+{
+	return m_pGalaxy->GetCelestialIndex();
+}
+
+SGMVector3 CGMEngine::GetNearStarWorldPos() const
+{
+	osg::Vec3d vNearStarWorldPos = m_pGalaxy->GetNearStarWorldPos();
+	return SGMVector3(vNearStarWorldPos.x(), vNearStarWorldPos.y(), vNearStarWorldPos.z());
+}
+
+SGMVector4f CGMEngine::Angle2Color(const float fEmotionAngle) const
+{
+	osg::Vec4f vColor = m_pDataManager->Angle2Color(fEmotionAngle);
+	return SGMVector4f(vColor.r(), vColor.g(), vColor.b(), vColor.a());
 }
 
 CGMViewWidget* CGMEngine::CreateViewWidget(QWidget* parent)
 {
 	GM_Viewer = new CGMViewWidget(GM_View, parent);
+	GM_View->getCamera()->setProjectionMatrixAsPerspective(
+		m_pConfigData->fFovy,
+		static_cast<double>(m_pConfigData->iScreenWidth) / static_cast<double>(m_pConfigData->iScreenHeight),
+		0.0003, 30.0);
+
+	m_pPost->CreatePost(m_pSceneTex.get(), m_pBackgroundTex.get(), m_pForegroundTex.get());
+	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
+	{
+		//m_pPost->SetVolumeEnable(true, m_pGalaxy->GetTAATex());
+	}
 	return GM_Viewer.get();
 }
 
-void CGMEngine::_Next(EGMA_MODE eMode)
+/** @brief 加载配置 */
+bool CGMEngine::_LoadConfig()
+{
+	CGMXml hXML;
+	hXML.Load(g_strGMConfigFile, "Config");
+	m_pConfigData = new SGMConfigData;
+
+	// 解析系统配置
+	CGMXmlNode sNode = hXML.GetChild("System");
+
+	m_pConfigData->strCorePath = sNode.GetPropStr("corePath", m_pConfigData->strCorePath.c_str());
+	m_pConfigData->strMediaPath = sNode.GetPropWStr("mediaPath", m_pConfigData->strMediaPath.c_str());
+	m_pConfigData->eRenderQuality = EGMRENDER_QUALITY(sNode.GetPropInt("renderQuality", m_pConfigData->eRenderQuality));
+	m_pConfigData->bPhoto = sNode.GetPropBool("photo", m_pConfigData->bPhoto);
+	m_pConfigData->bWanderingEarth = sNode.GetPropBool("wanderingEarth", m_pConfigData->bWanderingEarth);
+	m_pConfigData->fFovy = sNode.GetPropFloat("fovy", m_pConfigData->fFovy);
+	m_pConfigData->fVolume = sNode.GetPropFloat("volume", m_pConfigData->fVolume);
+	m_pConfigData->fMinBPM = sNode.GetPropDouble("minBPM", m_pConfigData->fMinBPM);
+
+	return true;
+}
+
+void CGMEngine::_InitBackground()
+{
+	m_pBackgroundTex = new osg::Texture2D();
+	m_pBackgroundTex->setTextureSize(m_pConfigData->iScreenWidth, m_pConfigData->iScreenHeight);
+	m_pBackgroundTex->setInternalFormat(GL_RGBA8);
+	m_pBackgroundTex->setSourceFormat(GL_RGBA);
+	m_pBackgroundTex->setSourceType(GL_UNSIGNED_BYTE);
+	m_pBackgroundTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	m_pBackgroundTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	m_pBackgroundTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+	m_pBackgroundTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+	m_pBackgroundTex->setBorderColor(osg::Vec4d(0, 0, 0, 0));
+	m_pBackgroundTex->setDataVariance(osg::Object::DYNAMIC);
+	m_pBackgroundTex->setResizeNonPowerOfTwoHint(false);
+
+	m_pKernelData->pBackgroundCam = new osg::Camera;
+	m_pKernelData->pBackgroundCam->setName("backgroundCamera");
+	m_pKernelData->pBackgroundCam->setReferenceFrame(osg::Transform::ABSOLUTE_RF_INHERIT_VIEWPOINT);
+	m_pKernelData->pBackgroundCam->setClearMask(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	m_pKernelData->pBackgroundCam->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
+	m_pKernelData->pBackgroundCam->setViewport(0, 0, m_pConfigData->iScreenWidth, m_pConfigData->iScreenHeight);
+	m_pKernelData->pBackgroundCam->setRenderOrder(osg::Camera::PRE_RENDER, 0);
+	m_pKernelData->pBackgroundCam->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
+	m_pKernelData->pBackgroundCam->attach(osg::Camera::COLOR_BUFFER, m_pBackgroundTex.get());
+	m_pKernelData->pBackgroundCam->setAllowEventFocus(false);
+	m_pKernelData->pBackgroundCam->setProjectionMatrixAsPerspective(
+		m_pConfigData->fFovy,
+		double(m_pConfigData->iScreenWidth) / double(m_pConfigData->iScreenHeight),
+		1.0, 1e5);
+	m_pKernelData->pBackgroundCam->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+	GM_Root->addChild(m_pKernelData->pBackgroundCam.get());
+}
+
+void CGMEngine::_InitForeground()
+{
+	m_pForegroundTex = new osg::Texture2D();
+	m_pForegroundTex->setTextureSize(m_pConfigData->iScreenWidth, m_pConfigData->iScreenHeight);
+	m_pForegroundTex->setInternalFormat(GL_RGBA8);
+	m_pForegroundTex->setSourceFormat(GL_RGBA);
+	m_pForegroundTex->setSourceType(GL_UNSIGNED_BYTE);
+	m_pForegroundTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	m_pForegroundTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	m_pForegroundTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+	m_pForegroundTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+	m_pForegroundTex->setBorderColor(osg::Vec4d(0, 0, 0, 0));
+	m_pForegroundTex->setDataVariance(osg::Object::DYNAMIC);
+	m_pForegroundTex->setResizeNonPowerOfTwoHint(false);
+	
+	m_pKernelData->pForegroundCam = new osg::Camera;
+	m_pKernelData->pForegroundCam->setName("foregroundCamera");
+	m_pKernelData->pForegroundCam->setReferenceFrame(osg::Transform::ABSOLUTE_RF_INHERIT_VIEWPOINT);
+	m_pKernelData->pForegroundCam->setClearMask(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	m_pKernelData->pForegroundCam->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
+	m_pKernelData->pForegroundCam->setViewport(0, 0, m_pConfigData->iScreenWidth, m_pConfigData->iScreenHeight);
+	m_pKernelData->pForegroundCam->setRenderOrder(osg::Camera::PRE_RENDER, 0);
+	m_pKernelData->pForegroundCam->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
+	m_pKernelData->pForegroundCam->attach(osg::Camera::COLOR_BUFFER, m_pForegroundTex.get());
+	m_pKernelData->pForegroundCam->setAllowEventFocus(false);
+	m_pKernelData->pForegroundCam->setProjectionMatrixAsPerspective(
+		m_pConfigData->fFovy,
+		double(m_pConfigData->iScreenWidth) / double(m_pConfigData->iScreenHeight),
+		1.0, 1e5);
+	m_pKernelData->pForegroundCam->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+	GM_Root->addChild(m_pKernelData->pForegroundCam.get());
+}
+
+void CGMEngine::_Next(const EGMA_MODE eMode)
 {
 	std::wstring wstrCurrentFile = L"";
 
@@ -538,16 +810,16 @@ void CGMEngine::_Next(EGMA_MODE eMode)
 		m_pAudio->AudioControl(EGMA_CMD_CLOSE);
 
 		int iMaxNum = m_pDataManager->GetAudioNum();
-		int iNext = (m_pDataManager->GetCurrentAudioID() + 1) % iMaxNum;
+		unsigned int iNext = (m_pDataManager->GetUID() + 1) % iMaxNum;// wrong to do
 		wstrCurrentFile = m_pDataManager->FindAudio(iNext);
 
 		m_pAudio->SetCurrentAudio(wstrCurrentFile);
 		m_pAudio->AudioControl(EGMA_CMD_OPEN);
 		m_pAudio->AudioControl(EGMA_CMD_PLAY);
 
-		SGMStarCoord starCoord = m_pDataManager->GetStarCoord(wstrCurrentFile);
+		SGMGalaxyCoord vGC = m_pDataManager->GetGalaxyCoord(wstrCurrentFile);
 		double fWorldX, fWorldY;
-		_StarCoord2World(starCoord, fWorldX, fWorldY);
+		_GalaxyCoord2World(vGC.x, vGC.y, fWorldX, fWorldY);
 		m_pGalaxy->SetCurrentStar(osg::Vec3f(fWorldX, fWorldY, 0.0f), wstrCurrentFile);
 	}
 	break;
@@ -556,21 +828,21 @@ void CGMEngine::_Next(EGMA_MODE eMode)
 		m_pAudio->AudioControl(EGMA_CMD_CLOSE);
 
 		int iMaxNum = m_pDataManager->GetAudioNum();
-		m_iRandom.seed(time(0));
-		int iNext = m_iRandom() % iMaxNum;
+		std::uniform_int_distribution<> iPseudoNoise(0, iMaxNum-1);
+		int iNext = iPseudoNoise(m_iRandom);
 		wstrCurrentFile = m_pDataManager->FindAudio(iNext);
 		while (L"" == wstrCurrentFile)
 		{
-			iNext = m_iRandom() % iMaxNum;
+			iNext = iPseudoNoise(m_iRandom);
 			wstrCurrentFile = m_pDataManager->FindAudio(iNext);
 		}
 		m_pAudio->SetCurrentAudio(wstrCurrentFile);
 		m_pAudio->AudioControl(EGMA_CMD_OPEN);
 		m_pAudio->AudioControl(EGMA_CMD_PLAY);
 
-		SGMStarCoord starCoord = m_pDataManager->GetStarCoord(wstrCurrentFile);
+		SGMGalaxyCoord vGC = m_pDataManager->GetGalaxyCoord(wstrCurrentFile);
 		double fWorldX, fWorldY;
-		_StarCoord2World(starCoord, fWorldX, fWorldY);
+		_GalaxyCoord2World(vGC.x, vGC.y, fWorldX, fWorldY);
 		m_pGalaxy->SetCurrentStar(osg::Vec3f(fWorldX, fWorldY, 0.0f), wstrCurrentFile);
 	}
 	break;
@@ -587,9 +859,9 @@ void CGMEngine::_Next(EGMA_MODE eMode)
 	}
 }
 
-void CGMEngine::_InnerUpdate(float updateStep)
+void CGMEngine::_InnerUpdate(const float updateStep)
 {
-	if (m_pAudio->IsAudioOver())
+	if (m_pAudio->IsWelcomeFinished() && m_pAudio->IsAudioOver())
 	{
 		if (m_pGalaxy->GetEditMode())
 		{
@@ -600,9 +872,42 @@ void CGMEngine::_InnerUpdate(float updateStep)
 			_Next(m_ePlayMode);
 		}
 	}
+
+	if (3 == m_pKernelData->iHierarchy || 2 == m_pKernelData->iHierarchy)
+	{
+		SGMVector3 vTargetHiePos = _OSG2GM(m_pManipulator->GetHierarchyTargetPos());
+		SGMVector3 vCelestialBodyDeltaPos = m_pGalaxy->UpdateCelestialBody(vTargetHiePos);
+		if (0 != vCelestialBodyDeltaPos.Length())
+		{
+			if (2 == m_pKernelData->iHierarchy)
+			{
+				m_pManipulator->ChangeCenter(vCelestialBodyDeltaPos);
+			}
+		}
+	}
 }
 
-bool CGMEngine::_World2GalaxyCoord(const double fX, const double fY, double & fGalaxyX, double & fGalaxyY)
+bool CGMEngine::_UpdateLater(const double dDeltaTime)
+{
+	// background camera
+	osg::Vec3d vEye, vCenter, vUp;
+	GM_View->getCamera()->getViewMatrixAsLookAt(vEye, vCenter, vUp);
+	osg::Vec3d vBackCamDir = vCenter - vEye;
+	m_pKernelData->pBackgroundCam->setViewMatrixAsLookAt(osg::Vec3d(0, 0, 0), vBackCamDir, vUp);
+	//前景相机和主相机有相同的姿态
+	m_pKernelData->pForegroundCam->setViewMatrixAsLookAt(vEye, vCenter, vUp);
+	double fFovy, fAspectRatio, fZNear, fZFar;
+	GM_View->getCamera()->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
+	m_pKernelData->pBackgroundCam->setProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
+	m_pKernelData->pForegroundCam->setProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
+
+	m_pCommonUniform->UpdateLater(dDeltaTime);
+	m_pGalaxy->UpdateLater(dDeltaTime);
+
+	return true;
+}
+
+bool CGMEngine::_World2GalaxyCoord(const double fX, const double fY, double & fGalaxyX, double & fGalaxyY) const
 {
 	double fRadius = 0.5*m_fGalaxyDiameter;
 	fGalaxyX = fX / fRadius;
@@ -610,7 +915,7 @@ bool CGMEngine::_World2GalaxyCoord(const double fX, const double fY, double & fG
 	return true;
 }
 
-bool CGMEngine::_GalaxyCoord2World(const double fGalaxyX, const double fGalaxyY, double & fX, double & fY)
+bool CGMEngine::_GalaxyCoord2World(const double fGalaxyX, const double fGalaxyY, double & fX, double & fY) const
 {
 	double fRadius = 0.5*m_fGalaxyDiameter;
 	fX = fGalaxyX * fRadius;
@@ -618,19 +923,34 @@ bool CGMEngine::_GalaxyCoord2World(const double fGalaxyX, const double fGalaxyY,
 	return true;
 }
 
-bool CGMEngine::_StarCoord2World(const SGMStarCoord& starCoord, double & fX, double & fY)
+osg::Vec3d CGMEngine::_AfterAddHierarchy(const osg::Vec4d& vBefore) const
 {
-	double fRadius = 0.5*m_fGalaxyDiameter;
-	fX = fRadius * double(starCoord.x) / GM_COORD_MAX;
-	fY = fRadius * double(starCoord.y) / GM_COORD_MAX;
-	return true;
+	osg::Vec4d vAfter = m_pGalaxy->HierarchyAddMatrix().preMult(vBefore);
+	return osg::Vec3d(vAfter.x(), vAfter.y(), vAfter.z());
+}
+
+osg::Vec3d CGMEngine::_AfterSubHierarchy(const osg::Vec4d& vBefore) const
+{
+	if(3 == m_pKernelData->iHierarchy) // 4->3
+	{
+		// 4->3时更新最近恒星的位置
+		m_pGalaxy->RefreshNearStarWorldPos();
+	}
+	osg::Vec4d vAfter = m_pGalaxy->HierarchySubMatrix().preMult(vBefore);
+	return osg::Vec3d(vAfter.x(), vAfter.y(), vAfter.z());
 }
 
 void CGMEngine::_UpdateScenes()
 {
-	if (!m_bDirty) return;
+	// 这行之前，层级还没有变化
+	bool bNeedUpdate = m_pManipulator->UpdateHierarchy();
+	// 这行之后，层级可能会变化，+1或者-1
+	_UpdateNearFar();
+	if (!bNeedUpdate) return;
 
+	m_pCommonUniform->UpdateHierarchy(m_pKernelData->iHierarchy);
 	m_pGalaxy->UpdateHierarchy(m_pKernelData->iHierarchy);
+	m_pPost->UpdateHierarchy(m_pKernelData->iHierarchy);
 
 	switch (m_pKernelData->iHierarchy)
 	{
@@ -672,6 +992,72 @@ void CGMEngine::_UpdateScenes()
 	default:
 	break;
 	}
+}
 
-	m_bDirty = false;
+void CGMEngine::_UpdateNearFar()
+{
+	osg::Camera* camera = GM_View->getCamera();
+	if (!camera) return;
+
+	double fFovy, fAspectRatio, fNear, fFar;
+	camera->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fNear, fFar);
+
+	double fEyeDistance = m_pManipulator->GetHierarchyEyePos().length();
+	double fDistance = m_pManipulator->GetHierarchyTargetDistance();
+	double fUnit = GM_ENGINE.GetUnit();
+	double fFarNew = 10.0;
+	double fNearNew = fFarNew * GM_NEARFAR_RATIO;
+	switch (m_pKernelData->iHierarchy)
+	{
+	case 1:
+	{
+		double fEyeAlt1 = m_pGalaxy->GetEyeAltitude() / fUnit;
+		fNearNew = 0.1 * fEyeAlt1;
+		fFarNew = fNearNew / GM_NEARFAR_RATIO;
+	}
+	break;
+	case 2:
+	{
+		fFarNew = fDistance + 1e3;
+		fNearNew = fFarNew * GM_NEARFAR_RATIO;
+		// 如果近截面太远，则缩小近截面
+		double fEyeAlt2 = m_pGalaxy->GetEyeAltitude() / fUnit;
+		if (fNearNew > 0.1* fEyeAlt2)
+		{
+			fNearNew = 0.1* fEyeAlt2;
+			fFarNew = fNearNew / GM_NEARFAR_RATIO;
+		}
+	}
+	break;
+	case 3:
+	{
+		fNearNew = osg::clampBetween(fEyeDistance - 2e-2, 1e-5, 0.1);
+		fFarNew = fNearNew / GM_NEARFAR_RATIO;
+	}
+	break;
+	case 4:
+	{
+		if (fEyeDistance < (m_fGalaxyDiameter * 0.5 / fUnit))// 在星系内部
+		{
+			fFarNew = osg::clampBetween(fEyeDistance + m_fGalaxyDiameter / fUnit, 2.0, 1000.0);
+			fNearNew = fFarNew * GM_NEARFAR_RATIO;
+		}
+		else// 在星系外面
+		{
+			fNearNew = osg::clampBetween(fEyeDistance - m_fGalaxyDiameter / fUnit, 2e-5, 0.4);
+			fFarNew = fNearNew / GM_NEARFAR_RATIO;
+		}
+	}
+	break;
+	case 5:
+	{
+		fNearNew = osg::clampBetween(fEyeDistance - m_fGalaxyDiameter * 0.5 / fUnit,
+			1e-4, _Mix(2e-3, 0.05, osg::clampBetween(fEyeDistance / 50.0, 0.0, 1.0)));
+		fFarNew = fNearNew / GM_NEARFAR_RATIO;
+	}
+	break;
+	default:
+		break;
+	}
+	camera->setProjectionMatrixAsPerspective(fFovy, fAspectRatio, fNearNew, fFarNew);
 }

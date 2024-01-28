@@ -81,9 +81,16 @@ public:
 	static CGMSystemManager* getSingletonPtr(void);
 
 private:
-	bool								m_bInit;			//!< 初始化标识
-	bool								m_bFirst;			//!< 是否第一帧
+	bool							m_bInit;				//!< 初始化标识
+	bool							m_bFirst;				//!< 是否第一帧
 
-	int									m_iFrameCount;		//!< 帧数计数器，30帧一循环
-	uint								m_nKeyMask;
+	bool							m_bVolumeHiding;		//!< 是否开始隐藏音量控件
+	int								m_iVolumeCount;			//!< 控制音量控件隐藏的帧数计数器
+
+	int								m_iFrameCount;			//!< 帧数计数器，30帧一循环
+	int								m_iRhythmCount;			//!< 节拍计数器，20一循环
+	qint64							m_iTimeRhythmStart;		//!< 节拍计数开始时间，单位：s
+	qint64							m_iTimeRhythmEnd;		//!< 节拍计数结束时间，单位：s
+
+	uint							m_nKeyMask;
 };

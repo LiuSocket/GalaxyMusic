@@ -31,6 +31,18 @@ protected:
 		const std::string& name = "",
 		bool windowDecoration = false);
 
+	void enterEvent(QEvent* event);
+
+signals:
+
+	/**
+	* _signalEnter3D
+	* @brief 进入三维界面
+	* @param void
+	* @return void
+	*/
+	void _signalEnter3D();
+
 protected:
 	QTimer _timer;
 };

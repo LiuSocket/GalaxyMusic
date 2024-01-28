@@ -92,6 +92,16 @@ public:
 	void UpdateAudioInfo();
 
 	/**
+	* SetVolumeVisible
+	* 设置是否显示实时变化的音量
+	* @author LiuTao
+	* @since 2022.04.10
+	* @param bVisible 是否显示实时变化的音量
+	* @return void
+	*/
+	void SetVolumeVisible(const bool bVisible);
+
+	/**
 	* SetCursorVisible
 	* 设置鼠标显示/隐藏
 	* @author LiuTao

@@ -40,7 +40,7 @@
   <property name="windowTitle">
    <string>CGMVolumeWidget</string>
   </property>
-  <widget class="QSlider" name="volumeSlider">
+  <widget class="CGMSlider" name="volumeSlider">
    <property name="geometry">
     <rect>
      <x>10</x>
@@ -109,6 +109,13 @@
   <zorder>volumeSlider</zorder>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
+ <customwidgets>
+  <customwidget>
+   <class>CGMSlider</class>
+   <extends>QSlider</extends>
+   <header>GMSlider.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

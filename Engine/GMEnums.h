@@ -239,4 +239,17 @@ namespace GM
 		EGM_KC_Hyper_R				= 0xFFEE,        /* Right hyper */
 		EGM_KC_Max
 	};
+
+	/**
+	* 画面渲染品质
+	*/
+	enum EGMRENDER_QUALITY
+	{
+		/** 低画质 */
+		EGMRENDER_LOW,
+		/** 普通画质 */
+		EGMRENDER_NORMAL,
+		/** 高画质 */
+		EGMRENDER_HIGH,
+	};
 }	// GM

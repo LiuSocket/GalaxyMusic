@@ -118,14 +118,6 @@ bool CGMAudio::SetCurrentAudio(std::wstring& strAudioFile)
 	}
 }
 
-/**
-* MusicControl
-* 音乐播放控制
-* @author LiuTao
-* @since 2021.05.29
-* @param command:	指令类型枚举
-* @return void
-*/
 void CGMAudio::AudioControl(EGMA_COMMAND command)
 {
 	if (!m_bWelcomeEnd) return;
@@ -145,6 +137,9 @@ void CGMAudio::AudioControl(EGMA_COMMAND command)
 		//const char* tag = BASS_ChannelGetTags(m_streamAudio, BASS_TAG_ID3V2);
 		// https://blog.csdn.net/u013401219/article/details/48103315
 		// https://github.com/alkatrazstudio/meson-sound-engine/blob/0e289ad770a892cda7999431ebe51eebbec51ef5/modules/MesonSoundEngine/mse/sources/source_stream.cpp
+
+		m_iAudioCurrentTime = 0;
+		m_iAudioLastTime = 0;
 
 		m_eAudioState = EGMA_STA_MUTE;
 	}
@@ -207,6 +202,11 @@ float CGMAudio::GetLevel()
 	{
 		return 0.0f;
 	}
+
+	//if (m_pConfigData->bWanderingEarth)
+	//{
+	//	return 1.0f;
+	//}
 
 	DWORD level, left, right;
 	level = BASS_ChannelGetLevel(m_streamAudio);

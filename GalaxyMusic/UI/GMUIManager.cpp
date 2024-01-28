@@ -100,7 +100,7 @@ void CGMUIManager::GetScreenSize(int& nWidth, int& nHight)
 /** @brief ¸üÐÂ */
 void CGMUIManager::Update()
 {
-	int a = 0;
+	m_pMainWindow->Update();
 }
 
 void CGMUIManager::SetFullScreen(const bool bFull)
@@ -116,6 +116,11 @@ bool CGMUIManager::GetFullScreen()
 void CGMUIManager::UpdateAudioInfo()
 {
 	m_pMainWindow->UpdateAudioInfo();
+}
+
+void CGMUIManager::SetVolumeVisible(const bool bVisible)
+{
+	m_pMainWindow->SetVolumeVisible(bVisible);
 }
 
 void CGMUIManager::SetCursorVisible(bool bVisible)

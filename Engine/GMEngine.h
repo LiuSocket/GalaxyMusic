@@ -13,7 +13,6 @@
 #pragma once
 #include "GMCommon.h"
 #include "GMKernel.h"
-#include "GMEnums.h"
 #include <random>
 
 /*************************************************************************
@@ -49,9 +48,11 @@ namespace GM
 	/*************************************************************************
 	Class
 	*************************************************************************/
+	class CGMCommonUniform;
 	class CGMDataManager;
 	class CGMGalaxy;
 	class CGMAudio;
+	class CGMPost;
 	class CGMCameraManipulator;
 
 	/*!
@@ -82,17 +83,26 @@ namespace GM
 		bool Load();
 		/** @brief 保存 */
 		bool Save();
+		/** @brief 保存太阳系此刻的信息 */
+		bool SaveSolarData();
+		/**
+		* 修改屏幕尺寸时调用此函数
+		* @param iW: 屏幕宽度
+		* @param iH: 屏幕高度
+		*/
+		void ResizeScreen(const int iW, const int iH);
 
 		/** @brief 开启/关闭编辑模式 */
 		void SetEditMode(const bool bEnable);
+		/** @brief 获取编辑模式，是或否 */
+		bool GetEditMode() const;
+		/** @brief 开启/关闭抓手的悬浮状态 */
+		void SetHandleHover(const bool bHover);
 		/** @brief 开启/关闭捕获功能 */
 		void SetCapture(const bool bEnable);
 
 		/**
-		* SetAudio
 		* @brief 根据坐标选择需要操作的音频
-		* @author LiuTao
-		* @since 2021.05.30
 		* @param fX, fY: 鼠标点击位置的世界空间坐标,单位：米
 		* @return bool 成功true， 失败false
 		*/
@@ -103,138 +113,126 @@ namespace GM
 		bool Pause();
 		/** @brief 停止 */
 		bool Stop();
-		/** @brief 上一首 */
+		/** @brief 查询上一首，但有代价：回到过去观察历史信息，未来便会改变 */
 		bool Last();
 		/** @brief 下一首 */
 		bool Next();
 		/** @brief 设置音量，0.0-1.0 */
-		bool SetVolume(float fVolume);
+		bool SetVolume(const float fVolume);
 		/** @brief 获取音量，0.0-1.0 */
-		float GetVolume();
+		float GetVolume() const;
 		/**
-		* SetPlayMode
 		* @brief 设置播放模式
-		* @author LiuTao
-		* @since 2021.10.24
 		* @param eMode:			播放模式（单曲循环、随机播放、列表循环等）
 		* @return bool：		成功true， 失败false
 		*/
 		bool SetPlayMode(EGMA_MODE eMode);
 		/**
-		* GetPlayMode
-		* @brief 获取播放模式
-		* @author LiuTao
-		* @since 2021.10.24
-		* @param void		
+		* @brief 获取播放模式	
 		* @return EGMA_MODE：	播放模式（单曲循环、随机播放、列表循环等）
 		*/
-		EGMA_MODE GetPlayMode();
+		inline EGMA_MODE GetPlayMode() const
+		{
+			return m_ePlayMode;
+		}
 
 		/**
-		* GetAudioName
-		* 获取当前音频文件名称
-		* @author LiuTao
-		* @since 2021.09.11
-		* @param void
+		* @brief 获取当前音频文件名称
 		* @return std::wstring 当前播放的音频文件名称，含后缀名，未播放则返回 L""
 		*/
-		std::wstring GetAudioName();
+		std::wstring GetAudioName() const;
+
 		/**
-		* SetAudioCurrentTime
 		* @brief 设置音频的播放位置，单位：ms
-		* @author LiuTao
-		* @since 2021.09.05
 		* @param iTime: 音频的播放位置
 		* @return bool 成功true， 失败false
 		*/
-		bool SetAudioCurrentTime(int iTime);
+		bool SetAudioCurrentTime(const int iTime);
 		/**
-		* GetAudioCurrentTime
 		* @brief 获取音频的播放位置，单位：ms
-		* @author LiuTao
-		* @since 2021.09.05
-		* @param void
 		* @return int: 音频的播放位置
 		*/
-		int GetAudioCurrentTime();
-		/**
-		* GetAudioDuration
-		* @brief 获取音频的总时长，单位：ms
-		* @author LiuTao
-		* @since 2021.09.05
-		* @param void
-		* @return int: 音频的总时长
-		*/
-		int GetAudioDuration();
+		int GetAudioCurrentTime() const;
 
 		/**
-		* Welcome
+		* @brief 获取音频的总时长，单位：ms
+		* @return int: 音频的总时长
+		*/
+		int GetAudioDuration() const;
+
+		/**
 		* @brief 开启“欢迎效果”
-		* @brief 每次开启软件，调用此函数以实现“欢迎功能”
-		* @author LiuTao
-		* @since 2021.08.28
-		* @param void
-		* @return void
+		* 每次开启软件，调用此函数以实现“欢迎功能”
 		*/
 		void Welcome();
 		/**
-		* WelcomeFinished
 		* @brief “欢迎效果”是否结束
-		* @author LiuTao
-		* @since 2021.09.11
-		* @param void
 		* @return bool 结束则返回true，否则false
 		*/
-		bool IsWelcomeFinished();
+		bool IsWelcomeFinished() const;
 
 		/**
-		* SetMousePosition
-		* 将当前鼠标空间层级坐标传入
-		* @author LiuTao
-		* @since 2021.07.04
-		* @param vPos:			当前帧鼠标在当前空间层级下的坐标
+		* @brief 获取音频播放的顺序列表，back位置为最新的音频
+		* @return std::vector<std::wstring>：	音频播放的顺序列表
+		*/
+		const std::vector<std::wstring> GetPlayingOrder() const;
+
+		/**
+		* @brief 将当前鼠标空间层级坐标传入
+		* @param vHiePos:		当前帧鼠标在当前空间层级下的坐标
 		* @return void
 		*/
-		void SetMousePosition(const osg::Vec3f& vHierarchyPos);
+		void SetMousePosition(const SGMVector3& vHiePos);
 
 		/**
-		* GetCurrentStarWorldPos
-		* 获取当前播放的音频星世界空间坐标
-		* 由于本产品的特殊性，需要将银河系中心作为宇宙的中心
-		* 这样就不用考虑用double表示恒星在6级空间中的位置的误差问题
-		* 而且为了方便计算，只有银河系中会计算恒星，其他星系都看做一个质点
-		* 规定：恒星的坐标的最小单位长度GM_STAR_POS_MIN = 1e10米（第3层跳跃到第2层时的相机半径是5e11）
-		* 而且这个精度可以在银河系中放置上万亿颗恒星而没有重复感，满足了产品需求
-		* @author LiuTao
-		* @since 2021.07.30
-		* @param void
-		* @return osg::Vec3d	当前播放的音频星世界空间坐标,单位：米
+		* @brief 设置当前播放的恒星显示的音频空间坐标
+		* 注意：不等于 设置恒星数据库中的坐标数据
+		* @param vAudioCoord:	当前播放的恒星的音频空间坐标
+		* @return void
 		*/
-		osg::Vec3d GetCurrentStarWorldPos();
+		void SetCurrentStarAudioCoord(const SGMAudioCoord& vAudioCoord);
 
 		/**
-		* GetGalaxyRadius
-		* 获取星系半径
-		* @author LiuTao
-		* @since 2021.08.22
-		* @param void
+		* @brief 获取当前播放的恒星显示的音频空间坐标
+		* 注意：不一定等于恒星数据库中的坐标数据，有可能正在修改
+		* @return SGMAudioCoord:	当前播放的恒星的音频空间坐标
+		*/
+		SGMAudioCoord GetCurrentStarAudioCoord() const;
+
+		/**
+		* @brief 获取当前播放的音频星世界空间坐标
+		* 由于本产品的特殊性，需要将银河系中心作为宇宙的中心
+		* 这样就不用考虑恒星在6级空间中的位置的误差问题(由double精度不足导致)
+		* 而且为了方便计算，只有银河系中会绘制恒星，其他星系都看做一个质点
+		* @return SGMVector3	当前播放的音频星世界空间坐标,单位：米
+		*/
+		SGMVector3 GetCurrentStarWorldPos() const;
+
+		/**
+		* @brief 获取指定音频的音频空间坐标
+		* 注意：不一定等于恒星数据库中的坐标数据，有可能正在修改
+		* @param strName：			音频文件名
+		* @return SGMAudioCoord:	音频空间坐标
+		*/
+		SGMAudioCoord GetAudioCoord(const std::wstring& strName) const;
+
+		/**
+		* @brief 获取星系半径
 		* @return double		星系半径，单位：米
 		*/
-		double GetGalaxyRadius();
+		inline double GetGalaxyRadius() const
+		{
+			return m_fGalaxyDiameter * 0.5;
+		}
 
 		/**
-		* GetHierarchyTargetDistance
-		* 获取当前层级下的目标点距离
-		* @author LiuTao
-		* @since 2021.10.05
-		* @param void
+		* @brief 获取当前层级下的目标点距离
 		* @return double		目标点距离，单位：当前层级单位
 		*/
-		double GetHierarchyTargetDistance();
+		double GetHierarchyTargetDistance() const;
 
 		/**
-		* GetUnit
-		* 获取当前“空间层级单位”，即一个单位代表多少米,初始值为1e20
+		* @brief 获取当前“空间层级单位”，即一个单位代表多少米,初始值为1e20
 		* 为了实现从 “1.0”米到“1e30”米的无缝穿梭，必须用6个double变量来记录每个空间层级的系统单位
 		* 然后就可以用这些变量整体控制系统所有物体的缩放
 		*
@@ -259,195 +257,234 @@ namespace GM
 		* 可观测宇宙范围：				1e27 米，约为930亿光年
 		* 在这之外，就是我的世界：		1e30 米
 		*
-		* @author LiuTao
-		* @since 2021.09.11
 		* @param void					如果输入为空，则认为输入的是当前空间层级编号
 		* @param iHierarchy				空间层级的层级编号
 		* @return double				输入的空间层级的“空间层级单位”
 		*/
-		inline double GetUnit()
+		inline double GetUnit() const
 		{
 			return m_pKernelData->fUnitArray->at(m_pKernelData->iHierarchy);
 		}
-		double GetUnit(int iHierarchy);
+		double GetUnit(const int iHierarchy) const;
 
 		/**
-		* GetHierarchyLastEyePos
-		* 获取当前空间层级跳跃前的最后时刻的眼点空间坐标
-		* 为了实现从 “1.0”米到“1e30”米的无缝穿梭，必须用14个Vec3d记录眼点和目标点在7个空间层级中进出时的空间坐标
-		* 然后用这些坐标整体控制当前空间层级所有物体的平移
-		* 每隔5个数量级，跳变一次，即改变一次系统原点；只要6次跳变，就可以遨游整个宇宙
-		* 在本系统中，宇宙分为6级空间，0级-6级，0级是人类尺度，6级是整个宇宙，级数编号越大，级数单位越大
-		* @author LiuTao
-		* @since 2021.09.25
-		* @param iHierarchy:			层级编号，-1则表示当前层级
-		* @return Vec3d：				眼点在该空间层级跳跃前的最后时刻的空间坐标，初始时全为(1,1,1)
-		*/
-		osg::Vec3d GetHierarchyLastEyePos(int iHierarchy = -1);
-
+		* @brief 获取小一级的空间层级“上方向向量”在当前空间层级坐标系下的向量值
+		* @param vX,vY,vZ:			归一化的X/Y/Z单位向量
+		* @return bool:				成功true，失败false */
+		bool GetSmallerHierarchyCoord(SGMVector3& vX, SGMVector3& vY, SGMVector3& vZ) const;
 		/**
-		* GetHierarchyLastTargetPos
-		* 获取当前空间层级跳跃前的最后时刻的目标点空间坐标
-		* @author LiuTao
-		* @since 2021.09.25
-		* @param iHierarchy:			层级编号，-1则表示当前层级
-		* @return Vec3d:				目标点在该空间层级跳跃前的最后时刻的空间坐标，初始时全为0
-		*/
-		osg::Vec3d GetHierarchyLastTargetPos(int iHierarchy = -1);
-
+		* 获取大一级的空间层级“上方向向量”在当前空间层级坐标系下的向量值
+		* @param vX,vY,vZ:			归一化的X/Y/Z单位向量
+		* @return bool:				成功true，失败false */
+		bool GetBiggerHierarchyCoord(SGMVector3& vX, SGMVector3& vY, SGMVector3& vZ) const;
 		/**
-		* GetHierarchy
-		* 获取当前空间层级的层级编号
+		* @brief 获取当前空间层级的层级编号
 		* 在本系统中，宇宙分为6级空间，0级-6级，0级是人类尺度，6级是整个宇宙
-		* @author LiuTao
-		* @since 2021.09.12
-		* @param void
 		* @return int				当前空间层级的层级编号
 		*/
-		inline int GetHierarchy()
+		inline int GetHierarchy() const
 		{
 			return m_pKernelData->iHierarchy;
 		}
 		/**
-		* AddHierarchy
-		* 将当前空间层级的层级编号+1，只能在 0-6 范围内
+		* @brief 将当前空间层级的层级编号+1，只能在 0-6 范围内
 		* 同时，必须传入眼点在当前空间层级下的空间坐标
-		* 用来计算上一层级空间的位置，以及记录以后原路返回该空间时的位置
+		* 用来计算升一级空间的位置，以及记录以后返回该空间时的位置
 		* 在本系统中，宇宙分为6级空间，0级-6级，0级是人类尺度，6级是整个宇宙
-		* @author LiuTao
-		* @since 2021.09.12
 		* @param vHierarchyEyePos:		当前空间层级下，眼点在层级跃迁时的空间坐标
 		* @param vHierarchyTargetPos:	当前空间层级下，目标点在层级跃迁时的空间坐标
 		* @return bool					成功true，如果已到6则false
 		*/
-		bool AddHierarchy(const osg::Vec3d& vHierarchyEyePos, const osg::Vec3d& vHierarchyTargetPos);
+		bool AddHierarchy(const SGMVector3& vHierarchyEyePos, const SGMVector3& vHierarchyTargetPos);
 		/**
-		* SubHierarchy
-		* 将当前空间层级的层级编号-1，只能在 0-6 范围内
+		* @brief 将当前空间层级的层级编号-1，只能在 0-6 范围内
 		* 同时，必须传入眼点和目标点在当前空间层级下的空间坐标
-		* 用来计算下一层级空间的位置，以及记录以后原路返回该空间时的位置
-		* 目标点空间坐标分两种情况考虑：
-		* 1.当前空间层级为0、1、2、3、4时，子空间原点就是当前空间的目标点
-		* 2.当前空间层级为5、6时，子空间原点 == 当前空间原点 == (0,0,0)
+		* 用来计算降一级空间的位置，以及记录以后返回该空间时的位置
+		* 目标点空间坐标分多种情况考虑：
+		* 1.当前空间层级为0、1时 to do
+		* 2.当前空间层级为2时，子空间原点就是当前最近天体的坐标
+		* 3.当前空间层级为4时，子空间原点就是当前最近恒星的坐标
+		* 4.当前空间层级为3、5、6时，子空间原点 == 当前空间原点 == (0,0,0)
 		* 在本系统中，宇宙分为6级空间，0级-6级，0级是人类尺度，6级是整个宇宙
-		* @author LiuTao
-		* @since 2021.09.12
 		* @param vHierarchyEyePos:		当前空间层级下，眼点在层级跃迁时的空间坐标
 		* @param vHierarchyTargetPos:	当前空间层级下，目标点在层级跃迁时的空间坐标
 		* @return bool					成功true，如果已到0则false
 		*/
-		bool SubHierarchy(const osg::Vec3d& vHierarchyEyePos, const osg::Vec3d& vHierarchyTargetPos);
+		bool SubHierarchy(const SGMVector3& vHierarchyEyePos, const SGMVector3& vHierarchyTargetPos);
+		/**
+		* @brief 获取任意向量在升级后空间下的向量
+		* @param vBefore:			该向量在升级前的空间下的值
+		* @return SGMVector4:		输入的向量在升级后空间下的值
+		*/
+		SGMVector3 AfterAddHierarchy(const SGMVector4& vBefore) const;
+		/**
+		* @brief 获取任意向量在降级后空间下的向量
+		* @param vBefore:		该向量在降级前的空间下的值
+		* @return SGMVector4:		输入的向量在降级后空间下的值
+		*/
+		SGMVector3 AfterSubHierarchy(const SGMVector4& vBefore) const;
+		/**
+		* @brief 获取查询位置附近最近的一颗天体（行星或恒星）的位置
+		* @param vSearchHiePos 查询位置，当前空间层级坐标系
+		* @param vPlanetHiePos 返回最近的天体位置，当前空间层级坐标系
+		* @param fOrbitalPeriod 返回此行星公转轨道周期，单位：秒
+		* @return bool 第3层级空间下，点击位置附近有天体则true，否则false
+		*/
+		bool GetNearestCelestialBody(const SGMVector3& vSearchHiePos,
+			SGMVector3& vPlanetHiePos, double& fOrbitalPeriod) const;
+		/**
+		* @brief 获取目标点附近最近的天体（行星或恒星）的位置
+		* @param vPlanetPos 返回最近的天体位置，单位：米
+		* @param fOrbitalPeriod 返回此行星公转轨道周期，单位：秒
+		*/
+		void GetCelestialBody(SGMVector3& vPlanetPos, double& fOrbitalPeriod) const;
 
 		/**
-		* Hierarchy2World
-		* 层级空间坐标转世界空间坐标，由于double精度不够，会有误差
-		* @author LiuTao
-		* @since 2021.09.19
-		* @param vHierarchy：		层级空间坐标
-		* @return osg::Vec3d：		世界空间坐标
+		* @brief 获取目标点附近最近的天体（行星或恒星）的平均半径
+		* @return double 天体平均半径，单位：米
 		*/
-		osg::Vec3d Hierarchy2World(osg::Vec3d vHierarchy);
+		double GetCelestialMeanRadius() const;
+		/**
+		* @brief 获取目标点附近最近的天体（行星或恒星）的指定纬度的海平面与球心距离
+		* @param fLatitude 纬度，单位：°，范围：[-90.0, 90.0]
+		* @return double 指定纬度的海平面与球心距离，单位：米
+		*/
+		double GetCelestialRadius(const double fLatitude) const;
+		/**
+		* @brief 获取目标点附近最近的天体（行星或恒星）的北极轴（当前层级空间下）
+		* @return SGMVector3 北极轴（当前层级空间下）
+		*/
+		SGMVector3 GetCelestialNorth() const;
 
 		/**
-		* StarWorld2Hierarchy
-		* 恒星的世界空间坐标转层级空间坐标，只能用于恒星坐标计算
-		* 恒星的世界空间坐标最小距离为1e10,且只计算银河系内的恒星
-		* 所以用double可以精确表示每颗恒星的世界空间坐标
-		* @author LiuTao
-		* @since 2021.09.19
-		* @param vStarWorldPos：	恒星的世界空间坐标
-		* @return osg::Vec3d：		层级空间坐标
+		* @brief 获取目标点附近最近的天体（行星或恒星）在本恒星系中的索引
+		* @return unsigned int 0代表恒星，1代表公转轨道半径最小的天体
 		*/
-		osg::Vec3d StarWorld2Hierarchy(osg::Vec3d vStarWorldPos);
+		unsigned int GetCelestialIndex() const;
+
+		/**
+		* @brief 获取最近的恒星在银河系坐标系（4级空间的世界坐标系）的位置
+		* @author LiuTao
+		* @since 2023.01.16
+		* @param void:
+		* @return SGMVector3:		最近的恒星在银河系坐标系（4级空间的世界坐标系）的位置
+		*/
+		SGMVector3 GetNearStarWorldPos() const;
+
+		/**
+		* Angle2Color const
+		* 星音乐的“情绪角度”转“颜色”。
+		* @author LiuTao
+		* @since 2022.09.04
+		* @param fEmotionAngle：	情绪角度，[0.0,2*PI)
+		* @return SGMVector4f：		星音乐类型对应的颜色,[0.0,1.0]
+		*/
+		SGMVector4f Angle2Color(const float fEmotionAngle) const;
 
 		/** @brief 创建视口(QT:QWidget) */
 		CGMViewWidget* CreateViewWidget(QWidget* parent);
 
-		/** @brief 获取音频数据管理类 */
-		inline CGMDataManager* GetDataManager() { return m_pDataManager; }
-
 	private:
 		/**
-		* _Next
-		* 播放下一首
-		* @author LiuTao
-		* @since 2021.07.23
-		* @param void
-		* @return void
+		* @brief 加载配置
 		*/
-		void _Next(EGMA_MODE eMode);
-
+		bool _LoadConfig();
 		/**
-		* _InnerUpdate
-		* 间隔更新
-		* @author LiuTao
-		* @since 2021.07.04
+		* @brief 初始化背景相关节点
+		*/
+		void _InitBackground();
+		/**
+		* @brief 初始化前景相关节点
+		*/
+		void _InitForeground();
+		/**
+		* @brief 播放下一首
+		*/
+		void _Next(const EGMA_MODE eMode);
+		/**
+		* @brief 间隔更新，一秒钟更新10次
 		* @param updateStep 两次间隔更新的时间差，单位s
-		* @return void
 		*/
-		void _InnerUpdate(float updateStep);
-
+		void _InnerUpdate(const float updateStep);
+		/** @brief 更新(在主相机更新姿态之后) */
+		bool _UpdateLater(const double dDeltaTime);
 		/**
-		* _World2GalaxyCoord
 		* @brief 世界空间坐标 转 银河空间坐标
-		* @author LiuTao
-		* @since 2021.06.22
 		* @param fX, fY: 世界空间坐标
 		* @param &fGalaxyX, &fGalaxyY: 银河空间坐标[-1,1]
 		* @return bool 成功true， 失败false
 		*/
-		bool _World2GalaxyCoord(const double fX, const double fY, double& fGalaxyX, double& fGalaxyY);
-
+		bool _World2GalaxyCoord(const double fX, const double fY, double& fGalaxyX, double& fGalaxyY) const;
 		/**
-		* _World2GalaxyCoord
 		* @brief 银河空间坐标 转 世界空间坐标
-		* @author LiuTao
-		* @since 2021.07.04
 		* @param fGalaxyX, fGalaxyY: 银河空间坐标[-1,1]
 		* @param &fX, &fY: 如果成功，则代表世界空间坐标
 		* @return bool 成功true， 失败false
 		*/
-		bool _GalaxyCoord2World(const double fGalaxyX, const double fGalaxyY, double& fX, double& fY);
+		bool _GalaxyCoord2World(const double fGalaxyX, const double fGalaxyY, double& fX, double& fY) const;
 
 		/**
-		* _StarCoord2World
-		* @brief 星辰坐标 转 世界空间坐标
-		* @author LiuTao
-		* @since 2021.07.04
-		* @param starCoord: 星辰坐标
-		* @param &fX, &fY: 如果成功，则代表世界空间坐标
-		* @return bool 成功true， 失败false
+		* @brief 获取任意向量在升级后空间下的向量
+		* @param vBefore:			该向量在升级前的空间下的值
+		* @return osg::Vec3d:		输入的点在升级后空间下的值
 		*/
-		bool _StarCoord2World(const SGMStarCoord& starCoord, double& fX, double& fY);
-
+		osg::Vec3d _AfterAddHierarchy(const osg::Vec4d& vBefore) const;
 		/**
-		* _UpdateScenes
+		* @brief 获取任意向量在降级后空间下的向量
+		* @param vBefore:			该向量在降级前的空间下的值
+		* @return osg::Vec3d:		输入的向量在降级后空间下的值
+		*/
+		osg::Vec3d _AfterSubHierarchy(const osg::Vec4d& vBefore) const;
+		/**
 		* @brief 由于空间层级变化而更新场景
-		* @author LiuTao
-		* @since 2021.09.15
-		* @param void
-		* @return void
 		*/
 		void _UpdateScenes();
+		/**
+		* @brief 更新相机远近截面
+		*/
+		void _UpdateNearFar();
+		/**
+		* @brief 混合函数,参考 glsl 中的 mix(a,b,x)
+		* @param fMin, fMax:			范围
+		* @param fX:					混合系数
+		* @return double:				混合后的值
+		*/
+		inline double _Mix(const double fMin, const double fMax, const double fX)
+		{
+			return fMin * (1 - fX) + fMax * fX;
+		}
+		/**
+		* @brief SGMVector3 转 osg::Vec3d
+		* @param vGM:				输入的GM向量
+		* @return osg::Vec3d:		输出的osg向量 */
+		inline SGMVector3 _OSG2GM(const osg::Vec3d& vOSG) const
+		{
+			return SGMVector3(vOSG.x(), vOSG.y(), vOSG.z());
+		}
 
 		// 变量
 	private:
 
 		SGMKernelData*						m_pKernelData;				//!< 内核数据
 		SGMConfigData*						m_pConfigData;				//!< 配置数据
+		CGMCommonUniform*					m_pCommonUniform;			//!< 公用Uniform
 		CGMDataManager*						m_pDataManager;				//!< 数据管理模块
 		CGMCameraManipulator*				m_pManipulator;				//!< 相机操作器
 
 		bool								m_bInit;					//!< 初始化标志
-		bool								m_bDirty;					//!< 脏标记
 		double								m_dTimeLastFrame;			//!< 上一帧时间
 		float								m_fDeltaStep;				//!< 单位s
 		float								m_fConstantStep;			//!< 等间隔更新的时间,单位s
 		double								m_fGalaxyDiameter;			//!< 星系直径，单位：米
 		CGMGalaxy*							m_pGalaxy;					//!< 星系模块
 		CGMAudio*							m_pAudio;					//!< 音频模块
-		EGMA_MODE							m_ePlayMode;				//!< 当前播放模式
+		CGMPost*							m_pPost;					//!< 后期模块
 
+		EGMA_MODE							m_ePlayMode;				//!< 当前播放模式
 		std::default_random_engine			m_iRandom;
+
+		osg::ref_ptr<osg::Texture2D>		m_pSceneTex;				//!< 主场景颜色图
+		osg::ref_ptr<osg::Texture2D>		m_pBackgroundTex;			//!< 背景颜色图
+		osg::ref_ptr<osg::Texture2D>		m_pForegroundTex;			//!< 前景颜色图
 	};
 }	// GM

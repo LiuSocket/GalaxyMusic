@@ -111,30 +111,19 @@ namespace GM
 		}
 
 		/**
-		* AudioControl
-		* 音频播放控制
-		* @author LiuTao
-		* @since 2021.05.29
+		* @brief 音频播放控制
 		* @param command:	指令类型枚举
-		* @return void
 		*/
 		void AudioControl(EGMA_COMMAND command);
 
 		/**
-		* IsAudioOver
-		* 判断音频是否播放完毕
-		* @author LiuTao
-		* @since 2021.05.29
-		* @param 无
+		* @brief 判断音频是否播放完毕
 		* @return bool 完毕返回true，未完毕返回false
 		*/
 		bool IsAudioOver();
 
 		/**
-		* SetVolume
-		* 设置音量（注意，和瞬时振幅值不是一个概念）
-		* @author LiuTao
-		* @since 2021.10.23
+		* @brief 设置音量（注意，和瞬时振幅值不是一个概念）
 		* @param fLevel 音量 [0.0f,1.0f]
 		* @return bool 合法返回true，不合法或失败返回false
 		*/

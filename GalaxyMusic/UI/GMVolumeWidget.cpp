@@ -34,7 +34,7 @@ int CGMVolumeWidget::GetVolume()
 	return ui.volumeSlider->value();
 }
 
-void CGMVolumeWidget::leaveEvent(QEvent *)
+void CGMVolumeWidget::leaveEvent(QEvent* event)
 {
 	hide();
 }

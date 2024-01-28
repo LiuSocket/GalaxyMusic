@@ -42,6 +42,7 @@ CGMViewWidget::CGMViewWidget(osgViewer::View* pView,QWidget* parent, Qt::WindowF
 	camera->setViewport(new osg::Viewport(0, 0, traits->width, traits->height));
 	camera->setProjectionMatrixAsPerspective(40.0, static_cast<double>(traits->width) / static_cast<double>(traits->height), 0.0003, 30.0);
 	camera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+	camera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
 }
 
 CGMViewWidget::~CGMViewWidget()
@@ -70,4 +71,9 @@ osgQt::GraphicsWindowQt* CGMViewWidget::createGraphicsWindow(
 	traits->samples = ds->getNumMultiSamples();
 
 	return new osgQt::GraphicsWindowQt(traits.get());
+}
+
+void CGMViewWidget::enterEvent(QEvent* event)
+{
+	emit _signalEnter3D();
 }

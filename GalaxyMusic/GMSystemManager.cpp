@@ -14,10 +14,11 @@
 #include "UI/GMUIManager.h"
 
 #include <thread>
-#include <QtWidgets/QDesktopWidget>
-#include <QtWidgets/QApplication>
+#include <QDesktopWidget>
+#include <QApplication>
 #include <QSettings>
 #include <QTextCodec>
+#include <QDatetime.h>
 #include <QKeyEvent>
 
 using namespace GM;
@@ -33,7 +34,10 @@ CGMSystemManager Methods
 *************************************************************************/
 
 CGMSystemManager::CGMSystemManager()
-	: m_bInit(false), m_bFirst(true), m_iFrameCount(0), m_nKeyMask(0)
+	: m_bInit(false), m_bFirst(true),
+	m_bVolumeHiding(false), m_iVolumeCount(0),
+	m_iFrameCount(0), m_iRhythmCount(0),
+	m_iTimeRhythmStart(0), m_iTimeRhythmEnd(20), m_nKeyMask(0)
 {
 }
 
@@ -74,7 +78,7 @@ bool CGMSystemManager::Init()
 	GM_UI_MANAGER_PTR->Init();
 
 	// 启动定时器
-	startTimer(10);
+	startTimer(8);
 
 	m_bInit = true;
 	return true;
@@ -106,6 +110,64 @@ bool CGMSystemManager::GMKeyDown(EGMKeyCode eKC)
 		GM_UI_MANAGER_PTR->SetFullScreen(false);
 	}
 	break;
+	case EGMKeyCode::EGM_KC_F7:
+	{
+		if (GM_ENGINE_PTR->GetEditMode())
+		{
+			m_iRhythmCount = 0;
+		}
+	}
+	break;
+	case EGMKeyCode::EGM_KC_F8:
+	{
+		if (GM_ENGINE_PTR->GetEditMode())
+		{
+			if (m_iRhythmCount < 20 && m_iRhythmCount >= 0)
+			{
+				if (0 == m_iRhythmCount)
+				{
+					m_iTimeRhythmStart = QDateTime::currentDateTime().currentMSecsSinceEpoch()/1000;
+				}
+				m_iRhythmCount++;
+			}
+			else if(m_iRhythmCount >= 20)// 满20个节拍（周期）
+			{
+				m_iTimeRhythmEnd = QDateTime::currentDateTime().currentMSecsSinceEpoch()/1000;
+				double fBPM = 60 / ((m_iTimeRhythmEnd - m_iTimeRhythmStart) / 20);
+				SGMAudioCoord vAudioCoord = GM_ENGINE_PTR->GetCurrentStarAudioCoord();
+				vAudioCoord.BPM = fBPM;
+				GM_ENGINE_PTR->SetCurrentStarAudioCoord(vAudioCoord);
+				m_iRhythmCount = -1;
+			}		
+		}
+	}
+	break;
+	case EGMKeyCode::EGM_KC_Up:
+	case EGMKeyCode::EGM_KC_Down:
+	{
+		m_bVolumeHiding = false;
+		m_iVolumeCount = 0;
+		GM_UI_MANAGER_PTR->SetVolumeVisible(true);
+		if (EGM_KC_Up == eKC)
+		{
+			GM_ENGINE_PTR->SetVolume(GM_ENGINE_PTR->GetVolume() + 0.057);
+		}
+		else
+		{
+			GM_ENGINE_PTR->SetVolume(GM_ENGINE_PTR->GetVolume() - 0.057);
+		}
+	}
+	break;
+	case EGMKeyCode::EGM_KC_Left:
+	{
+		GM_ENGINE_PTR->Last();
+	}
+	break;
+	case EGMKeyCode::EGM_KC_Right:
+	{
+		GM_ENGINE_PTR->Next();
+	}
+	break;
 	}
 	return true;
 }
@@ -113,7 +175,16 @@ bool CGMSystemManager::GMKeyDown(EGMKeyCode eKC)
 /** @brief 键盘按键弹起事件 */
 bool CGMSystemManager::GMKeyUp(EGMKeyCode eKC)
 {
-	return false;
+	switch (eKC)
+	{
+	case EGMKeyCode::EGM_KC_Up:
+	case EGMKeyCode::EGM_KC_Down:
+	{
+		m_bVolumeHiding = true;
+	}
+	break;
+	}
+	return true;
 }
 
 void CGMSystemManager::SetCursorVisible(bool bVisible)
@@ -140,6 +211,17 @@ void CGMSystemManager::timerEvent(QTimerEvent *event)
 		}
 
 		m_iFrameCount = 0;
+	}
+
+	if (m_bVolumeHiding)
+	{
+		m_iVolumeCount++;
+		if (60 <= m_iVolumeCount)
+		{
+			m_iVolumeCount = 0;
+			m_bVolumeHiding = false;
+			GM_UI_MANAGER_PTR->SetVolumeVisible(false);
+		}
 	}
 
 	_Render();

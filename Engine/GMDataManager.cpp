@@ -12,12 +12,23 @@
 
 #include "GMDataManager.h"
 #include "GMXml.h"
+#include "GMKit.h"
+#include <osgDB/ReadFile>
 #include <io.h>
-
 using namespace GM;
 
 /*************************************************************************
+ Macro Defines
+*************************************************************************/
+#define GM_LIST_MAX					(50)	// 最近播放列表的最大长度
+#define LUT_WIDTH					8192	// 查找表的最大宽度
+
+/*************************************************************************
 Structs
+*************************************************************************/
+
+/*************************************************************************
+Class
 *************************************************************************/
 
 /*************************************************************************
@@ -26,25 +37,11 @@ CGMDataManager Methods
 
 /** @brief 构造 */
 CGMDataManager::CGMDataManager() :
-	m_pConfigData(nullptr),
-	m_strAudioPath(L"Music/"), m_strAudioName(L""),
+	m_pKernelData(nullptr), m_pConfigData(nullptr),
+	m_strAudioPath(L"Music/"), m_strCurrentAudio(L""),
 	m_formatVector({ L"mp3", L"wma", L"wav", L"ogg" }),
-	m_vOffsetVector({ osg::Vec2i(0,0),
-		osg::Vec2i(1,0), osg::Vec2i(-1,0), osg::Vec2i(0,1), osg::Vec2i(0,-1),
-		osg::Vec2i(1,1), osg::Vec2i(-1,-1), osg::Vec2i(-1,1), osg::Vec2i(1,-1),
-		osg::Vec2i(2,0), osg::Vec2i(-2,0), osg::Vec2i(0,2), osg::Vec2i(0,-2), 
-		osg::Vec2i(2,1), osg::Vec2i(-2,-1), osg::Vec2i(-1,2), osg::Vec2i(1,-2), 
-		osg::Vec2i(2,-1), osg::Vec2i(-2,1), osg::Vec2i(-1,-2), osg::Vec2i(1,2), 
-		osg::Vec2i(2,2), osg::Vec2i(-2,-2), osg::Vec2i(2,-2), osg::Vec2i(-2,2), 
-		osg::Vec2i(3,0), osg::Vec2i(-3,0), osg::Vec2i(0,3), osg::Vec2i(0,-3), 
-		osg::Vec2i(3,1), osg::Vec2i(-3,-1), osg::Vec2i(-1,3), osg::Vec2i(1,-3), 
-		osg::Vec2i(3,-1), osg::Vec2i(-3,1), osg::Vec2i(1,3), osg::Vec2i(-1,-3),
-		osg::Vec2i(4,0), osg::Vec2i(-4,0), osg::Vec2i(0,4), osg::Vec2i(0,-4),
-		osg::Vec2i(3,2), osg::Vec2i(-3,-2), osg::Vec2i(-2,3), osg::Vec2i(2,-3),
-		osg::Vec2i(2,3), osg::Vec2i(-2,-3), osg::Vec2i(-3,2), osg::Vec2i(3,-2),
-		osg::Vec2i(4,1), osg::Vec2i(-4,-1), osg::Vec2i(-1,4), osg::Vec2i(1,-4),
-		osg::Vec2i(4,-1), osg::Vec2i(-4,1), osg::Vec2i(-1,-4), osg::Vec2i(1,4)
-		})
+	m_iFreeUID(1),
+	m_pAudioNumUniform(new osg::Uniform("audioNum", 4096.0f))
 {
 }
 
@@ -55,33 +52,283 @@ CGMDataManager::~CGMDataManager()
 }
 
 /** @brief 初始化 */
-bool CGMDataManager::Init(SGMConfigData * pConfigData)
+bool CGMDataManager::Init(SGMKernelData* pKernelData, SGMConfigData * pConfigData)
 {
+	m_pKernelData = pKernelData;
 	m_pConfigData = pConfigData;
 
 	// 读取已经保存的音频坐标
 	_RefreshAudioCoordinates();
 	// 扫描Data/Media/Music路径下所有支持的音频文件，并将文件名保存在m_fileVector中
 	_RefreshAudioFiles();
+
+	// 读取已经保存的音频播放顺序
+	_LoadPlayingOrder();
+
+	// 初始化compute shader
+	_InitComputeNearUID();
+
+	return true;
+}
+
+bool CGMDataManager::Update(double dDeltaTime)
+{
+	if (m_pNearComputeNode->getDirty())
+	{
+		if (!(GM_Root->containsNode(m_pReadPixelCam.get())))
+		{
+			GM_Root->addChild(m_pReadPixelCam.get());
+		}
+		m_pNearComputeNode->setDirty(false);
+		m_pReadPixelFinishCallback->SetReady(true);
+	}
+	if (m_pReadPixelFinishCallback->GetWritten())
+	{
+		GM_Root->removeChild(m_pReadPixelCam.get());
+	}
 	return true;
 }
 
 /** @brief 保存 */
 bool CGMDataManager::Save()
 {
-	return _SaveAudioCoordinates();
+	//_SaveAudioCoordinates();
+	return SavePlayingOrder();
 }
 
-bool CGMDataManager::GetStarCoordVector(std::vector<SGMStarCoord>& coordV)
+bool CGMDataManager::GetAudioDataMap(std::map<unsigned int, SGMAudioData>& dataMap)
 {
-	coordV = m_storedCoordVector;
+	dataMap = m_audioDataMap;
 	return true;
 }
 
 bool CGMDataManager::FindAudio(const std::wstring & strName)
 {
-	auto itr = std::find(m_storedNameVector.begin(), m_storedNameVector.end(), strName);
-	if (itr != m_storedNameVector.end())
+	for (auto itr : m_audioDataMap)
+	{
+		if (strName == itr.second.name)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool CGMDataManager::FindAudio(double& fX, double& fY, double& fZ, std::wstring& strName)
+{
+	if (m_pNearUIDImage.valid())
+	{
+		unsigned int iWidth = m_pNearUIDImage->s();
+		unsigned int iHeight = m_pNearUIDImage->t();
+		unsigned int s = osg::clampBetween(fX * 0.5 + 0.5, 0.0, 1.0) * iWidth;
+		unsigned int t = osg::clampBetween(fY * 0.5 + 0.5, 0.0, 1.0) * iHeight;
+
+		float fR = m_pNearUIDImage->getColor(s, t).r();
+		float fG = m_pNearUIDImage->getColor(s, t).g();
+		float fB = m_pNearUIDImage->getColor(s, t).b();
+		float fA = m_pNearUIDImage->getColor(s, t).a();
+
+		if (1.0f > fA) // 屏蔽掉太远的音频星
+		{
+			int iUID = (fR + (fG + fB * 255) * 255) * 255;
+			auto itr = m_audioDataMap.find(iUID);
+			if (itr != m_audioDataMap.end())
+			{
+				SGMGalaxyCoord sGC = itr->second.galaxyCoord;
+				// 修改fX,fY,fZ的值
+				fX = sGC.x;
+				fY = sGC.y;
+				fZ = sGC.z;
+				m_strCurrentAudio = itr->second.name;
+				// 查询到这个音频名称后，更新播放顺序列表和历史记录
+				_UpdateAudioList(m_strCurrentAudio);
+				strName = m_strCurrentAudio;
+				return true;
+			}
+		}
+	}
+
+	strName = L"";
+	return false;
+}
+
+std::wstring CGMDataManager::FindAudio(const unsigned int iUID)
+{
+	auto itr = m_audioDataMap.find(iUID);
+	if (itr != m_audioDataMap.end())
+	{
+		m_strCurrentAudio = itr->second.name;
+		// 查询到这个音频名称后，更新播放顺序列表和历史记录
+		_UpdateAudioList(m_strCurrentAudio);
+		return m_strCurrentAudio;
+	}
+	return L"";
+}
+
+std::wstring CGMDataManager::GetLastAudio()
+{
+	// 如果只有一个音频，或者没有音频，则返回空字符串
+	if (L"" == m_strCurrentAudio || 2 > m_historyList.size())
+	{
+		return L"";
+	}
+
+	auto itr = m_historyList.end();
+	itr--; itr--;
+	m_strCurrentAudio = itr->data();
+
+	// 一旦回到过去观察历史信息，未来便会改变
+	m_historyList.pop_back();
+	return itr->data();
+}
+
+int CGMDataManager::GetCurrentAudioID() const
+{
+	if (L"" == m_strCurrentAudio || m_playingOrder.empty())
+	{
+		return -1;
+	}
+
+	int i = 0;
+	for (auto itr = m_audioDataMap.begin();
+		itr != m_audioDataMap.end();
+		itr++, i++)
+	{
+		if (m_strCurrentAudio == itr->second.name)
+		{
+			return i;
+		}
+	}
+	return 0;
+}
+
+osg::Vec4f CGMDataManager::GetAudioColor(const SGMAudioCoord& audioCoord) const
+{
+	return Angle2Color(audioCoord.angle);
+}
+
+osg::Vec4f CGMDataManager::GetAudioColor(const unsigned int iUID) const
+{
+	//if (m_pConfigData->bWanderingEarth)
+	//{
+	//	return osg::Vec4f(1.0, 0.9, 0.1, 1.0);
+	//}
+
+	auto itr = m_audioDataMap.find(iUID);
+	if (itr != m_audioDataMap.end())
+	{
+		return GetAudioColor(itr->second.audioCoord);
+	}
+	return osg::Vec4f(1, 1, 1, 1);
+}
+
+osg::Vec4f CGMDataManager::Angle2Color(const float fEmotionAngle) const
+{
+	// 0.0f - 1.0f
+	float fAngle = fmod(fEmotionAngle / (2.0f * osg::PI), 1.0f);
+	return osg::Vec4f(
+		osg::clampBetween(std::abs(4.0f * fAngle - 2.5f) - 0.5f, 0.0f, 1.0f),
+		osg::clampBetween(1.5f - std::abs(4.0f * fAngle - 1.5f), 0.0f, 1.0f),
+		1.0f - osg::clampBetween(std::abs(4.0f*fAngle - 3.0f), 0.0f, 1.0f),
+		1);
+}
+
+unsigned int CGMDataManager::GetUID() const
+{
+	if (L"" == m_strCurrentAudio)
+	{
+		return 0;
+	}
+	else
+	{
+		return GetUID(m_strCurrentAudio);
+	}
+}
+
+unsigned int CGMDataManager::GetUID(const std::wstring& strName) const
+{
+	for (auto itr : m_audioDataMap)
+	{
+		if (strName == itr.second.name)
+		{
+			return itr.second.UID;
+		}
+	}
+	return 0;
+}
+
+SGMAudioCoord CGMDataManager::GetAudioCoord(const std::wstring& strName) const
+{
+	for (auto itr : m_audioDataMap)
+	{
+		if (strName == itr.second.name)
+		{
+			return itr.second.audioCoord;
+		}
+	}
+	return SGMAudioCoord();
+}
+
+SGMGalaxyCoord CGMDataManager::GetGalaxyCoord(const std::wstring & strName) const
+{
+	for (auto itr : m_audioDataMap)
+	{
+		if (strName == itr.second.name)
+		{
+			return itr.second.galaxyCoord;
+		}
+	}
+	return SGMGalaxyCoord();
+}
+
+bool CGMDataManager::EditAudioData(SGMAudioData& sData)
+{
+	if (sData.audioCoord.angle < 0.0 ||
+		sData.audioCoord.angle >= (osg::PI*2.0) ||
+		sData.audioCoord.BPM > 600.0 ||
+		sData.audioCoord.BPM < 20.0 ||
+		sData.galaxyCoord.x > 1.0 || sData.galaxyCoord.y > 1.0 || sData.galaxyCoord.z > 1.0 ||
+		sData.galaxyCoord.x < -1.0 || sData.galaxyCoord.y < -1.0 || sData.galaxyCoord.z < -1.0)
+	{
+		return false;
+	}
+
+	// 检查银河坐标和音频坐标是否重合，如果有任何一个重合就做相应修改
+	auto iter = m_audioDataMap.begin();
+	while (iter != m_audioDataMap.end())
+	{
+		if ((sData.galaxyCoord == iter->second.galaxyCoord) || (sData.audioCoord == iter->second.audioCoord))
+		{
+			// 存在重合
+			if (sData.galaxyCoord == iter->second.galaxyCoord)
+			{
+				sData.galaxyCoord.z += fmod(sData.galaxyCoord.z + 1.011f, 2.0f) - 1.0f;
+			}
+			if (sData.audioCoord == iter->second.audioCoord)
+			{
+				sData.audioCoord.rank += 1;
+			}
+			// 回到开始，重新检查是否重合
+			iter = m_audioDataMap.begin();
+		}
+		else
+		{
+			iter++;
+		}
+	}
+
+	bool bExist = false;
+	for (auto& itr : m_audioDataMap)
+	{
+		if (sData.name == itr.second.name)
+		{
+			itr.second = sData;
+			bExist = true;
+			break;
+		}
+	}
+
+	if (bExist)
 	{
 		return true;
 	}
@@ -91,215 +338,166 @@ bool CGMDataManager::FindAudio(const std::wstring & strName)
 	}
 }
 
-std::wstring CGMDataManager::FindAudio(double& fX, double& fY, double& fZ)
+bool CGMDataManager::SavePlayingOrder() const
 {
-	int iX = fX * GM_COORD_MAX;
-	int iY = fY * GM_COORD_MAX;
-	for (auto offsetItr : m_vOffsetVector)
+	CGMXml aXML;
+	aXML.Create(m_pConfigData->strCorePath + "Users/AudioPlayingOrder.xml", "Order");
+	for (auto &itr : m_playingOrder)
 	{
-		SGMStarCoord starCoord(iX + offsetItr.x(), iY + offsetItr.y(), 0);
-		auto itr = m_audioDataMap.find(starCoord);
-		if (itr != m_audioDataMap.end())
-		{
-			fX = double(starCoord.x) / GM_COORD_MAX;
-			fY = double(starCoord.y) / GM_COORD_MAX;
-
-			m_strAudioName = itr->second.name;
-			if (m_playedVector.empty() || m_strAudioName != m_playedVector.back())
-			{
-				m_playedVector.push_back(m_strAudioName);
-			}
-			return m_strAudioName;
-		}
+		CGMXmlNode sNode = aXML.AddChild("Audio");
+		sNode.SetPropWStr("name", itr.c_str());
 	}
-	return L"";
+	return aXML.Save();
 }
 
-std::wstring CGMDataManager::FindAudio(const int iID)
+SGMGalaxyCoord CGMDataManager::AudioCoord2GalaxyCoord(const SGMAudioCoord & audioCoord) const
 {
-	if (iID < m_storedNameVector.size())
-	{
-		m_strAudioName = m_storedNameVector.at(iID);
-		if (m_playedVector.empty() || m_strAudioName != m_playedVector.back())
-		{
-			m_playedVector.push_back(m_strAudioName);
-		}
-		return m_strAudioName;
-	}
-	else
-	{
-		return L"";
-	}
-}
+	double fA = audioCoord.angle + osg::PI*1.25;
 
-std::wstring CGMDataManager::FindLastAudio()
-{
-	if (m_playedVector.empty())
+	SGMGalaxyCoord vGalaxyCoord = SGMGalaxyCoord();
+	vGalaxyCoord.z = 0.01*audioCoord.rank;
+
+	// BPM大于600的音频，我认定为“无节奏音频”，放在银心位置
+	if ((600.0 < audioCoord.BPM) || (m_pConfigData->fMinBPM > audioCoord.BPM))
 	{
-		return L"";
+		vGalaxyCoord.x = 0.1*std::cos(fA);
+		vGalaxyCoord.y = 0.1*std::sin(fA);
+		return vGalaxyCoord;
 	}
 
-	auto itr = std::find(m_playedVector.begin(), m_playedVector.end(), m_strAudioName);
-	if (itr != m_playedVector.end() && itr->data() != m_playedVector.front())
+	/*
+	BPM对应的等角螺线的角坐标：[0, 90]，单位：°，但一定要注意：不是线性关系
+	因为音频BPM主要集中在100附近，所以为了美观，音频BPM和角坐标Theta的“2次开方”成线性关系
+	*/
+	double fRadiusRatio = sqrt(m_pConfigData->fMinBPM / audioCoord.BPM);
+	double fEmotion = fmod(fA / osg::PI, 1.0);
+	double fTheta = fRadiusRatio * osg::PI * 2.5 - fEmotion * osg::PI_2 + osg::PI;
+	if (audioCoord.angle < osg::PI*1.75 && audioCoord.angle > osg::PI*0.75)
 	{
-		m_strAudioName = (itr - 1)->data();
-		return m_strAudioName;
+		fTheta += osg::PI;
 	}
-	else
-	{
-		return L"";
-	}
-}
+	double fRadius = (exp((fRadiusRatio * 5.0 + fEmotion)/6.0)-1.0) / (exp(1.0)-1.0);
+	vGalaxyCoord.x = fRadius * std::cos(fTheta);
+	vGalaxyCoord.y = fRadius * std::sin(fTheta);
 
-int CGMDataManager::GetCurrentAudioID()
-{
-	if (L"" == m_strAudioName)
-	{
-		return -1;
-	}
-
-	int i = 0;
-	for (auto itr = m_storedNameVector.begin();
-		itr != m_storedNameVector.end();
-		itr++, i++)
-	{
-		if (m_strAudioName == itr->data())
-		{
-			return i;
-		}
-	}
-	return 0;
-}
-
-osg::Vec4f CGMDataManager::GetAudioColor(const SGMAudioCoord audioCoord)
-{
-	// 0.0f - 1.0f
-	float fAngle = audioCoord.angle / (2*osg::PI);
-	return osg::Vec4f(
-		osg::clampBetween(std::abs(4.0f * fAngle - 2.5f) - 0.5f, 0.0f, 1.0f),
-		osg::clampBetween(1.5f - std::abs(4.0f * fAngle - 1.5f), 0.0f, 1.0f),
-		1.0f - osg::clampBetween(std::abs(4.0f*fAngle - 3.0f), 0.0f, 1.0f),
-		1);
-}
-
-osg::Vec4f CGMDataManager::GetAudioColor(const SGMStarCoord starCoord)
-{
-	auto itr = m_audioDataMap.find(starCoord);
-	if (itr != m_audioDataMap.end())
-	{
-		SGMAudioCoord audioCoord = itr->second.audioCoord;
-		return GetAudioColor(audioCoord);
-	}
-	return osg::Vec4f(1, 1, 1, 1);
-}
-
-SGMStarCoord CGMDataManager::GetStarCoord()
-{
-	if (L"" == m_strAudioName)
-	{
-		return SGMStarCoord();
-	}
-	else
-	{
-		return GetStarCoord(m_strAudioName);
-	}
-}
-
-SGMStarCoord CGMDataManager::GetStarCoord(const std::wstring & strName)
-{
-	int i = 0;
-	for (auto itr = m_storedNameVector.begin();
-		itr != m_storedNameVector.end();
-		itr++,i++)
-	{
-		if (strName == itr->data())
-		{
-			return m_storedCoordVector.at(i);
-		}
-	}
-	return SGMStarCoord();
-}
-
-SGMAudioCoord CGMDataManager::GetAudioCoord(const std::wstring & strName)
-{
-	for(auto itr = m_audioDataMap.begin(); itr != m_audioDataMap.end(); itr++)
-	{
-		if (strName == itr->second.name)
-		{
-			return itr->second.audioCoord;
-		}
-	}
-	return SGMAudioCoord();
-}
-
-bool CGMDataManager::SetAudioData(const SGMAudioData& sData)
-{
-	if (sData.audioCoord.angle < 0.0 ||
-		sData.audioCoord.angle >= (osg::PI*2.0) ||
-		sData.audioCoord.radius > 1.0 ||
-		sData.audioCoord.radius <= 0.0)
-	{
-		return false;
-	}
-
-	SGMStarCoord vOldStarCoord = SGMStarCoord(0, 0, 0);
-	SGMStarCoord vStarCoord = _AudioCoord2StarCoord(sData.audioCoord);
-	int i = 0;
-	auto itr = m_storedNameVector.begin();
-	for ( ; itr != m_storedNameVector.end(); itr++, i++)
-	{
-		if (sData.name == itr->data())
-		{
-			vOldStarCoord = m_storedCoordVector.at(i);
-			m_storedCoordVector.at(i) = vStarCoord;
-		}
-	}
-	if (itr == m_storedNameVector.end()) return false;
-
-	m_audioDataMap.erase(vOldStarCoord);
-	m_audioDataMap.insert(std::make_pair(vStarCoord, sData));
-
-	return true;
+	return vGalaxyCoord;
 }
 
 void CGMDataManager::_RefreshAudioCoordinates()
 {
 	CGMXml aXML;
-	if (aXML.Load(m_pConfigData->strCorePath + "Coordinates/AudioData.xml", "Data"))
+	if (aXML.Load(m_pConfigData->strCorePath + "Users/AudioData.xml", "Data"))
 	{
-		VGMXmlElementVec vAudioVec = aXML.GetChildren("Audio");
+		// 临时记录UID错误的音频数据Vector
+		std::vector<SGMAudioData> tempAudioVector;
+
+		VGMXmlNodeVec vAudioVec = aXML.GetChildren("Audio");
 		for (auto audioItr : vAudioVec)
 		{
-			const char* cStr = audioItr.Attribute("name");
-			double fRadius, fAngle;
-			audioItr.Attribute("radius", &fRadius);
-			audioItr.Attribute("angle", &fAngle);
+			const std::wstring wStr = audioItr.GetPropWStr("name");
+			double fUID = audioItr.GetPropDouble("UID");
+			double fBPM = audioItr.GetPropDouble("BPM", 100);
+			double fAngle = audioItr.GetPropDouble("angle");
+			double fRank = audioItr.GetPropDouble("rank");
 
-			// insert the starCoord and file name
-			SGMAudioCoord audioCoord(fRadius, fAngle);
-			SGMStarCoord starCoord = _AudioCoord2StarCoord(audioCoord);
-			// 处理UTF-8
-			const std::wstring wStr = _CharToWstring(cStr);
-			auto iter = std::find(m_storedNameVector.begin(), m_storedNameVector.end(), wStr);
-			if (iter == m_storedNameVector.end())
+			SGMAudioCoord vAudioCoord(fBPM, fAngle, int(fRank));
+			SGMGalaxyCoord vGalaxyCoord = AudioCoord2GalaxyCoord(vAudioCoord);
+
+			if (0 == fUID)
 			{
-				m_storedNameVector.push_back(wStr);
-				m_storedCoordVector.push_back(starCoord);
-				SGMAudioData sData(wStr, audioCoord);
-				m_audioDataMap.insert(std::make_pair(starCoord, sData));
+				SGMAudioData sTempData(fUID, wStr, vAudioCoord, vGalaxyCoord);
+				tempAudioVector.push_back(sTempData);
+			}
+			else
+			{
+				if (m_audioDataMap.empty())
+				{
+					// vector为空，直接插入合法数据
+					SGMAudioData sData(fUID, wStr, vAudioCoord, vGalaxyCoord);
+					_AddAudioData2Map(sData);
+					
+				}
+				else
+				{
+					bool bExist = false;
+					for (auto iter : m_audioDataMap)
+					{
+						if (fUID == iter.second.UID && wStr == iter.second.name)
+						{
+							// UID和名称都相同，说明音频已存在
+							bExist = true;
+							break;
+						}
+						else if (fUID == iter.second.UID && wStr != iter.second.name)
+						{
+							// UID相同，名称不同，说明UID错误，
+							// 需要临时将UID修改为0，等到音频文件全部加载完后，统一修改所有错误的UID
+							bExist = true;
+							fUID = 0;
+							SGMAudioData sTempData(fUID, wStr, vAudioCoord, vGalaxyCoord);
+							tempAudioVector.push_back(sTempData);
+						}
+						else if (fUID != iter.second.UID && wStr == iter.second.name)
+						{
+							//  UID不同，名称相同，说明文件中的音频重复，忽略
+							bExist = true;
+							break;
+						}
+					}
+					if (!bExist)
+					{
+						auto iter = m_audioDataMap.begin();
+						while (iter != m_audioDataMap.end())
+						{
+							if ((vGalaxyCoord == iter->second.galaxyCoord) || (vAudioCoord == iter->second.audioCoord))
+							{
+								// 存在重合
+								if (vGalaxyCoord == iter->second.galaxyCoord)
+								{
+									vGalaxyCoord.z += fmod(vGalaxyCoord.z + 1.011f, 2.0f) - 1.0f;
+								}
+								if (vAudioCoord == iter->second.audioCoord)
+								{
+									vAudioCoord.rank += 1;
+								}
+								// 回到开始，重新检查是否重合
+								iter = m_audioDataMap.begin();
+							}
+							else
+							{
+								iter++;
+							}
+						}
+						SGMAudioData sData(fUID, wStr, vAudioCoord, vGalaxyCoord);
+						_AddAudioData2Map(sData);
+					}
+				}
 			}
 		}
+
+		// 将临时保存的错误UID的音频文件再统一设置合法的UID，插入到map
+		//tempAudioVector -》m_audioDataMap
+		for (auto& itr : tempAudioVector)
+		{
+			itr.UID = m_iFreeUID;
+			_AddAudioData2Map(itr);
+		}
+		tempAudioVector.clear();
 	}
 }
 
-bool CGMDataManager::_SaveAudioCoordinates()
+bool CGMDataManager::_SaveAudioCoordinates() const
 {
 	CGMXml aXML;
-	aXML.Create(m_pConfigData->strCorePath + "Coordinates/AudioData.xml", "Data");
+	aXML.Create(m_pConfigData->strCorePath + "Users/AudioData.xml", "Data");
 	for (auto &itr : m_audioDataMap)
 	{
-		const std::string str = _WcharToChar(itr.second.name.c_str());
-		aXML.AddChild("Audio", str.c_str(), itr.second.audioCoord.radius, itr.second.audioCoord.angle);
+		CGMXmlNode sNode = aXML.AddChild("Audio");
+		sNode.SetPropUInt("UID", itr.second.UID);
+		sNode.SetPropWStr("name", itr.second.name.c_str());
+		sNode.SetPropDouble("BPM", itr.second.audioCoord.BPM);
+		sNode.SetPropDouble("angle", itr.second.audioCoord.angle);
+		sNode.SetPropDouble("rank",itr.second.audioCoord.rank);
 	}
 	return aXML.Save();
 }
@@ -313,62 +511,50 @@ void CGMDataManager::_RefreshAudioFiles()
 	std::wstring strFilePath;
 	std::wstring strFile = m_pConfigData->strMediaPath + m_strAudioPath;
 
+	double fAngle = 0.01;
 	for (auto formatItr : m_formatVector)
 	{
 		if ((hFile = _wfindfirst(strFilePath.assign(strFile).append(L"/*.").append(formatItr).c_str(), &fileinfo)) != -1)
 		{
 			do{
-				if (m_fileVector.size() >= 65536) break;
+				if (m_audioDataMap.size() >= 65536) break;
 				std::wstring strFileName = strFilePath.assign(fileinfo.name);
-				m_fileVector.push_back(strFileName);  //将文件名保存
 
-				auto iter = std::find(m_storedNameVector.begin(), m_storedNameVector.end(), strFileName);
-				if (iter == m_storedNameVector.end())
+				bool bFind = false;
+				for (auto iter : m_audioDataMap)
 				{
-					m_iRandom.seed(time(0) + m_fileVector.size());
-					SGMAudioCoord audioCoord(0.0, 0.0);
-					SGMStarCoord starCoord(0,0,0);
-					do {
-						const int iLargeNum = 10000;
-						// 用一个随机数iRadiusFilter来过滤半径
-						int iRadiusFilter = -1;
-						double fRadius = 0;
-						do {
-							// 半径 == 音频的节拍，半径越大，节拍越慢
-							// [0,GM_COORD_MAX]
-							int iRadius = m_iRandom() % GM_COORD_MAX;
-							// [0.0,1.0]
-							fRadius = double(iRadius) / GM_COORD_MAX;
+					if (strFileName == iter.second.name)
+					{
+						bFind = true;
+						break;
+					}
+				}
+				if (!bFind)
+				{
+					// 没有找到，所以是新的音频文件，加入map，属于无BPM类型
+					SGMAudioCoord vAudioCoord = SGMAudioCoord(0, fAngle, 1);
+					// 检查音频坐标是否有重合，如果有就修改
+					auto iter = m_audioDataMap.begin();
+					while (iter != m_audioDataMap.end())
+					{
+						if (vAudioCoord == iter->second.audioCoord)
+						{
+							// 存在重合
+							vAudioCoord.angle = fmod(vAudioCoord.angle + 0.01234, osg::PI * 2);
+							// 回到开始，重新检查是否重合
+							iter = m_audioDataMap.begin();
+						}
+						else
+						{
+							iter++;
+						}
+					}
+					// 音频空间坐标转银河坐标
+					SGMGalaxyCoord vGalaxyCoord = AudioCoord2GalaxyCoord(vAudioCoord);
 
-							iRadiusFilter = m_iRandom() % iLargeNum;
-						}while(iRadiusFilter > (1-std::exp(-fRadius*6))*std::exp2(-fRadius * 6)*4*iLargeNum);
-
-						// 用另一个随机数iAngleFilter来过滤角度
-						int iAngleFilter = -1;
-						double fAngle = -osg::PI_2;
-						do {
-							// 旋转角度 == 音频的类型
-							// [0,GM_COORD_MAX*16]
-							int iAngle = m_iRandom() % GM_COORD_MAX_16;
-							// [0.0,PI * 2.0]
-							fAngle = osg::PI * 2.0 * double(iAngle) / GM_COORD_MAX_16;
-
-							iAngleFilter = m_iRandom() % iLargeNum;
-						} while (iAngleFilter > iLargeNum*(std::cos(fAngle*2)+3)*0.25*
-							std::powf(1-std::abs(std::sin(fAngle*2)),4.0*fRadius));
-
-						// 音频空间坐标转星辰坐标
-						audioCoord = SGMAudioCoord(fRadius, fAngle);
-						starCoord = _AudioCoord2StarCoord(audioCoord);
-
-					} while ((starCoord.x == 0 && starCoord.y == 0) ||
-						(m_audioDataMap.find(starCoord) != m_audioDataMap.end()));
-
-					// insert the coord and file name			
-					m_storedNameVector.push_back(strFileName);
-					m_storedCoordVector.push_back(starCoord);
-					SGMAudioData sData(strFileName, audioCoord);
-					m_audioDataMap.insert(std::make_pair(starCoord, sData));
+					// 在合适的位置插入音频坐标
+					SGMAudioData sData(m_iFreeUID, strFileName, vAudioCoord, vGalaxyCoord);
+					_AddAudioData2Map(sData);
 				}
 			} while (_wfindnext(hFile, &fileinfo) == 0);
 		}
@@ -376,61 +562,271 @@ void CGMDataManager::_RefreshAudioFiles()
 	}
 }
 
-const std::wstring CGMDataManager::_CharToWstring(const char *cstr)
+void CGMDataManager::_DeleteOverdueAudios()
 {
-	if (!cstr) return std::wstring();
-	int length = int(strlen(cstr)) + 1;
-	wchar_t *t = (wchar_t*)malloc(sizeof(wchar_t) * length);
-	if (!t) return std::wstring();
-	memset(t, 0, length * sizeof(wchar_t));
-	MultiByteToWideChar(CP_UTF8, 0, cstr, int(strlen(cstr)), t, length);
-	std::wstring wstr = t;
-	free(t);
-	return wstr;
+	//文件句柄 
+	intptr_t hFile = 0;
+	//文件信息（用Unicode保存使用_wfinddata_t，多字节字符集使用_finddata_t）
+	_wfinddata_t fileinfo;
+	std::wstring strFilePath;
+	std::wstring strFile = m_pConfigData->strMediaPath + m_strAudioPath;
+
+	for (auto itr = m_audioDataMap.begin(); itr != m_audioDataMap.end(); )
+	{
+		if ((hFile = _wfindfirst(strFilePath.assign(strFile).append(itr->second.name.c_str()).c_str(), &fileinfo)) != -1)
+		{
+			itr++;
+		}
+		else
+		{
+			for (auto it = m_audioDataMap.begin(); it != m_audioDataMap.end(); )
+			{
+				if (it->second.name == itr->second.name)
+				{
+					it = m_audioDataMap.erase(it);
+					break;
+				}
+				else
+				{
+					it++;
+				}
+			}
+			itr = m_audioDataMap.erase(itr);
+		}
+		_findclose(hFile);
+	}
+
+	m_pAudioNumUniform->set(float(m_audioDataMap.size()));
 }
 
-const std::string CGMDataManager::_WcharToChar(const wchar_t* wstr)
+void CGMDataManager::_UpdateAudioList(const std::wstring & strName)
 {
-	int length = int(wcslen(wstr));
-	int destLen = WideCharToMultiByte(CP_UTF8, 0, wstr, length, 0, 0, 0, 0);
-	if (destLen <= 0)
+	// 如果列表中不存在这个名字，则将这个名字加入最近播放列表
+	auto itr = std::find(m_playingOrder.begin(), m_playingOrder.end(), strName);
+	if (itr == m_playingOrder.end())
 	{
-		return std::string();
+		if (GM_LIST_MAX <= m_playingOrder.size())
+		{
+			// 删除第一个元素
+			m_playingOrder.erase(m_playingOrder.begin());
+		}
+		m_playingOrder.push_back(strName);
 	}
-	std::string sDest(destLen, '\0');
-	destLen = WideCharToMultiByte(CP_UTF8, 0, wstr, length, &sDest[0], destLen, 0, 0);
-	if (destLen <= 0)
+
+	// 更新历史记录
+	if (m_historyList.empty())
 	{
-		return std::string();
+		m_historyList.push_back(strName);
 	}
-	return sDest;
+	else if (strName != m_historyList.back())
+	{
+		m_historyList.push_back(strName);
+	}
 }
 
-SGMStarCoord CGMDataManager::_AudioCoord2StarCoord(const SGMAudioCoord& audioCoord)
+void CGMDataManager::_LoadPlayingOrder()
 {
-	double fAudioX = audioCoord.radius * std::cos(audioCoord.angle);
-	double fAudioY = audioCoord.radius * std::sin(audioCoord.angle);
+	// 先清空现有播放列表
+	m_playingOrder.clear();
+	m_historyList.clear();
 
-	// Y值向上下偏移
-	double fOffset = 0.22;
-	if (fAudioX - fAudioY > 0)
+	CGMXml aXML;
+	if (aXML.Load(m_pConfigData->strCorePath + "Users/AudioPlayingOrder.xml", "Order"))
 	{
-		fOffset *= -1.0f;
+		VGMXmlNodeVec vAudioVec = aXML.GetChildren("Audio");
+		int i = 0;
+		for (auto audioItr : vAudioVec)
+		{
+			const std::wstring wStr = audioItr.GetPropWStr("name");
+			m_playingOrder.push_back(wStr);
+			m_historyList.push_back(wStr);
+
+			i++;
+			if (vAudioVec.size() == i)
+			{
+				// 将当前播放的音频修改为上次播放的最后一个音频
+				m_strCurrentAudio = wStr;
+			}
+		}
+	}
+}
+
+bool CGMDataManager::_AddAudioData2Map(SGMAudioData & sData)
+{
+	if (m_iFreeUID <= sData.UID)
+	{
+		m_audioDataMap[sData.UID] = sData;
+		if (m_iFreeUID == sData.UID)
+		{
+			m_iFreeUID++;
+		}
+
+		m_pAudioNumUniform->set(float(m_audioDataMap.size()));
+		return true;
+	}
+	else
+	{
+		m_audioDataMap.at(sData.UID) = sData;
+		return false;
+	}
+}
+
+void CGMDataManager::_InitComputeNearUID()
+{
+	int iSize = 1024;
+	m_pNearComputeNode = new CGMDispatchCompute(iSize / 16, iSize / 16, 1);
+	osg::ref_ptr<osg::Geode> pNearCSGeode = new osg::Geode();
+	pNearCSGeode->setCullingActive(false);
+	pNearCSGeode->addDrawable(m_pNearComputeNode.get());
+	GM_Root->addChild(pNearCSGeode.get());
+	osg::ref_ptr<osg::StateSet> pNearSS = m_pNearComputeNode->getOrCreateStateSet();
+
+	const std::string strImgPath = m_pConfigData->strCorePath + "Users/NearUID.tga";
+	if (!m_pNearUIDImage.valid()) m_pNearUIDImage = osgDB::readImageFile(strImgPath);
+	// 如果该图片不存在，则生成图片
+	if (!m_pNearUIDImage.valid())
+	{
+		m_pNearUIDImage = new osg::Image;
+		unsigned int* pNearUIDData = new unsigned int[iSize*iSize];
+		for (int j = 0; j < iSize*iSize; j++)
+		{
+			pNearUIDData[j] = 0;
+		}
+		m_pNearUIDImage->setImage(iSize, iSize, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*)pNearUIDData, osg::Image::USE_NEW_DELETE);
+
+		// 初始化时执行一次，计算完成后自动关闭
+		m_pNearComputeNode->setDispatch(true);
 	}
 
-	osg::Vec4 vOffset = osg::Vec4(fAudioX, fAudioY*(1.0f - std::abs(fOffset)) + fOffset, 0.0f, 0.0f);
-	double fAngle = -osg::PI_4 + audioCoord.radius*osg::PI*2.0f;
-	osg::Quat qRotate = osg::Quat(
-		0, osg::Vec3d(1.0, 0.0, 0.0),
-		0, osg::Vec3d(0.0, 1.0, 0.0),
-		fAngle, osg::Vec3d(0.0, 0.0, 1.0));
-	osg::Matrix mRotate;
-	mRotate.setRotate(qRotate);
-	osg::Vec4 vRotate = vOffset * mRotate;
+	// 使用 compute shader 计算最近的音频UID并存储
+	// LUT图像的数组,按照UID从小到大的顺序，记录音频的银河空间二维坐标
+	float* pDataLUT = new float[LUT_WIDTH];
+	for (int j = 0; j < LUT_WIDTH; j++)
+	{
+		pDataLUT[j] = 0.0f;
+	}
+	int i = 0;
+	for (auto& itr = m_audioDataMap.begin();
+		(itr != m_audioDataMap.end()) && (i+1 < LUT_WIDTH);
+		itr++, i += 2)
+	{
+		pDataLUT[i] = itr->second.galaxyCoord.x;
+		pDataLUT[i+1] = itr->second.galaxyCoord.y;
+	}
+	// Create Galaxy Coord LUT image 
+	m_pGalaxyCoordImage = new osg::Image;
+	m_pGalaxyCoordImage->setImage(LUT_WIDTH, 1, 1, GL_R32F, GL_RED, GL_FLOAT, (unsigned char*)pDataLUT, osg::Image::USE_NEW_DELETE);
+	// Create Galaxy Coord LUT texture 
+	m_pGalaxyCoordTex = new osg::Texture2D;
+	m_pGalaxyCoordTex->setImage(m_pGalaxyCoordImage.get());
+	m_pGalaxyCoordTex->setName("galaxyCoordTex");
+	m_pGalaxyCoordTex->setInternalFormat(GL_R32F);
+	m_pGalaxyCoordTex->setSourceFormat(GL_RED);
+	m_pGalaxyCoordTex->setSourceType(GL_FLOAT);
+	m_pGalaxyCoordTex->setFilter(osg::Texture2D::MIN_FILTER, osg::Texture2D::NEAREST);
+	m_pGalaxyCoordTex->setFilter(osg::Texture2D::MAG_FILTER, osg::Texture2D::NEAREST);
+	m_pGalaxyCoordTex->setWrap(osg::Texture2D::WRAP_S, osg::Texture2D::CLAMP_TO_BORDER);
+	m_pGalaxyCoordTex->setWrap(osg::Texture2D::WRAP_T, osg::Texture2D::CLAMP_TO_BORDER);
+	m_pGalaxyCoordTex->setDataVariance(osg::Object::DYNAMIC);
+	m_pGalaxyCoordTex->setTextureSize(LUT_WIDTH, 1);
+	m_pGalaxyCoordTex->setBorderColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
 
-	SGMStarCoord starCoord;
-	starCoord.x = vRotate.x() * GM_COORD_MAX;
-	starCoord.y = vRotate.y() * GM_COORD_MAX;
-	starCoord.z = vRotate.z();
-	return starCoord;
+	int iUnit = 0;
+
+	m_pGalaxyCoordTex->bindToImageUnit(iUnit, osg::Texture::READ_ONLY);
+	m_pGalaxyCoordTex->setUnRefImageDataAfterApply(false);
+	pNearSS->setTextureAttribute(iUnit, m_pGalaxyCoordTex.get());
+	pNearSS->addUniform(new osg::Uniform("galaxyCoordImg", iUnit));
+	iUnit++;
+
+	m_pNearUIDTex = new osg::Texture2D();
+	m_pNearUIDTex->setTextureSize(iSize, iSize);
+	m_pNearUIDTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
+	m_pNearUIDTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::NEAREST);
+	m_pNearUIDTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_BORDER);
+	m_pNearUIDTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_BORDER);
+	m_pNearUIDTex->setBorderColor(osg::Vec4(0, 0, 0, 0));
+	m_pNearUIDTex->setInternalFormat(GL_RGBA8);
+	m_pNearUIDTex->setSourceFormat(GL_RGBA);
+	m_pNearUIDTex->setSourceType(GL_UNSIGNED_BYTE);
+	m_pNearUIDTex->bindToImageUnit(iUnit, osg::Texture::WRITE_ONLY);
+	m_pNearUIDTex->setUnRefImageDataAfterApply(false);
+
+	osg::ref_ptr<osg::Uniform> pTargetUniform = new osg::Uniform("targetImg", iUnit);
+	pNearSS->addUniform(pTargetUniform.get());
+	pNearSS->setTextureAttribute(iUnit, m_pNearUIDTex.get());
+	iUnit++;
+
+	m_pAudioNumUniform->set(float(m_audioDataMap.size()));
+	pNearSS->addUniform(m_pAudioNumUniform.get());
+
+	// galaxy shader 着色器路径
+	std::string strGalaxyShaderPath = "Shaders/GalaxyShader/";
+	std::string strCompPath = m_pConfigData->strCorePath + strGalaxyShaderPath + "NearMap.comp";
+	CGMKit::LoadComputeShader(pNearSS.get(), strCompPath, "CloudShadowCS");
+
+	m_pReadPixelCam = new osg::Camera;
+	m_pReadPixelCam->setName("ReadPixelCamera");
+	m_pReadPixelCam->setReferenceFrame(osg::Transform::ABSOLUTE_RF_INHERIT_VIEWPOINT);
+	m_pReadPixelCam->setClearMask(GL_COLOR_BUFFER_BIT);
+	m_pReadPixelCam->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
+	m_pReadPixelCam->setViewport(0, 0, iSize, iSize);
+	m_pReadPixelCam->setRenderOrder(osg::Camera::POST_RENDER);
+	m_pReadPixelCam->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
+	m_pReadPixelCam->attach(osg::Camera::COLOR_BUFFER, m_pNearUIDImage.get());
+	m_pReadPixelCam->setAllowEventFocus(false);
+	m_pReadPixelCam->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+	m_pReadPixelCam->setViewMatrix(osg::Matrix::identity());
+	m_pReadPixelCam->setProjectionMatrixAsOrtho2D(0, iSize, 0, iSize);
+	m_pReadPixelCam->setProjectionResizePolicy(osg::Camera::FIXED);
+
+	m_pReadPixelFinishCallback = new CReadPixelFinishCallback(m_pNearUIDImage.get());
+
+	m_pReadPixelFinishCallback->SetPath(strImgPath);
+	m_pReadPixelCam->setFinalDrawCallback(m_pReadPixelFinishCallback);
+
+	osg::ref_ptr<osg::Geode> pGeode = new osg::Geode();
+	pGeode->addDrawable(_CreateScreenTriangle(iSize, iSize));
+	m_pReadPixelCam->addChild(pGeode.get());
+
+	osg::ref_ptr<osg::StateSet> pStateset = pGeode->getOrCreateStateSet();
+	pStateset->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+	pStateset->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+
+	int iReadPixelUnit = 0;
+	CGMKit::AddTexture(pStateset.get(), m_pNearUIDTex.get(), "inputTex", iReadPixelUnit++);
+
+	std::string strVertPath = m_pConfigData->strCorePath + strGalaxyShaderPath + "ReadPixel.vert";
+	std::string strFragPath = m_pConfigData->strCorePath + strGalaxyShaderPath + "ReadPixel.frag";
+	CGMKit::LoadShader(pStateset.get(), strVertPath, strFragPath, "ReadPixel");
+}
+
+osg::Geometry* CGMDataManager::_CreateScreenTriangle(const int width, const int height)
+{
+	osg::Geometry* pGeometry = new osg::Geometry();
+
+	osg::ref_ptr<osg::Vec3Array> verArray = new osg::Vec3Array;
+	verArray->push_back(osg::Vec3(0, 0, 0));
+	verArray->push_back(osg::Vec3(2 * width, 0, 0));
+	verArray->push_back(osg::Vec3(0, 2 * height, 0));
+	pGeometry->setVertexArray(verArray);
+
+	osg::ref_ptr<osg::Vec2Array> textArray = new osg::Vec2Array;
+	textArray->push_back(osg::Vec2(0, 0));
+	textArray->push_back(osg::Vec2(2, 0));
+	textArray->push_back(osg::Vec2(0, 2));
+	pGeometry->setTexCoordArray(0, textArray);
+
+	osg::ref_ptr <osg::Vec3Array> normal = new osg::Vec3Array;
+	normal->push_back(osg::Vec3(0, 1, 0));
+	pGeometry->setNormalArray(normal);
+	pGeometry->setNormalBinding(osg::Geometry::BIND_OVERALL);
+
+	pGeometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 3));
+
+	pGeometry->setUseVertexBufferObjects(true);
+	pGeometry->setUseDisplayList(false);
+	pGeometry->setDataVariance(osg::Object::DYNAMIC);
+
+	return pGeometry;
 }

@@ -1,20 +1,22 @@
 #include "GMMainWindow.h"
 #include "GMVolumeWidget.h"
+#include "GMListWidget.h"
 #include "UI/GMUIManager.h"
 #include "../Engine/GMEngine.h"
 #include <QKeyEvent>
-#include <QtPlatformHeaders\QWindowsWindowFunctions>
+#include <QScreen>
 
 using namespace GM;
 
 CGMMainWindow::CGMMainWindow(QWidget *parent)
 	: QMainWindow(parent),
-	m_pVolumeWidget(nullptr),
-	m_bInit(false), m_bFull(false), m_bPressed(false), m_vPos(QPoint(0,0)),
-	m_iAudioDuration(5000),m_strName(QString())
+	m_pVolumeWidget(nullptr), m_pListWidget(nullptr), m_pSceneWidget(nullptr),
+	m_bInit(false), m_bFull(false), m_bPressed(false), m_bShowVolume(false),
+	m_vPos(QPoint(0,0)), m_iAudioDuration(5000), m_strName(QString())
 {
 	ui.setupUi(this);
 	setWindowFlags(Qt::FramelessWindowHint);
+	setAttribute(Qt::WA_Mapped);
 
 	ui.centralWidget->setLayout(ui.centralVLayout);
 	ui.titleWidget->setLayout(ui.titleHLayout);
@@ -29,13 +31,20 @@ CGMMainWindow::CGMMainWindow(QWidget *parent)
 	connect(ui.closeBtn, SIGNAL(clicked()), this, SLOT(_slotClose()));
 
 	connect(ui.timeSlider, SIGNAL(valueChanged(int)), this, SLOT(_slotSetAudioTime(int)));
+
 	connect(ui.volumeBtn, SIGNAL(clicked()), this, SLOT(_slotSetMute()));
+	connect(ui.listBtn, SIGNAL(clicked()), this, SLOT(_slotListVisible()));
 	connect(ui.fullScreenBtn, SIGNAL(clicked()), this, SLOT(_slotFullScreen()));
 
 	m_pVolumeWidget = new CGMVolumeWidget(this);
 	m_pVolumeWidget->raise();
 	m_pVolumeWidget->hide();
 	connect(m_pVolumeWidget, SIGNAL(_signalSetVolume(int)), this, SLOT(_slotSetVolume(int)));
+
+	m_pListWidget = new CGMListWidget(this);
+	m_pListWidget->Init();
+	m_pListWidget->raise();
+	m_pListWidget->hide();
 
 	// 加载QSS
 	QFile qssFile(":/Resources/MainWindow.qss");
@@ -44,6 +53,7 @@ CGMMainWindow::CGMMainWindow(QWidget *parent)
 		QString style = QLatin1String(qssFile.readAll());
 		setStyleSheet(style);
 		m_pVolumeWidget->setStyleSheet(style);
+		m_pListWidget->setStyleSheet(style);
 		qssFile.close();
 	}
 }
@@ -59,8 +69,10 @@ bool CGMMainWindow::Init()
 	if (m_bInit)
 		return true;
 
-	osg::ref_ptr<CGMViewWidget> pSceneWidget = GM_ENGINE_PTR->CreateViewWidget(this);
-	ui.centralVLayout->insertWidget(2,(QWidget*)pSceneWidget.get());
+	m_pSceneWidget = GM_ENGINE_PTR->CreateViewWidget(this);
+	ui.centralVLayout->insertWidget(2,(QWidget*)m_pSceneWidget);
+
+	connect(m_pSceneWidget, SIGNAL(_signalEnter3D()), this, SLOT(_slotEnter3D()));
 
 	QImage* pAudioImg = new QImage;
 	pAudioImg->load(":/Resources/default_Image.png");
@@ -69,6 +81,15 @@ bool CGMMainWindow::Init()
 	m_bInit = true;
 
 	return m_bInit;
+}
+
+void CGMMainWindow::Update()
+{
+	// 更新音量
+	if (m_bShowVolume)
+	{
+		m_pVolumeWidget->SetVolume(GM_ENGINE_PTR->GetVolume() * 100);
+	}
 }
 
 void CGMMainWindow::SetFullScreen(const bool bFull)
@@ -80,18 +101,23 @@ void CGMMainWindow::SetFullScreen(const bool bFull)
 		// 全屏切换
 		if (m_bFull)
 		{
-			// 启用全屏功能前必须先加上这行
-			QWindowsWindowFunctions::setHasBorderInFullScreen(windowHandle(), true);
-			showFullScreen();
+			QList<QScreen*> mScreen = qApp->screens();
+			setGeometry(0, 0, mScreen[0]->geometry().width(), mScreen[0]->geometry().height());
+			show();
+
 			ui.titleWidget->hide();
 			ui.titleEdgeLab->hide();
 			ui.toolWidget->hide();
 			ui.toolEdgeLab->hide();
+
+			ui.listBtn->setChecked(false);
+			m_pListWidget->hide();
 		}
 		else
 		{
 			if (ui.maxBtn->isChecked())
 			{
+				setGeometry(320, 180, 1280, 720);
 				showNormal();
 			}
 			else
@@ -114,7 +140,8 @@ bool CGMMainWindow::GetFullScreen()
 
 void CGMMainWindow::UpdateAudioInfo()
 {
-	QString strFileName = QString::fromStdWString(GM_ENGINE_PTR->GetAudioName());
+	const std::wstring wstrAudioName = GM_ENGINE_PTR->GetAudioName();
+	QString strFileName = QString::fromStdWString(wstrAudioName);
 	if ("" == strFileName) return;
 	if (m_strName != strFileName)
 	{
@@ -124,14 +151,27 @@ void CGMMainWindow::UpdateAudioInfo()
 		// 如果切成的段数大于1，第一段就是作者名，第二段就是歌曲名称
 		if (1 < strList.size())
 		{
-			ui.audioNameLab->setText(strList[1]);
-			ui.audioInfoLab->setText(strList[0]);
+			ui.audioNameTextScroller->setText(strList[1]);
+			ui.audioInfoTextScroller->setText(strList[0]);
 		}
 		else
 		{
-			ui.audioNameLab->setText(strFileName);
-			ui.audioInfoLab->setText("");
+			ui.audioNameTextScroller->setText(strFileName);
+			ui.audioInfoTextScroller->setText("Unknown");
 		}
+
+		//更新播放列表界面
+		SGMAudioCoord sAudioCoord = GM_ENGINE_PTR->GetAudioCoord(wstrAudioName);
+		if (1 < strList.size())
+		{
+			m_pListWidget->AddAudio(strList[1], strList[0], sAudioCoord.BPM, sAudioCoord.angle);
+		}
+		else
+		{
+			m_pListWidget->AddAudio(strFileName, "", sAudioCoord.BPM, sAudioCoord.angle);
+		}
+		qApp->processEvents();
+		m_pListWidget->EnsureLastAudioVisible();
 
 		m_iAudioDuration = GM_ENGINE_PTR->GetAudioDuration();
 
@@ -164,6 +204,19 @@ void CGMMainWindow::UpdateAudioInfo()
 	if (iSecondsPassed < 10) strPassed += "0";
 	strPassed += QString::number(iSecondsPassed);
 	ui.timePassedLab->setText(strPassed);
+}
+
+void CGMMainWindow::SetVolumeVisible(const bool bVisible)
+{
+	if (bVisible)
+	{
+		int iX = pos().x() + ui.volumeBtn->pos().x();
+		int iY = pos().y() + ui.toolEdgeLab->pos().y() - m_pVolumeWidget->size().height() + 20;
+		m_pVolumeWidget->move(iX, iY);
+	}
+
+	m_pVolumeWidget->setVisible(bVisible);
+	m_bShowVolume = bVisible;
 }
 
 void CGMMainWindow::_slotLast()
@@ -206,10 +259,16 @@ void CGMMainWindow::_slotMaximum()
 	{
 		showMaximized();
 	}
+
+	if (m_pListWidget->isVisible())
+	{
+		_SetPlayingListGeometry();
+	}
 }
 
 void CGMMainWindow::_slotClose()
 {
+	GM_ENGINE_PTR->Save();
 	exit(0);
 }
 
@@ -243,7 +302,7 @@ void CGMMainWindow::_slotSetVolume(int iVolume)
 		if(!ui.volumeBtn->isChecked())
 			ui.volumeBtn->setChecked(true);
 	}
-	else 
+	else
 	{
 		if (ui.volumeBtn->isChecked())
 			ui.volumeBtn->setChecked(false);
@@ -252,9 +311,28 @@ void CGMMainWindow::_slotSetVolume(int iVolume)
 	GM_ENGINE_PTR->SetVolume(iVolume*0.01f);
 }
 
+void CGMMainWindow::_slotListVisible()
+{
+	if (ui.listBtn->isChecked())
+	{
+		_SetPlayingListGeometry();
+		m_pListWidget->show();
+		m_pListWidget->EnsureLastAudioVisible();
+	}
+	else
+	{
+		m_pListWidget->hide();
+	}
+}
+
 void CGMMainWindow::_slotFullScreen()
 {
 	SetFullScreen(true);
+}
+
+void CGMMainWindow::_slotEnter3D()
+{
+	m_pVolumeWidget->hide();
 }
 
 void CGMMainWindow::resizeEvent(QResizeEvent* event)
@@ -285,6 +363,11 @@ void CGMMainWindow::mouseDoubleClickEvent(QMouseEvent *event)
 			// 切换到窗口
 			showNormal();
 		}
+
+		if (m_pListWidget->isVisible())
+		{
+			_SetPlayingListGeometry();
+		}
 	}
 	QWidget::mouseDoubleClickEvent(event);
 }
@@ -304,9 +387,10 @@ void CGMMainWindow::mouseReleaseEvent(QMouseEvent * event)
 
 void CGMMainWindow::mouseMoveEvent(QMouseEvent* event)
 {
-	int iVolumeMinX = ui.volumeBtn->pos().rx();
+	// 设置音量控件显隐
+	int iVolumeMinX = ui.volumeBtn->pos().x();
 	int iVolumeMaxX = iVolumeMinX + ui.volumeBtn->width();
-	int iVolumeMinY = ui.toolEdgeLab->pos().ry();
+	int iVolumeMinY = ui.toolEdgeLab->pos().y();
 	int iVolumeMaxY = iVolumeMinY + ui.volumeBtn->height();
 
 	if (event->x() < iVolumeMinX || event->x() > iVolumeMaxX ||
@@ -319,14 +403,15 @@ void CGMMainWindow::mouseMoveEvent(QMouseEvent* event)
 	}
 	else if (!m_pVolumeWidget->isVisible())
 	{
-		int iX = pos().rx() + ui.volumeBtn->pos().rx();
-		int iY = pos().ry() + ui.toolEdgeLab->pos().ry() - m_pVolumeWidget->size().height() + 20;
+		int iX = pos().x() + ui.volumeBtn->pos().x();
+		int iY = pos().y() + ui.toolEdgeLab->pos().y() - m_pVolumeWidget->size().height() + 20;
 
 		m_pVolumeWidget->SetVolume(GM_ENGINE_PTR->GetVolume() * 100);
 		m_pVolumeWidget->move(iX, iY);
 		m_pVolumeWidget->show();
 	}
 
+	// 鼠标拖动标题栏以移动窗口
 	if (m_bPressed && (event->pos().y() < ui.titleWidget->height()))
 	{
 		if (ui.maxBtn->isChecked())// 窗口化状态
@@ -334,6 +419,8 @@ void CGMMainWindow::mouseMoveEvent(QMouseEvent* event)
 			QPoint movePoint = event->globalPos() - m_vPos;
 			m_vPos = event->globalPos();
 			move(x() + movePoint.x(), y() + movePoint.y());
+
+			m_pListWidget->move(m_pListWidget->pos().x() + movePoint.x(), m_pListWidget->pos().y() + movePoint.y());
 		}
 		else // 最大化状态
 		{
@@ -343,6 +430,11 @@ void CGMMainWindow::mouseMoveEvent(QMouseEvent* event)
 
 			m_vPos = event->globalPos();
 			move(m_vPos.x() - 640, m_vPos.y() - 5);
+
+			if (m_pListWidget->isVisible())
+			{
+				_SetPlayingListGeometry();
+			}
 		}
 	}
 
@@ -354,6 +446,8 @@ void CGMMainWindow::keyPressEvent(QKeyEvent* event)
 	if ((event->modifiers() == Qt::ControlModifier) && (event->key() == Qt::Key_S))
 	{
 		GM_ENGINE_PTR->Save();
+		// 记录太阳系此刻的信息，保证重启时太阳系行星的同步
+		GM_ENGINE_PTR->SaveSolarData();
 	}
 
 	switch (event->key())
@@ -389,4 +483,14 @@ void CGMMainWindow::_Million2MinutesSeconds(const int ms, int & minutes, int & s
 	int iAllSeconds = ms / 1000;
 	minutes = max(0, min(59, iAllSeconds / 60));
 	seconds = max(0, min(59, iAllSeconds % 60));
+}
+
+void CGMMainWindow::_SetPlayingListGeometry()
+{
+	int iX = pos().x() + ui.titleEdgeLab->pos().x() + ui.titleEdgeLab->width() - m_pListWidget->width();
+	int iY = pos().y() + ui.titleEdgeLab->pos().y() + ui.titleEdgeLab->height();
+	int iWidth = m_pListWidget->width();
+	int iHeight = ui.toolEdgeLab->y() - ui.titleEdgeLab->pos().y() - ui.titleEdgeLab->height();
+
+	m_pListWidget->setGeometry(iX, iY, iWidth, iHeight);
 }
