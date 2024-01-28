@@ -11,11 +11,10 @@ out vec4 vertexColor;
 void main()
 {
 	lengthV = length((gl_ModelViewMatrix*gl_Vertex).xyz);
-	float lenFall = 1.0-clamp(lengthV*0.01,0.0,1.0);
-	lenFall *= lenFall;
+	float lenFall = clamp(1.5-lengthV*0.04, 0, 1);
 
-	vertexColor.rgb = 2*gl_Color.rgb*(gl_Color.a+0.1)*lenFall;
-	vertexColor.a = gl_Color.a;
+	vertexColor.rgb = gl_Color.rgb;
+	vertexColor.a = gl_Color.a*lenFall;
 	
 	float distancStar = distance(gl_Vertex.xyz, starWorldPos);
 	float disRipple = mod(distancStar*10.0, 128.0);
@@ -29,7 +28,7 @@ void main()
 	vertexColor.rgb = mix(vertexColor.rgb, 2.0*playingStarColor.rgb, starRipple);
 #endif // WELCOME or not
 
-	gl_PointSize = (gl_Color.a + 1 + starRipple)*8.0*lenFall;
+	gl_PointSize = (gl_Color.a + 1.5 + 4.5*exp2(-lengthV*0.5) + starRipple)*lenFall;
 	gl_TexCoord[0] = gl_TextureMatrix[0] * gl_MultiTexCoord0;
 	gl_Position = ftransform();
 }

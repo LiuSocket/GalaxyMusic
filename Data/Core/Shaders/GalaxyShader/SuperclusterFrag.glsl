@@ -8,7 +8,7 @@ uniform vec3 rangeMin;
 uniform vec3 rangeMax;
 uniform vec3 screenSize;
 uniform sampler3D shapeNoiseTex;
-uniform sampler2D blueNoiseSampler;
+uniform sampler2D blueNoiseTex;
 
 in vec3 worldPos;
 
@@ -47,7 +47,7 @@ void main()
 
 	float lenD;
 	vec3 startPos = StartPos(WVD, worldPos, lenV, lenD);
-	float noiseD = texture2D(blueNoiseSampler, gl_FragCoord.xy/128.0).r;
+	float noiseD = texture2D(blueNoiseTex, gl_FragCoord.xy/128.0).r;
 
 	float lenStep = noiseD*0.05*boxHalfSize;
 	vec4 cloud = vec4(1,0,0,0);

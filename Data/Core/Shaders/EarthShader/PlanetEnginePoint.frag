@@ -18,8 +18,8 @@ void main()
 	if(unit > 1e6)
 	{
 		float tailAlpha = texture(tailTex, gl_FragCoord.xy/screenSize.xy).a;
-		alpha *= 1-0.9*tailAlpha;
+		alpha *= 1-tailAlpha;
 	}
 
-	gl_FragColor = vec4(vec3(0.7, 0.7+0.3*noise, 0.95), alpha);
+	gl_FragColor = vec4(0.7, 0.7+0.3*noise, 0.95, 1.0)*alpha;
 }

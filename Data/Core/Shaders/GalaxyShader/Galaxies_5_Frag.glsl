@@ -17,9 +17,7 @@ void main()
 	vec4 galaxiesColor = texture2DArray(galaxiesTex, vec3(texUV, coordW));
 
 	vec2 fall = 2*abs(coord-0.5);
-	float radius = length(fall);
-	radius = clamp(1-radius,0,1);
-	radius *= radius; radius *= radius;
+	float radius = clamp(1-length(fall),0,1);
 
 	gl_FragColor = mix(
 		(vec4(2)+vertexColor)*2*falloff*radius,

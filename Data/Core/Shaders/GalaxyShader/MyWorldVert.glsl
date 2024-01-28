@@ -10,6 +10,6 @@ out vec4 vertexColor;
 void main()
 {
 	vertexColor = gl_Color;
-	gl_PointSize = (0.3 + 0.7*gl_Color.a) * mix(128, 32, myWorldAlpha);
+	gl_PointSize = (0.5 + 0.5*gl_Color.a) * mix(128, 32, myWorldAlpha);
 	gl_Position = ftransform();
 }

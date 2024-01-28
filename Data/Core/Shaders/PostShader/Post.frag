@@ -28,9 +28,10 @@ void main()
 	sceneSide += textureOffset(sceneTex, sideUV, ivec2(1,1));
 	sceneSide += textureOffset(sceneTex, sideUV, ivec2(0,1));
 	sceneSide *= 0.25;
-	float blurFact = distance(gl_TexCoord[0].xy, vec2(0.5,0.5))*2;
-	blurFact = min(1, blurFact*blurFact);
-	sceneColor = mix(max(sceneColor,sceneSide), sceneSide, blurFact);
+	//float blurFact = distance(gl_TexCoord[0].xy, vec2(0.5,0.5))*2;
+	//blurFact = min(1, blurFact*blurFact);
+	//sceneColor = mix(max(sceneColor, sceneSide), sceneSide, blurFact);
+	sceneColor = mix(sceneColor, vec4(1), 0.5*sceneSide);
 
 	vec4 color = backgroundColor;
 

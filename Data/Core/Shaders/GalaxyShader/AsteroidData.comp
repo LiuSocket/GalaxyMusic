@@ -1,0 +1,82 @@
+#version 430
+
+layout (local_size_x = 256, local_size_y = 1) in;
+
+layout( location = 0 ) uniform float stepTime;
+layout( location = 1 ) uniform vec2 jupiterPos;
+layout( location = 2 ) uniform float level[128];
+
+layout(RGBA32F, binding = 0) uniform image2D lastAsteroidDataImg;
+layout(RGBA32F, binding = 1) uniform image2D targetAsteroidDataImg;
+
+const float M_PI = 3.141592657;
+const float G = 6.67349e-11;
+const float M_SUN = 1.98855e30; // kg
+const float M_JUPITER = 1.8986e27; // kg
+const float DIV = 8.0;
+
+float Random(vec2 uv)
+{
+    return fract(sin(dot(uv.xy, vec2(12.9898,78.233))) * 43758.5453123);
+}
+
+void main()
+{
+	ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+
+	vec4 asteroidData = imageLoad(lastAsteroidDataImg, pos);
+	vec2 asteroidPos = asteroidData.xy;
+	vec2 asteroidVelocity = asteroidData.zw;
+	float divTime = stepTime / DIV;
+
+	// float levelPos = clamp(length(asteroidPos)*1e-12*64, 0, 64);
+	// float magicNum = 1 + max(-0.9, 10*(level[int(levelPos)+63] - level[int(levelPos)]));
+	float magicNum = 1;// - min(0.9, 5*(level[0]+level[2]+level[4]+level[6]-level[8]-level[10]-level[12]-level[14]));
+
+	for(int i = 0 ; i < int(DIV) ; i++)
+	{
+		vec2 asteroidOutDir = normalize(asteroidPos);
+		vec2 asteroid2Jupiter = jupiterPos - asteroidPos;
+		vec2 asteroid2JupiterDir = normalize(asteroid2Jupiter);
+		float disS2A2 = asteroidPos.x*asteroidPos.x + asteroidPos.y*asteroidPos.y;
+		float disJ2A2 = asteroid2Jupiter.x*asteroid2Jupiter.x + asteroid2Jupiter.y*asteroid2Jupiter.y;
+
+		float gravitySun = magicNum*G*M_SUN/disS2A2;
+		float gravityJupiter = G*M_JUPITER/disJ2A2;	
+		vec2 gravitySunField = -asteroidOutDir*gravitySun;
+		vec2 gravityJupiterField = asteroid2JupiterDir*gravityJupiter;
+		vec2 gravityField = gravitySunField + gravityJupiterField;
+
+		asteroidPos += asteroidVelocity * divTime;
+		asteroidVelocity += gravityField * divTime;
+	}
+
+	float newAsteroid2Sun = length(asteroidPos);
+	vec2 jupiterFrontDir = normalize(vec2(-jupiterPos.y, jupiterPos.x));
+	// change the asteroid which is too far or too near	
+	float isTooFar = step(1e12, newAsteroid2Sun);
+	float isTooNear = 1-step(2.3e10, newAsteroid2Sun);
+	float isDead = max(isTooFar, isTooNear);
+	float noise_0 = sin(Random(asteroidPos)+gl_LocalInvocationIndex); // [-1,1]
+	float noise_1 = sin(Random(asteroidVelocity)+2.03*gl_LocalInvocationIndex); // [-1,1]
+
+	// reborn in asteroid belt
+	float cosTheta = cos(noise_0*M_PI);
+	float sinTheta = sin(noise_0*M_PI);
+	mat2 rotateMatrix = mat2(
+		cosTheta,	-sinTheta,
+		sinTheta,	cosTheta);
+	asteroidPos = mix(asteroidPos, -(0.7 + 0.2*noise_1)*(rotateMatrix*jupiterPos), isDead);
+	asteroidVelocity = mix(asteroidVelocity, -16000.0*(rotateMatrix*jupiterFrontDir), isDead);
+
+	// Lagrange Point 4 or 5
+	// const float sqrt3_2 = sqrt(3.0)*0.5;
+	// float mixSign = sign(float(gl_LocalInvocationIndex)-127.5);
+	// vec2 LagrangePoint = jupiterPos*0.5 + vec2(-jupiterPos.y, jupiterPos.x)*mixSign*sqrt3_2;
+	// vec2 LagrangeFrontDir = normalize(vec2(-LagrangePoint.y,LagrangePoint.x));
+	// asteroidPos = mix(asteroidPos, LagrangePoint*(1+0.01*noise_0), isDead);
+	// asteroidVelocity = mix(asteroidVelocity, (13061.119 + 100.0*noise_1)*LagrangeFrontDir, isDead);
+
+	vec4 data = vec4(asteroidPos, asteroidVelocity);
+	imageStore(targetAsteroidDataImg, pos, data);
+}	

@@ -167,7 +167,7 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 
 	vec3 erosionUVW = modelStepPos/ATMOS_RADIUS;
 	erosionUVW *= vec3(1, 1, 0.413);		
-	erosionUVW.z -= times*0.001;
+	erosionUVW.z -= times*0.002;
 
 	vec3 offsetUVW = texture3D(noiseErosionTex, fract(erosionUVW)).bgr;
 	vec3 shapeUVW = modelStepPos/ATMOS_RADIUS;
@@ -248,7 +248,7 @@ void Tail(commonParam cP, inout vec4 tailColor, inout float lenTail)
 		float lenS = lenStartStep + lenStep; // distance from eye to this step
 		for(int i = int(startStepNum);all(bvec3(tailC.a<ALPHA_MAX, lenStep<(lenRange*0.999), lenS<(cP.lenMin+lenD))); i++)
 		{
-			lenS = lenStartStep + lenStep*(1-0.001*cP.noiseD);
+			lenS = lenStartStep + lenStep*(1-0.003*cP.noiseD);
 			vec3 modelStepPos = cP.modelEyePos + cP.modelPixDir*lenS;
 			vec3 modelStepDir = normalize(modelStepPos);
 
@@ -328,7 +328,7 @@ void main()
 	float forwardScattering = (1-gForward*gForward)/(4*M_PI*pow(1+gForward*gForward-2*gForward*dotVL,1.5));
 	float scattering = 0.5 + forwardScattering;
 
-	float noiseD = texture(blueNoiseTex, gl_FragCoord.xy*screenSize.z/64.0).r;
+	float noiseD = texture(blueNoiseTex, gl_FragCoord.xy*screenSize.z/(abs(fract(times*20)-0.5)*10+64)).r;
 	// bounding shape
 	float dstEarth = 0;
 	vec2 lenMinMax = LenMinMax(modelEyePos, modelPixDir, dstEarth);

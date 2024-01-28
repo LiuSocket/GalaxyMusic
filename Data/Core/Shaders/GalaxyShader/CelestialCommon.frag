@@ -1,7 +1,6 @@
 #version 400 compatibility
-#extension GL_EXT_texture_array : enable
 
-#pragma import_defines(ATMOS, EARTH)
+#pragma import_defines(ATMOS, EARTH, WANDERING)
 
 uniform vec3 viewUp;
 uniform vec3 viewLight;
@@ -25,8 +24,7 @@ uniform float groundTop;
 uniform mat4 osg_ViewMatrixInverse;
 uniform sampler3D inscatteringTex;
 
-#ifdef EARTH
-#else // not EARTH
+#ifndef EARTH
 uniform mat4 atmosColorMatrix;
 #endif // EARTH
 
@@ -149,29 +147,15 @@ vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, 
 		GetCoordUL(cosVertUL),
 		GetCoordPitch(CosDH(cosVertDir, cosVertHoriz)),
 		GetCoordAlt(vertAlt, horizonDisMax, Rv))).rgb;
-	vec3 atmosSum = max(vec3(0), atmosNear - atmosVert);
-
-	if(eyeAltitude < groundTop)
-	{
-		float eye2Core = length(osg_ViewMatrixInverse[3].xyz);
-		vec3 viewCorePos = -viewUp*eye2Core;
-		float localRadius = eye2Core - eyeAltitude;
-		float midAlt = eye2Core*sinUV-localRadius;
-		vec3 viewMidPos = viewDir*dot(viewDir,viewCorePos)-viewCorePos;
-		vec3 viewMidUp = normalize(viewMidPos);
-		// cosMidUL = the cos of mid pos viewUp dir & light source dir
-		float cosMidUL = dot(viewMidUp, viewLight);
-		vec3 atmosMid = Texture4D(vec4(
-			(cosVL-cosVertMinVL)/deltaCosVertVL, // to do
-			GetCoordUL(cosMidUL),
-			0.5, // to do
-			GetCoordAlt(midAlt, horizonDisMax, Rv))).rgb;
-
-		atmosSum = mix(atmosSum, abs(2*atmosMid-atmosVert-atmosNear), step(0,-cosUV)*step(0,-cosVertDir));
-	}
+	vec3 atmosSum = abs(atmosNear - atmosVert);
 
 #ifdef EARTH
+#ifdef WANDERING
+	float meanSum = (atmosSum.r+atmosSum.g+atmosSum.b)*0.33;
+	return mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5);
+#else // not WANDERING
 	return atmosSum;
+#endif // WANDERING
 #else // not EARTH
 	return (atmosColorMatrix*vec4(atmosSum,1)).rgb;
 #endif // EARTH

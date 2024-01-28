@@ -1,5 +1,5 @@
 #version 400 compatibility
-#pragma import_defines(AURORA, SATURN, EARTH)
+#pragma import_defines(AURORA, SATURN, EARTH, WANDERING)
 
 uniform vec3 viewUp;
 uniform vec3 viewLight;
@@ -131,56 +131,57 @@ void main()
 	float cosNUL = dot(viewNearUp, viewLight);
 	// cosVL = the cos of view dir & light source dir
 	float cosVL = dot(viewDir, viewLight);
-
-	vec2 nearLightDir = vec2(sqrt(1 - cosNUL*cosNUL), cosNUL);
-	vec2 nearViewFrontDir = vec2(sinNUV, cosNUV);
-	vec2 nearViewBackDir = vec2(-sinNUV, cosNUV);
-	float cosMinVL = dot(nearViewBackDir, nearLightDir);
-	float cosMaxVL = dot(nearViewFrontDir, nearLightDir);
-	float deltaCosVL = cosMaxVL-cosMinVL;
-	deltaCosVL = step(0, deltaCosVL) * max(1e-9, abs(deltaCosVL));
+	// sin & cos of horizon, affected by celestial radius
+	float sinHoriz = min(1, midGeoRadius / lenCore2Near);
+	float cosHoriz = -sqrt(1 - sinHoriz * sinHoriz);
 
 	vec3 atmosSum = vec3(0,0,0);
 	if(eyeAltitude > atmosHeight)
 	{
-		// sin & cos of horizon at near atmosphere pos, affected by celestial radius
-		float sinNearHoriz = min(1, midGeoRadius / lenCore2Near);
-		float cosNearHoriz = -sqrt(1 - sinNearHoriz * sinNearHoriz);
+		vec2 nearLightDir = vec2(sqrt(1 - cosNUL*cosNUL), cosNUL);
+		vec2 nearViewFrontDir = vec2(sinNUV, cosNUV);
+		vec2 nearViewBackDir = vec2(-sinNUV, cosNUV);
+		float cosMinVL = dot(nearViewBackDir, nearLightDir);
+		float cosMaxVL = dot(nearViewFrontDir, nearLightDir);
+		float deltaCosVL = cosMaxVL-cosMinVL;
+		deltaCosVL = (2*step(0, deltaCosVL)-1) * max(1e-9, abs(deltaCosVL));
 
-		// cosNearYaw : the cos of "view dir project to the sea plane at near atmosphere pos"
-		// and "light source dir project to the sea plane at near atmosphere pos"
-		float cosNearYaw = dot(normalize(viewDir-viewNearUp*cosNUV), normalize(viewLight-viewNearUp*cosNUV));
 		atmosSum = Texture4D(vec4(
 			(cosVL-cosMinVL)/deltaCosVL,
 			GetCoordUL(cosNUL),
-			GetCoordPitch(CosSkyDH(cosNUV, cosNearHoriz)),
+			GetCoordPitch(CosSkyDH(cosNUV, cosHoriz)),
 			1)).rgb;
 	}
 	else
 	{
+		// cosUL = cos of viewUp & light
+		float cosUL = dot(viewUp, viewLight);
+		//cosUV up is +, down is -
+		float cosUV = dot(viewUp, viewDir);
+		float sinUV = sqrt(1 - cosUV * cosUV);
+
+		vec2 eyeLightDir = vec2(sqrt(1 - cosUL*cosUL), cosUL);
+		vec2 eyeViewFrontDir = vec2(sinUV, cosUV);
+		vec2 eyeViewBackDir = vec2(-sinUV, cosUV);
+		float cosMinVL = dot(eyeViewBackDir, eyeLightDir);
+		float cosMaxVL = dot(eyeViewFrontDir, eyeLightDir);
+		float deltaCosVL = cosMaxVL-cosMinVL;
+
 		// distance of horizon at top atmosphere
 		float horizonDisMax = sqrt(atmosHeight * atmosHeight + 2 * atmosHeight * midGeoRadius);
 
-		// sin & cos of horizon at near atmosphere pos, affected by celestial radius
-		float sinEyeHoriz = min(1, midGeoRadius/lenCore2Eye);
-		float cosEyeHoriz = -sqrt(1-sinEyeHoriz*sinEyeHoriz);
-
-		//cosEyeDir up is +, down is -
-		float cosEyeDir = dot(viewUp, viewDir);
-		// UL = viewUp at mid pos & light
-		float cosUL = dot(viewUp, viewLight);
-		// cosYaw : the cos of "view dir project to the sea plane at near atmosphere pos"
-		// and "light source dir project to the sea plane at near atmosphere pos"
-		float cosYaw = dot(normalize(viewDir-viewUp*cosEyeDir), normalize(viewLight-viewUp*cosEyeDir));
-		vec3 atmosEye = Texture4D(vec4(
-			0.5+cosYaw*0.5,
+		atmosSum = Texture4D(vec4(
+			(cosVL-cosMinVL)/deltaCosVL,
 			GetCoordUL(cosUL),
-			GetCoordPitch(CosSkyDH(cosEyeDir, cosEyeHoriz)),
+			GetCoordPitch(CosSkyDH(cosUV, cosHoriz)),
 			GetCoordAlt(eyeAltitude, horizonDisMax, midGeoRadius))).rgb;
-		atmosSum = atmosEye;
 	}
 
 #ifdef EARTH
+#ifdef WANDERING
+	float meanSum = (atmosSum.r+atmosSum.g+atmosSum.b)*0.33;
+	atmosSum = mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5);
+#endif // WANDERING
 #else // not EARTH
 	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;
 #endif // EARTH

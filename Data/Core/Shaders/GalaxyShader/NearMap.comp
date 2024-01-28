@@ -1,0 +1,42 @@
+#version 430
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout( location = 0 ) uniform float audioNum;
+//layout( location = 1 ) uniform vec4 shadowRightUp;
+
+layout(R32F, binding = 0) uniform image2D galaxyCoordImg;
+layout(RGBA8, binding = 1) uniform image2D targetImg;
+
+const float M_PI = 3.141592657;
+
+vec3 Int_RGB8(int x)
+{
+	return floor(mod(x*vec3(1.0, 1.0/255.0, 1.0/(255.0*255.0)), 255))/255;
+}
+
+void main()
+{
+	const int imgWidth = 8192;
+	int NearestUID = 0;
+	float distanceMin = 2.0;
+	ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+	vec2 csUV = pos/vec2(gl_NumWorkGroups.xy*gl_WorkGroupSize.xy);
+	vec2 galaxyCoordNow = csUV*2-1;
+	for(int i = 0; i< int(audioNum); i++)
+	{
+		ivec2 coord = ivec2(mod(i*2, imgWidth), i*2/imgWidth);
+		float galaxyCoordX = imageLoad(galaxyCoordImg, coord).r;
+		float galaxyCoordY = imageLoad(galaxyCoordImg, coord+ivec2(1,0)).r;
+		float disNow = distance(galaxyCoordNow, vec2(galaxyCoordX,galaxyCoordY));
+		float isNear = step(0.0, distanceMin - disNow);
+		distanceMin = min(distanceMin, disNow);
+
+		float tmp = mix(float(NearestUID), float(i)+1, isNear);
+		NearestUID = int(tmp);
+	}
+
+	vec4 data = vec4(Int_RGB8(NearestUID), distanceMin*16);
+
+	imageStore(targetImg, pos, data);
+}	

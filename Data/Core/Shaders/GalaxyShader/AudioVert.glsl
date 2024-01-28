@@ -20,21 +20,21 @@ void main()
 	float lenFall = 1.0-clamp(lengthV*0.01,0.0,1.0);
 	lenFall *= lenFall;
 
-	float distancMouse = distance(gl_Vertex.xyz, mouseWorldPos);
-	float distancStar = distance(gl_Vertex.xyz, starWorldPos);
+	float distanceMouse = distance(gl_Vertex.xyz, mouseWorldPos);
+	float distanceStar = distance(gl_Vertex.xyz, starWorldPos);
 
-	float disRipple = mod(distancStar*10.0, 128.0);
+	float disRipple = mod(distanceStar*10.0, 128.0);
 #ifdef WELCOME
-	float dissipate = 3*exp(-distancStar*0.2);
+	float dissipate = 3*exp(-distanceStar*0.2);
 #else
-	float dissipate = exp(-distancStar*0.5);
+	float dissipate = exp(-distanceStar*0.5);
 #endif // WELCOME or not
 	float starRipple = level[int(disRipple)]*dissipate;
-	playingStar = step(-0.001,-distancStar);
-	float mouseSelect = sqrt(1.0 - min(1.0, distancMouse*mix(1.5,5.0,exp2(-abs(WCP.z)))));	
+	playingStar = step(-0.001,-distanceStar);
+	float mouseSelect = 1 - step(1, distanceMouse*mix(2,6,exp2(-abs(WCP.z))));	
 	float ripple = min(1.0,max(mouseSelect, starRipple));
 
-	vertexColor.rgb = 2*mix(vec3(1.0), gl_Color.rgb, max(playingStar,ripple));
+	vertexColor.rgb = 3*mix(vec3(1.0), gl_Color.rgb, max(playingStar,ripple));
 	vertexColor.a = 2*lenFall;
 
 	gl_PointSize = max(14*playingStar*(exp2(-lengthV*5.0)+1)*lenFall,16*mouseSelect*exp2(-lengthV*0.02)) +
