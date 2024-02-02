@@ -77,7 +77,7 @@ public slots:
 
 	/** 
 	* @brief 设置音频当前的时间
-	* @param iTimeRatio: 当前时间与总时间的比值
+	* @param iTimeRatio: 当前时间与总时间的比值,[0,100]
 	*/
 	void _slotSetAudioTime(int iTimeRatio);
 

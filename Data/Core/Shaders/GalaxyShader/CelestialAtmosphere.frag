@@ -11,6 +11,9 @@ uniform mat4 view2ECEFMatrix;
 uniform sampler3D inscatteringTex;
 
 #ifdef EARTH
+#ifdef WANDERING
+uniform float wanderProgress;
+#endif // WANDERING	
 #else // not EARTH
 uniform mat4 atmosColorMatrix;
 #endif // EARTH
@@ -180,7 +183,7 @@ void main()
 #ifdef EARTH
 #ifdef WANDERING
 	float meanSum = (atmosSum.r+atmosSum.g+atmosSum.b)*0.33;
-	atmosSum = mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5);
+	atmosSum = mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5*wanderProgress);
 #endif // WANDERING
 #else // not EARTH
 	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;

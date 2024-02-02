@@ -6,6 +6,10 @@ uniform vec3 viewUp;
 uniform vec3 viewLight;
 uniform float minDotUL;
 
+#ifdef WANDERING
+uniform float wanderProgress;
+#endif // WANDERING	
+
 vec3 ToneMapping(vec3 color)
 {
 	const float A = 2.51;
@@ -152,7 +156,7 @@ vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, 
 #ifdef EARTH
 #ifdef WANDERING
 	float meanSum = (atmosSum.r+atmosSum.g+atmosSum.b)*0.33;
-	return mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5);
+	return mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5*wanderProgress);
 #else // not WANDERING
 	return atmosSum;
 #endif // WANDERING

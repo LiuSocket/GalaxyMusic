@@ -175,8 +175,8 @@ osg::Vec4f CGMKit::GetImageColor(const osg::Image* pImg, const float fX, const f
 	unsigned int iWidth = pImg->s();
 	unsigned int iHeight = pImg->t();
 
-	float fS = fX * (iWidth - 1);
-	float fT = fY * (iHeight - 1);
+	float fS = fX * (iWidth - 1) + 0.5f;
+	float fT = fY * (iHeight - 1) + 0.5f;
 
 	float fDeltaS = fS - (int)fS;
 	float fDeltaT = fT - (int)fT;

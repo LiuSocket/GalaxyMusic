@@ -233,6 +233,8 @@ bool CGMEngine::Update()
 		m_pGalaxy->Update(deltaTime);
 		m_pAudio->Update(deltaTime);
 
+		// 临时将流浪地球计划的进展接口写在这里
+		m_pGalaxy->SetWanderingEarthProgress(float(m_pAudio->GetAudioCurrentTime())/float(m_pAudio->GetAudioDuration()));
 		// 更新涟漪效果
 		m_pCommonUniform->SetAudioLevel(m_pAudio->GetLevel());
 
@@ -704,6 +706,11 @@ CGMViewWidget* CGMEngine::CreateViewWidget(QWidget* parent)
 		//m_pPost->SetVolumeEnable(true, m_pGalaxy->GetTAATex());
 	}
 	return GM_Viewer.get();
+}
+
+void CGMEngine::SetWanderingEarthProgress(const float fProgress)
+{
+	m_pGalaxy->SetWanderingEarthProgress(fProgress);
 }
 
 /** @brief 加载配置 */

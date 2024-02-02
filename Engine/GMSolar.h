@@ -189,6 +189,11 @@ namespace GM
 		* @param vHiePos 超新星位置，单位：当前空间层级单位
 		*/
 		void SetSupernovaHiePos(const osg::Vec3f& vHiePos);
+		/**
+		* @brief 设置“流浪地球计化”的进展
+		* @param fProgress 进展百分比，[0.0, 1.0]
+		*/
+		void SetWanderingEarthProgress(const float fProgress);
 
 		/**
 		* @brief 由于空间层级变化而更新场景
@@ -491,7 +496,7 @@ namespace GM
 
 		CGMTerrain*										m_pTerrain;						//!< 地形模块
 		CGMAtmosphere*									m_pAtmos;						//!< 大气模块
-		CGMEarth*										m_pEarth;						//!< 地球模块
+		CGMEarth*										m_pEarth;						//!< 地球模块(单独成模块)
 		CGMPlanet*										m_pPlanet;						//!< 行星模块（还包括卫星）
 		CGMOort*										m_pOort;						//!< 奥尔特云模块
 	};

@@ -1,3 +1,5 @@
+const float PROGRESS_0 = 0.1;
+
 uniform sampler2DArray baseTex;
 uniform vec2 planetRadius;
 
@@ -28,6 +30,15 @@ float DEM(in float normDEM)
 {
 	float x = 2*normDEM-1;
 	return sign(x)*x*x*1e4;
+}
+
+// lat:[-1.0, 1.0]
+float SeaLevel(in float lat, in float seaLevel_66_Progress)
+{
+	// [0.0,0.1] seaLevel + 66m
+	float seaLevel = 66*seaLevel_66_Progress;
+	seaLevel = mix(seaLevel, clamp(abs(lat), 0, 1)*15000-9000, smoothstep(0.3, 0.8, wanderProgress));
+	return seaLevel;
 }
 
 void main()
@@ -63,18 +74,31 @@ void main()
 	vec3 viewHalf = normalize(viewLight - viewDir);
 	float dotNH = max(dot(viewVertUp, viewHalf), 0);
 #ifdef WANDERING
+	float seaLevel_66_Progress = min(1, wanderProgress/PROGRESS_0);
+	vec3 wanderingBaseCoord = baseCoord;
+	wanderingBaseCoord.z += 6;
+	vec4 wanderingColor = texture(baseTex, wanderingBaseCoord);
+	baseColor.rgb = mix(baseColor.rgb, wanderingColor.rgb, seaLevel_66_Progress);
 	vec3 ambient = vec3(0.07,0.11,0.15)*exp2(min(0, texCoord_0.y-0.48)*25);
-	color = baseColor.rgb * (0.02 + ambient + 0.5*diffuse);
-	vec3 oceanColor = vec3(0.15,0.2,0.25)*(ambient + 0.5*diffuse) + 0.5*pow(dotNH, 50)*sqrt(diffuse);
 
 	vec3 DEMCoord = texCoord_1;
 	DEMCoord.xy = (DEMCoord.xy - 0.5)*celestialCoordScale.w + 0.5;
 	float elev = DEM(texture(DEMTex, DEMCoord).r);
 	vertAlt = elev/unit;
-	rockMask = smoothstep(-10000.0, -9000.0, elev);
+	float lat = texCoord_0.y*2-1;
+	float seaLevel = SeaLevel(lat, seaLevel_66_Progress);
+	float elev2Sea = elev-seaLevel;
+	// [0.0,0.1] seaLevel + 66m
+	rockMask = mix(rockMask, smoothstep(-10.0, 0.0, elev2Sea), seaLevel_66_Progress);
+
+	color = mix(vec3(0.1,0.25,0.0), baseColor.rgb, clamp(elev2Sea*0.005, 1-0.7*seaLevel_66_Progress, 1.0));
+	color *= 0.02 + ambient + 0.5*diffuse;
+
+	vec3 oceanColor = mix(vec3(0.06,0.13,0.2), vec3(0.2,0.3,0.3), exp2(min(0, elev2Sea)*0.01));
+	oceanColor = oceanColor*(ambient + 0.5*diffuse) + clamp(-elev2Sea*0.01, 0, 1)*vec3(0.5,0.4,0.3)*pow(dotNH, 200)*sqrt(diffuse);
 #else // not WANDERING
 	vec3 oceanColor = vec3(0.08,0.1,0.12)*diffuse + vec3(1.0,0.9,0.7)*pow(dotNH, 200)*sqrt(diffuse);
-#endif // WANDERING	
+#endif // WANDERING	or not
 	color = mix(oceanColor, color, rockMask);
 #endif // EARTH
 

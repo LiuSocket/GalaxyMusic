@@ -1080,6 +1080,11 @@ void CGMSolar::SetSupernovaHiePos(const osg::Vec3f& vHiePos)
 		m_pOort->SetOortHiePos4(vHiePos);
 }
 
+void CGMSolar::SetWanderingEarthProgress(const float fProgress)
+{
+	m_pEarth->SetWanderingEarthProgress(fProgress);
+}
+
 bool CGMSolar::UpdateHierarchy(int iHieNew)
 {
 	if (iHieNew <= 4)

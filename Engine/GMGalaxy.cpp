@@ -1229,6 +1229,11 @@ osg::Quat CGMGalaxy::GetNearStarRotate() const
 	return m_pSolarSystem->GetSolarRotate();
 }
 
+void CGMGalaxy::SetWanderingEarthProgress(const float fProgress)
+{
+	m_pSolarSystem->SetWanderingEarthProgress(fProgress);
+}
+
 void CGMGalaxy::_InitBackground()
 {
 	m_pCosmosBoxNode = new CCosmosBox();

@@ -5,7 +5,6 @@
 uniform float unit;
 uniform vec4 coordScale_Earth;
 uniform sampler2DArray DEMTex;
-
 #endif // EARTH
 
 out vec2 texCoord_0;
@@ -37,5 +36,4 @@ void main()
 
 	texCoord_0 = gl_MultiTexCoord0.xy;
 	texCoord_1 = gl_MultiTexCoord1.xyz;
-
 }

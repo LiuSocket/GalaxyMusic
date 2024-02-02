@@ -45,9 +45,14 @@ void main()
 	vec3 cloudCoord = texCoord_1;
 	cloudCoord.xy = (cloudCoord.xy - 0.5)*celestialCoordScale.y + 0.5;
 	
-	vec4 cloudColor = texture(cloudTex, cloudCoord);
-	vec4 baseColor = cloudColor;
+	vec4 baseColor = texture(cloudTex, cloudCoord);
 #ifdef EARTH
+#ifdef WANDERING
+	vec3 wanderingCloudCoord = cloudCoord;
+	wanderingCloudCoord.z += 6;
+	vec4 wanderingColor = texture(cloudTex, wanderingCloudCoord);
+	baseColor.a = mix(baseColor.a, wanderingColor.a, wanderProgress);
+#endif // WANDERING	
 	float lenV = length(viewPos.xyz);
 	// cloud detail
 	vec4 detail4 = texture(cloudDetailTex, texCoord_1.xy*27);

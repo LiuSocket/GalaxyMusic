@@ -69,7 +69,7 @@ bool CGMMainWindow::Init()
 	if (m_bInit)
 		return true;
 
-	m_pSceneWidget = GM_ENGINE_PTR->CreateViewWidget(this);
+	m_pSceneWidget = GM_ENGINE.CreateViewWidget(this);
 	ui.centralVLayout->insertWidget(2,(QWidget*)m_pSceneWidget);
 
 	connect(m_pSceneWidget, SIGNAL(_signalEnter3D()), this, SLOT(_slotEnter3D()));
@@ -88,7 +88,7 @@ void CGMMainWindow::Update()
 	// 更新音量
 	if (m_bShowVolume)
 	{
-		m_pVolumeWidget->SetVolume(GM_ENGINE_PTR->GetVolume() * 100);
+		m_pVolumeWidget->SetVolume(GM_ENGINE.GetVolume() * 100);
 	}
 }
 
@@ -140,7 +140,7 @@ bool CGMMainWindow::GetFullScreen()
 
 void CGMMainWindow::UpdateAudioInfo()
 {
-	const std::wstring wstrAudioName = GM_ENGINE_PTR->GetAudioName();
+	const std::wstring wstrAudioName = GM_ENGINE.GetAudioName();
 	QString strFileName = QString::fromStdWString(wstrAudioName);
 	if ("" == strFileName) return;
 	if (m_strName != strFileName)
@@ -161,7 +161,7 @@ void CGMMainWindow::UpdateAudioInfo()
 		}
 
 		//更新播放列表界面
-		SGMAudioCoord sAudioCoord = GM_ENGINE_PTR->GetAudioCoord(wstrAudioName);
+		SGMAudioCoord sAudioCoord = GM_ENGINE.GetAudioCoord(wstrAudioName);
 		if (1 < strList.size())
 		{
 			m_pListWidget->AddAudio(strList[1], strList[0], sAudioCoord.BPM, sAudioCoord.angle);
@@ -173,7 +173,7 @@ void CGMMainWindow::UpdateAudioInfo()
 		qApp->processEvents();
 		m_pListWidget->EnsureLastAudioVisible();
 
-		m_iAudioDuration = GM_ENGINE_PTR->GetAudioDuration();
+		m_iAudioDuration = GM_ENGINE.GetAudioDuration();
 
 		// 将播放/暂停按钮设置成播放状态
 		ui.playBtn->setChecked(true);
@@ -190,9 +190,12 @@ void CGMMainWindow::UpdateAudioInfo()
 		ui.timeAllLab->setText(strAll);
 	}
 	// 获取当前音频播放位置，单位：ms
-	int iCurrentTime = GM_ENGINE_PTR->GetAudioCurrentTime();
+	int iCurrentTime = GM_ENGINE.GetAudioCurrentTime();
 	float fTimeRatio = 100 * float(iCurrentTime) / float(m_iAudioDuration);
-	ui.timeSlider->setValue(int(fTimeRatio));
+	// 避免循环修改时间
+	int iTimeLast = ui.timeSlider->value();
+	if(abs(fTimeRatio - iTimeLast) > 0.5f)
+		ui.timeSlider->setValue(fTimeRatio);
 
 	// 计算并显示已播放时间
 	int iMinutesPassed = 0;
@@ -221,7 +224,7 @@ void CGMMainWindow::SetVolumeVisible(const bool bVisible)
 
 void CGMMainWindow::_slotLast()
 {
-	GM_ENGINE_PTR->Last();
+	GM_ENGINE.Last();
 	ui.playBtn->setChecked(true);
 }
 
@@ -229,17 +232,17 @@ void CGMMainWindow::_slotPlayOrPause()
 {
 	if (ui.playBtn->isChecked())
 	{
-		GM_ENGINE_PTR->Play();
+		GM_ENGINE.Play();
 	}
 	else
 	{
-		GM_ENGINE_PTR->Pause();
+		GM_ENGINE.Pause();
 	}
 }
 
 void CGMMainWindow::_slotNext()
 {
-	GM_ENGINE_PTR->Next();
+	GM_ENGINE.Next();
 	ui.playBtn->setChecked(true);
 }
 
@@ -268,7 +271,7 @@ void CGMMainWindow::_slotMaximum()
 
 void CGMMainWindow::_slotClose()
 {
-	GM_ENGINE_PTR->Save();
+	GM_ENGINE.Save();
 	exit(0);
 }
 
@@ -276,10 +279,10 @@ void CGMMainWindow::_slotSetAudioTime(int iTimeRatio)
 {
 	// 当前音频播放的时刻
 	int iAudioCurrentTime = float(iTimeRatio)*0.01*m_iAudioDuration;
-	int iAudioCurrentPreciseTime = GM_ENGINE_PTR->GetAudioCurrentTime();
+	int iAudioCurrentPreciseTime = GM_ENGINE.GetAudioCurrentTime();
 	if (std::abs(iAudioCurrentPreciseTime - iAudioCurrentTime) > 1000)
 	{
-		GM_ENGINE_PTR->SetAudioCurrentTime(iAudioCurrentTime);
+		GM_ENGINE.SetAudioCurrentTime(iAudioCurrentTime);
 	}
 }
 
@@ -287,11 +290,11 @@ void CGMMainWindow::_slotSetMute()
 {
 	if (ui.volumeBtn->isChecked())
 	{
-		GM_ENGINE_PTR->SetVolume(0.0f);
+		GM_ENGINE.SetVolume(0.0f);
 	}
 	else
 	{
-		GM_ENGINE_PTR->SetVolume(m_pVolumeWidget->GetVolume()*0.01f);
+		GM_ENGINE.SetVolume(m_pVolumeWidget->GetVolume()*0.01f);
 	}
 }
 
@@ -308,7 +311,7 @@ void CGMMainWindow::_slotSetVolume(int iVolume)
 			ui.volumeBtn->setChecked(false);
 	}
 
-	GM_ENGINE_PTR->SetVolume(iVolume*0.01f);
+	GM_ENGINE.SetVolume(iVolume*0.01f);
 }
 
 void CGMMainWindow::_slotListVisible()
@@ -406,7 +409,7 @@ void CGMMainWindow::mouseMoveEvent(QMouseEvent* event)
 		int iX = pos().x() + ui.volumeBtn->pos().x();
 		int iY = pos().y() + ui.toolEdgeLab->pos().y() - m_pVolumeWidget->size().height() + 20;
 
-		m_pVolumeWidget->SetVolume(GM_ENGINE_PTR->GetVolume() * 100);
+		m_pVolumeWidget->SetVolume(GM_ENGINE.GetVolume() * 100);
 		m_pVolumeWidget->move(iX, iY);
 		m_pVolumeWidget->show();
 	}
@@ -445,23 +448,23 @@ void CGMMainWindow::keyPressEvent(QKeyEvent* event)
 {
 	if ((event->modifiers() == Qt::ControlModifier) && (event->key() == Qt::Key_S))
 	{
-		GM_ENGINE_PTR->Save();
+		GM_ENGINE.Save();
 		// 记录太阳系此刻的信息，保证重启时太阳系行星的同步
-		GM_ENGINE_PTR->SaveSolarData();
+		GM_ENGINE.SaveSolarData();
 	}
 
 	switch (event->key())
 	{
 	case Qt::Key_F2:
 	{
-		GM_ENGINE_PTR->SetPlayMode(EGMA_MOD_CIRCLE);
-		GM_ENGINE_PTR->Next();
+		GM_ENGINE.SetPlayMode(EGMA_MOD_CIRCLE);
+		GM_ENGINE.Next();
 	}
 	break;
 	case Qt::Key_F3:
 	{
-		GM_ENGINE_PTR->SetPlayMode(EGMA_MOD_RANDOM);
-		GM_ENGINE_PTR->Next();
+		GM_ENGINE.SetPlayMode(EGMA_MOD_RANDOM);
+		GM_ENGINE.Next();
 	}
 	break;
 	case Qt::Key_F11:

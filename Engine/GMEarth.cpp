@@ -222,6 +222,7 @@ CGMEarth::CGMEarth() : CGMPlanet(),
 	m_fCloudBottom(5e3f), m_fCloudTop(1e4f),
 	m_fEngineIntensityUniform(new osg::Uniform("engineIntensity", 1.0f)),
 	m_vEarthCoordScaleUniform(new osg::Uniform("coordScale_Earth", osg::Vec4f(1.0f, 1.0f, 1.0f, 1.0f))),//UV缩放，四层够用了
+	m_fWanderProgressUniform(new osg::Uniform("wanderProgress", 0.0f)),
 	m_pEarthTail(nullptr)
 {
 	m_pEarthRoot_1 = new osg::Group();
@@ -263,15 +264,13 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 		osg::ref_ptr<osg::Group> _pRoot = new osg::Group();
 		m_pHieEarthRootVector.push_back(_pRoot);
 	}
+
+	m_aEarthBaseTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Earth_base_");
+	m_aEarthCloudTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Earth_cloud_");
 	if (m_pConfigData->bWanderingEarth)
 	{
-		m_aEarthBaseTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/wanderingEarth_base_");
-		m_aEarthCloudTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/wanderingEarth_cloud_");
-	}
-	else
-	{
-		m_aEarthBaseTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Earth_base_");
-		m_aEarthCloudTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Earth_cloud_");
+		_AddTex2DArray(m_aEarthBaseTex, strSphereTexPath + "Earth/wanderingEarth_base_");
+		_AddTex2DArray(m_aEarthCloudTex, strSphereTexPath + "Earth/wanderingEarth_cloud_");
 	}
 
 	m_aIllumTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Earth_illum_");
@@ -612,6 +611,13 @@ void CGMEarth::SetEarthRotate(const osg::Quat& qRotate)
 		m_pEarthTail->SetEarthTailRotate(qRotate);
 }
 
+void CGMEarth::SetWanderingEarthProgress(const float fProgress)
+{
+	if (!m_pConfigData->bWanderingEarth) return;
+
+	m_fWanderProgressUniform->set(osg::clampBetween(fProgress, 0.0f, 1.0f));
+}
+
 bool CGMEarth::CreateEarth()
 {
 	_CreateGlobalCloudShadow();
@@ -765,6 +771,12 @@ bool CGMEarth::_CreateGlobalCloudShadow()
 	osg::ref_ptr<osg::Uniform> pCloudDetailUniform = new osg::Uniform("cloudDetailTex", iShadowUnit++);
 	m_pSSGlobalShadow->addUniform(pCloudDetailUniform);
 
+	if (m_pConfigData->bWanderingEarth)
+	{
+		m_pSSGlobalShadow->addUniform(m_fWanderProgressUniform);
+		m_pSSGlobalShadow->setDefine("WANDERING", osg::StateAttribute::ON);
+	}
+
 	// 添加shader
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
 	CGMKit::LoadShader(m_pSSGlobalShadow,
@@ -837,6 +849,7 @@ bool CGMEarth::_CreateEarth_1()
 		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
 		m_pSSEarthGround_1->addUniform(pGroundTailUniform);
 
+		m_pSSEarthGround_1->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthGround_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
@@ -903,6 +916,7 @@ bool CGMEarth::_CreateEarth_1()
 		osg::ref_ptr<osg::Uniform> pCloudTailUniform = new osg::Uniform("tailTex", iCloudUnit++);
 		m_pSSEarthCloud_1->addUniform(pCloudTailUniform);
 
+		m_pSSEarthCloud_1->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthCloud_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
@@ -959,6 +973,7 @@ bool CGMEarth::_CreateEarth_1()
 
 	if (m_pConfigData->bWanderingEarth)
 	{
+		m_pSSEarthAtmos_1->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthAtmos_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
@@ -1029,6 +1044,7 @@ bool CGMEarth::_CreateEarth_2()
 		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
 		m_pSSEarthGround_2->addUniform(pGroundTailUniform);
 
+		m_pSSEarthGround_2->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthGround_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
@@ -1095,6 +1111,7 @@ bool CGMEarth::_CreateEarth_2()
 		osg::ref_ptr<osg::Uniform> pCloudTailUniform = new osg::Uniform("tailTex", iCloudUnit++);
 		m_pSSEarthCloud_2->addUniform(pCloudTailUniform);
 
+		m_pSSEarthCloud_2->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthCloud_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
@@ -1151,6 +1168,7 @@ bool CGMEarth::_CreateEarth_2()
 
 	if (m_pConfigData->bWanderingEarth)
 	{
+		m_pSSEarthAtmos_2->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthAtmos_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
@@ -1169,6 +1187,7 @@ bool CGMEarth::_CreateWanderingEarth()
 	//_GenEarthEngineData();
 	// 临时添加的生成“行星发动机分布图”和“周围bloom图”的工具函数
 	//_GenEarthEngineTexture();
+	
 	// 临时添加的生成流浪地球版本的各个贴图的工具函数
 	std::string strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_base_real_";
 	std::string strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/engineBody";
@@ -1600,6 +1619,32 @@ osg::Texture2DArray* CGMEarth::_CreateDDSTex2DArray(const std::string& filePreNa
 	texture->setBorderColor(osg::Vec4(0, 0, 0, 0));
 	texture->setSourceType(GL_UNSIGNED_BYTE);
 	return texture.release();
+}
+
+bool CGMEarth::_AddTex2DArray(osg::Texture2DArray* pTex, const std::string& filePreName, bool bFlip)
+{
+	if(!pTex) return false;
+	osg::Image* pImg = osgDB::readImageFile(filePreName + "0.dds");
+	if (!pImg) return false;
+
+	if (pTex->getTextureWidth() != pImg->s()) return false;
+	if (pTex->getTextureHeight() != pImg->t()) return false;
+	pTex->setTextureDepth(pTex->getTextureDepth()+6);
+
+	for (int i = 0; i < 6; i++)
+	{
+		std::string fileName = filePreName + std::to_string(i) + ".dds";
+		if (bFlip)
+		{
+			pTex->setImage(6+i, osgDB::readImageFile(fileName, m_pDDSOptions));
+		}
+		else
+		{
+			pTex->setImage(6+i, osgDB::readImageFile(fileName));
+		}
+	}
+
+	return true;
 }
 
 void CGMEarth::_GenEarthEngineData()

@@ -90,6 +90,11 @@ namespace GM
 		* @param qRotate 旋转四元数
 		*/
 		void SetEarthRotate(const osg::Quat& qRotate);
+		/**
+		* @brief 设置“流浪地球计化”的进展
+		* @param fProgress 进展百分比，[0.0, 1.0]
+		*/
+		void SetWanderingEarthProgress(const float fProgress);
 
 		/**
 		* @brief 创建地球
@@ -184,7 +189,14 @@ namespace GM
 		* @return osg::Texture* 返回纹理指针
 		*/
 		osg::Texture2DArray* _CreateDDSTex2DArray(const std::string& filePreName, bool bFlip = true) const;
-
+		/**
+		* @brief 追加DDS二维纹理数组
+		* @param pTex：	纹理指针
+		* @param filePreName: 图片文件路径（不包含数字和.dds）
+		* @param bFlip: 是否翻转上下（dds需要考虑是否翻转）
+		* @return bool 成功true，如果纹理指针为空或者增加的图片尺寸和已有图尺寸不同，则返回false
+		*/
+		bool _AddTex2DArray(osg::Texture2DArray* pTex, const std::string& filePreName, bool bFlip = true);
 		/**
 		* @brief 生成行星发动机经、纬、高、尺寸信息，生成后不要再调用
 		*/
@@ -293,6 +305,7 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_mView2ECEFUniform;			//!< view空间转ECEF的矩阵
 		osg::ref_ptr<osg::Uniform>						m_fEngineIntensityUniform;		//!< 行星发动机输出功率Uniform
 		osg::ref_ptr<osg::Uniform>						m_vEarthCoordScaleUniform;		//!< 地球贴图的纹理坐标缩放
+		osg::ref_ptr<osg::Uniform>						m_fWanderProgressUniform;		//!< 流浪地球计划进展Uniform
 
 		osg::ref_ptr<osgDB::Options>					m_pDDSOptions;					//!< dds的纹理操作
 		osg::ref_ptr<osg::Texture2DArray>				m_aEarthBaseTex;				//!< 地球base color纹理

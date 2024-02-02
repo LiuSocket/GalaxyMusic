@@ -384,6 +384,13 @@ namespace GM
 		/** @brief 创建视口(QT:QWidget) */
 		CGMViewWidget* CreateViewWidget(QWidget* parent);
 
+		//////////////////////////// 流浪地球相关接口
+		/**
+		* @brief 设置“流浪地球计化”的进展
+		* @param fProgress 进展百分比，[0.0, 1.0]
+		*/
+		void SetWanderingEarthProgress(const float fProgress);
+
 	private:
 		/**
 		* @brief 加载配置

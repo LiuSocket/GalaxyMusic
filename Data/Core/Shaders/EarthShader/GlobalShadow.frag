@@ -1,6 +1,12 @@
 #version 400 compatibility
 #extension GL_EXT_texture_array : enable
 
+#pragma import_defines(WANDERING)
+
+#ifdef WANDERING
+uniform float wanderProgress;
+#endif // WANDERING	
+
 uniform vec2 planetRadius;
 uniform vec4 coordScale_Earth;
 uniform sampler2DArray cloudTex;
@@ -16,6 +22,12 @@ void main()
 	cloudCoord.xy = (cloudCoord.xy - 0.5)*coordScale_Earth.y + 0.5;
 
 	float cloudAlpha = texture(cloudTex, cloudCoord).a;
+#ifdef WANDERING
+	vec3 wanderingCloudCoord = cloudCoord;
+	wanderingCloudCoord.z += 6;
+	float wanderingCloudAlpha = texture(cloudTex, wanderingCloudCoord).a;
+	cloudAlpha = mix(cloudAlpha, wanderingCloudAlpha, wanderProgress);
+#endif // WANDERING	
 	// cloud detail
 	vec4 detail4 = texture(cloudDetailTex, texCoord_1.xy*27);
 	vec4 detailMix = clamp((cloudAlpha-vec4(0.2,0.35,0.5,0.65))/0.15, vec4(0), vec4(1));
