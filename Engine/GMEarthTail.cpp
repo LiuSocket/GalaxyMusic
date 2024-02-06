@@ -138,13 +138,13 @@ bool CGMEarthTail::Load()
 	{
 		std::string strVertPath = strEarthShader + "EarthTail.Vert";
 		std::string strFragPath = strEarthShader + "EarthTail.Frag";
-		CGMKit::LoadShader(m_pSsTailDecFace.get(), strVertPath, strFragPath, "EarthTailFace");
-		CGMKit::LoadShader(m_pSsTailDecEdge.get(), strVertPath, strFragPath, "EarthTailEdge");
-		CGMKit::LoadShader(m_pSsTailDecVert.get(), strVertPath, strFragPath, "EarthTailVert");
+		CGMKit::LoadShader(m_pSsTailDecFace, strVertPath, strFragPath, "EarthTailFace");
+		CGMKit::LoadShader(m_pSsTailDecEdge, strVertPath, strFragPath, "EarthTailEdge");
+		CGMKit::LoadShader(m_pSsTailDecVert, strVertPath, strFragPath, "EarthTailVert");
 	}
 	if (m_statesetTAA.valid())
 	{
-		CGMKit::LoadShader(m_statesetTAA.get(),
+		CGMKit::LoadShader(m_statesetTAA,
 			m_pConfigData->strCorePath + m_strVolumeShaderPath + "TAAVert.glsl",
 			m_pConfigData->strCorePath + m_strVolumeShaderPath + "TAAFrag.glsl",
 			"TAA");
@@ -214,16 +214,16 @@ void CGMEarthTail::MakeEarthTail()
 	m_rayMarchCamera->setViewport(0, 0, iWidth, iHeight);
 	m_rayMarchCamera->setRenderOrder(osg::Camera::PRE_RENDER, 1);
 	m_rayMarchCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
-	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_vectorMap_0.get());
-	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_rayMarchTex.get());
+	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_vectorMap_0);
+	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_rayMarchTex);
 	m_rayMarchCamera->setAllowEventFocus(false);
 	m_rayMarchCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
 
 	// Raymarch交换buffer的回调函数指针
-	SwitchFBOCallback* pRaymarchFBOCallback = new SwitchFBOCallback(m_vectorMap_1.get(), m_vectorMap_0.get());
+	SwitchFBOCallback* pRaymarchFBOCallback = new SwitchFBOCallback(m_vectorMap_1, m_vectorMap_0);
 	m_rayMarchCamera->setPostDrawCallback(pRaymarchFBOCallback);
 
-	GM_Root->addChild(m_rayMarchCamera.get());
+	GM_Root->addChild(m_rayMarchCamera);
 
 	// 正十二面体方法绘制流浪地球尾迹
 	osg::Geometry* pDodecahedronFaceGeom = nullptr;
@@ -235,35 +235,35 @@ void CGMEarthTail::MakeEarthTail()
 	// make the transform of Dodecahedron :
 	m_pDodecahedronTrans = new osg::MatrixTransform();
 	m_pDodecahedronTrans->setMatrix(osg::Matrixd());
-	m_rayMarchCamera->addChild(m_pDodecahedronTrans.get());
+	m_rayMarchCamera->addChild(m_pDodecahedronTrans);
 
 	m_pDodecahedronFace = new osg::Geode();
 	m_pDodecahedronFace->addDrawable(pDodecahedronFaceGeom);
-	m_pDodecahedronTrans->addChild(m_pDodecahedronFace.get());
+	m_pDodecahedronTrans->addChild(m_pDodecahedronFace);
 	m_pSsTailDecFace = new osg::StateSet();
-	_InitEarthTailStateSet(m_pSsTailDecFace.get(), "EarthTailFace");
-	m_pDodecahedronFace->setStateSet(m_pSsTailDecFace.get());
+	_InitEarthTailStateSet(m_pSsTailDecFace, "EarthTailFace");
+	m_pDodecahedronFace->setStateSet(m_pSsTailDecFace);
 
 	m_pDodecahedronEdge = new osg::Geode();
 	m_pDodecahedronEdge->addDrawable(pDodecahedronEdgeGeom);
-	m_pDodecahedronTrans->addChild(m_pDodecahedronEdge.get());
+	m_pDodecahedronTrans->addChild(m_pDodecahedronEdge);
 	m_pSsTailDecEdge = new osg::StateSet();
-	_InitEarthTailStateSet(m_pSsTailDecEdge.get(), "EarthTailEdge");
+	_InitEarthTailStateSet(m_pSsTailDecEdge, "EarthTailEdge");
 	m_pSsTailDecEdge->setDefine("RAYS_2", osg::StateAttribute::ON);
-	m_pDodecahedronEdge->setStateSet(m_pSsTailDecEdge.get());
+	m_pDodecahedronEdge->setStateSet(m_pSsTailDecEdge);
 
 	m_pDodecahedronVert = new osg::Geode();
 	m_pDodecahedronVert->addDrawable(pDodecahedronVertGeom);
-	m_pDodecahedronTrans->addChild(m_pDodecahedronVert.get());
+	m_pDodecahedronTrans->addChild(m_pDodecahedronVert);
 	m_pSsTailDecVert = new osg::StateSet();
-	_InitEarthTailStateSet(m_pSsTailDecVert.get(), "EarthTailVert");
+	_InitEarthTailStateSet(m_pSsTailDecVert, "EarthTailVert");
 	m_pSsTailDecVert->setDefine("RAYS_2", osg::StateAttribute::ON);
 	m_pSsTailDecVert->setDefine("RAYS_3", osg::StateAttribute::ON);
-	m_pDodecahedronVert->setStateSet(m_pSsTailDecVert.get());
+	m_pDodecahedronVert->setStateSet(m_pSsTailDecVert);
 
 	// get and mix the last frame by TAA(temporal anti-aliasing)
 	// Add texture to TAA board,and active TAA
-	ActiveTAA(m_rayMarchTex.get(), m_vectorMap_0.get());
+	ActiveTAA(m_rayMarchTex, m_vectorMap_0);
 
 	m_pTailTransform2 = new osg::PositionAttitudeTransform();
 	m_pTailTransform2->setNodeMask(0);
@@ -658,11 +658,11 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	pSS->setAttributeAndModes(new osg::CullFace(osg::CullFace::BACK));
 
-	pSS->addUniform(m_fPixelLengthUniform.get());
-	pSS->addUniform(m_fTailVisibleUniform.get());
-	pSS->addUniform(m_vShakeVectorUniform.get());
-	pSS->addUniform(m_vDeltaShakeUniform.get());
-	pSS->addUniform(m_mWorld2TailMatUniform.get());
+	pSS->addUniform(m_fPixelLengthUniform);
+	pSS->addUniform(m_fTailVisibleUniform);
+	pSS->addUniform(m_vShakeVectorUniform);
+	pSS->addUniform(m_vDeltaShakeUniform);
+	pSS->addUniform(m_mWorld2TailMatUniform);
 	pSS->addUniform(m_pCommonUniform->GetUnit());
 	pSS->addUniform(m_pCommonUniform->GetTime());
 	pSS->addUniform(m_pCommonUniform->GetScreenSize());

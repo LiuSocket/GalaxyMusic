@@ -338,6 +338,22 @@ void CGMMainWindow::_slotEnter3D()
 	m_pVolumeWidget->hide();
 }
 
+void CGMMainWindow::changeEvent(QEvent* event)
+{
+	if (GM_ENGINE.GetRendering() && isMinimized())
+	{
+		GM_ENGINE.SetRendering(false);
+	}
+	else if (!GM_ENGINE.GetRendering() && !isMinimized())
+	{
+		GM_ENGINE.SetRendering(true);
+		setAttribute(Qt::WA_Mapped);
+	}
+	else{}
+
+	QWidget::changeEvent(event);
+}
+
 void CGMMainWindow::resizeEvent(QResizeEvent* event)
 {
 	m_pVolumeWidget->hide();
@@ -441,7 +457,7 @@ void CGMMainWindow::mouseMoveEvent(QMouseEvent* event)
 		}
 	}
 
-	QMainWindow::mouseMoveEvent(event);
+	QWidget::mouseMoveEvent(event);
 }
 
 void CGMMainWindow::keyPressEvent(QKeyEvent* event)
@@ -475,10 +491,13 @@ void CGMMainWindow::keyPressEvent(QKeyEvent* event)
 	default:
 		break;
 	}
+
+	QWidget::keyPressEvent(event);
 }
 
 void CGMMainWindow::keyReleaseEvent(QKeyEvent* event)
 {
+	QWidget::keyReleaseEvent(event);
 }
 
 void CGMMainWindow::_Million2MinutesSeconds(const int ms, int & minutes, int & seconds)

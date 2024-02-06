@@ -155,7 +155,7 @@ bool CGMPost::SetVolumeEnable(bool bEnabled, osg::Texture* pVolumeTex)
 		{
 			m_pVolumeTex = pVolumeTex;
 
-			CGMKit::AddTexture(pSsPost.get(), m_pVolumeTex.get(), "volumeTex", m_iPostUnit++);
+			CGMKit::AddTexture(pSsPost, m_pVolumeTex, "volumeTex", m_iPostUnit++);
 		}
 
 		if (m_pVolumeTex.valid())
@@ -194,14 +194,6 @@ bool CGMPost::UpdateHierarchy(int iHieNew)
 	return true;
 }
 
-/**
-* 创建渲染面
-* @author LiuTao
-* @since 2020.09.01
-* @param width: 面的宽度
-* @param height: 面的高度
-* @return osg::Geometry* 返回几何节点指针
-*/
 osg::Geometry* CGMPost::_CreateScreenTriangle(const int width, const int height)
 {
 	osg::Geometry* pGeometry = new osg::Geometry();
@@ -234,15 +226,6 @@ osg::Geometry* CGMPost::_CreateScreenTriangle(const int width, const int height)
 	return pGeometry;
 }
 
-/**
-* 给渲染面重设尺寸
-* @brief 屏幕两倍大小的三角面，比矩形效率要高一些
-* @author LiuTao
-* @since 2020.12.07
-* @param width: 等效矩形的宽度
-* @param height: 等效矩形的高度
-* @return void
-*/
 void CGMPost::_ResizeScreenTriangle(const int width, const int height)
 {
 	osg::ref_ptr<osg::Geometry> pGeometry = m_pPostGeode->asGeode()->getDrawable(0)->asGeometry();

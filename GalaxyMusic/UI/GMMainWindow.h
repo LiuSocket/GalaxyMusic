@@ -107,6 +107,7 @@ public slots:
 	void _slotEnter3D();
 
 protected:
+	void changeEvent(QEvent* event);
 	void resizeEvent(QResizeEvent* event);
 	void closeEvent(QCloseEvent* event);
 	void mouseDoubleClickEvent(QMouseEvent *event);

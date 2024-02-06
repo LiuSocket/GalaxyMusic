@@ -72,10 +72,10 @@ bool CGMSystemManager::Init()
 		return true;
 
 	// 初始化引擎
-	GM_ENGINE_PTR->Init();
+	GM_ENGINE.Init();
 
 	// 初始化界面
-	GM_UI_MANAGER_PTR->Init();
+	GM_UI_MANAGER.Init();
 
 	// 启动定时器
 	startTimer(8);
@@ -90,7 +90,7 @@ bool CGMSystemManager::Release()
 	if (!m_bInit)
 		return true;
 
-	GM_ENGINE_PTR->Release();
+	GM_ENGINE.Release();
 	m_bInit = false;
 	return true;
 }
@@ -102,17 +102,17 @@ bool CGMSystemManager::GMKeyDown(EGMKeyCode eKC)
 	{
 	case EGMKeyCode::EGM_KC_F11:
 	{
-		GM_UI_MANAGER_PTR->SetFullScreen(!GM_UI_MANAGER_PTR->GetFullScreen());
+		GM_UI_MANAGER.SetFullScreen(!GM_UI_MANAGER.GetFullScreen());
 	}
 	break;
 	case EGMKeyCode::EGM_KC_Escape:
 	{
-		GM_UI_MANAGER_PTR->SetFullScreen(false);
+		GM_UI_MANAGER.SetFullScreen(false);
 	}
 	break;
 	case EGMKeyCode::EGM_KC_F7:
 	{
-		if (GM_ENGINE_PTR->GetEditMode())
+		if (GM_ENGINE.GetEditMode())
 		{
 			m_iRhythmCount = 0;
 		}
@@ -120,7 +120,7 @@ bool CGMSystemManager::GMKeyDown(EGMKeyCode eKC)
 	break;
 	case EGMKeyCode::EGM_KC_F8:
 	{
-		if (GM_ENGINE_PTR->GetEditMode())
+		if (GM_ENGINE.GetEditMode())
 		{
 			if (m_iRhythmCount < 20 && m_iRhythmCount >= 0)
 			{
@@ -134,9 +134,9 @@ bool CGMSystemManager::GMKeyDown(EGMKeyCode eKC)
 			{
 				m_iTimeRhythmEnd = QDateTime::currentDateTime().currentMSecsSinceEpoch()/1000;
 				double fBPM = 60 / ((m_iTimeRhythmEnd - m_iTimeRhythmStart) / 20);
-				SGMAudioCoord vAudioCoord = GM_ENGINE_PTR->GetCurrentStarAudioCoord();
+				SGMAudioCoord vAudioCoord = GM_ENGINE.GetCurrentStarAudioCoord();
 				vAudioCoord.BPM = fBPM;
-				GM_ENGINE_PTR->SetCurrentStarAudioCoord(vAudioCoord);
+				GM_ENGINE.SetCurrentStarAudioCoord(vAudioCoord);
 				m_iRhythmCount = -1;
 			}		
 		}
@@ -147,25 +147,25 @@ bool CGMSystemManager::GMKeyDown(EGMKeyCode eKC)
 	{
 		m_bVolumeHiding = false;
 		m_iVolumeCount = 0;
-		GM_UI_MANAGER_PTR->SetVolumeVisible(true);
+		GM_UI_MANAGER.SetVolumeVisible(true);
 		if (EGM_KC_Up == eKC)
 		{
-			GM_ENGINE_PTR->SetVolume(GM_ENGINE_PTR->GetVolume() + 0.057);
+			GM_ENGINE.SetVolume(GM_ENGINE.GetVolume() + 0.057);
 		}
 		else
 		{
-			GM_ENGINE_PTR->SetVolume(GM_ENGINE_PTR->GetVolume() - 0.057);
+			GM_ENGINE.SetVolume(GM_ENGINE.GetVolume() - 0.057);
 		}
 	}
 	break;
 	case EGMKeyCode::EGM_KC_Left:
 	{
-		GM_ENGINE_PTR->Last();
+		GM_ENGINE.Last();
 	}
 	break;
 	case EGMKeyCode::EGM_KC_Right:
 	{
-		GM_ENGINE_PTR->Next();
+		GM_ENGINE.Next();
 	}
 	break;
 	}
@@ -189,7 +189,7 @@ bool CGMSystemManager::GMKeyUp(EGMKeyCode eKC)
 
 void CGMSystemManager::SetCursorVisible(bool bVisible)
 {
-	GM_UI_MANAGER_PTR->SetCursorVisible(bVisible);
+	GM_UI_MANAGER.SetCursorVisible(bVisible);
 }
 
 /** @brief 定时器更新 */
@@ -197,7 +197,7 @@ void CGMSystemManager::timerEvent(QTimerEvent *event)
 {
 	if (m_bFirst)
 	{
-		GM_ENGINE_PTR->Welcome();
+		GM_ENGINE.Welcome();
 		m_bFirst = false;
 	}
 
@@ -205,9 +205,9 @@ void CGMSystemManager::timerEvent(QTimerEvent *event)
 	m_iFrameCount++;
 	if (FRAME_UPDATE <= m_iFrameCount)
 	{
-		if (GM_ENGINE_PTR->IsWelcomeFinished())
+		if (GM_ENGINE.IsWelcomeFinished())
 		{
-			GM_UI_MANAGER_PTR->UpdateAudioInfo();
+			GM_UI_MANAGER.UpdateAudioInfo();
 		}
 
 		m_iFrameCount = 0;
@@ -220,7 +220,7 @@ void CGMSystemManager::timerEvent(QTimerEvent *event)
 		{
 			m_iVolumeCount = 0;
 			m_bVolumeHiding = false;
-			GM_UI_MANAGER_PTR->SetVolumeVisible(false);
+			GM_UI_MANAGER.SetVolumeVisible(false);
 		}
 	}
 
@@ -229,6 +229,6 @@ void CGMSystemManager::timerEvent(QTimerEvent *event)
 
 void CGMSystemManager::_Render()
 {
-	GM_ENGINE_PTR->Update();
-	GM_UI_MANAGER_PTR->Update();
+	GM_ENGINE.Update();
+	GM_UI_MANAGER.Update();
 }

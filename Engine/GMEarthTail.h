@@ -62,6 +62,7 @@ namespace GM
 		* @param height: 屏幕高度
 		*/
 		void ResizeScreen(const int width, const int height);
+
 		/**
 		* @brief 由于空间层级变化而更新场景
 		* @param iHierarchy:		更新后的空间层级编号

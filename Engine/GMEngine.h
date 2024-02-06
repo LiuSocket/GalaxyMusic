@@ -91,6 +91,23 @@ namespace GM
 		* @param iH: 屏幕高度
 		*/
 		void ResizeScreen(const int iW, const int iH);
+		/**
+		* @brief 开启/暂停渲染，最小化或者其他软件置顶时可以关闭渲染
+		*  关闭是为了最小化时不浪费显卡资源
+		* @param bEnable: 是否开启渲染
+		*/
+		inline void SetRendering(const bool bEnable)
+		{
+			m_bRendering = bEnable;
+		}
+		/**
+		* @brief 是否开启渲染
+		* @return bool: 是否开启渲染
+		*/
+		inline bool GetRendering() const
+		{
+			return m_bRendering;
+		}
 
 		/** @brief 开启/关闭编辑模式 */
 		void SetEditMode(const bool bEnable);
@@ -479,6 +496,7 @@ namespace GM
 		CGMCameraManipulator*				m_pManipulator;				//!< 相机操作器
 
 		bool								m_bInit;					//!< 初始化标志
+		bool								m_bRendering;				//!< 是否渲染
 		double								m_dTimeLastFrame;			//!< 上一帧时间
 		float								m_fDeltaStep;				//!< 单位s
 		float								m_fConstantStep;			//!< 等间隔更新的时间,单位s

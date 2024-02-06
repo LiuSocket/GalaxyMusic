@@ -62,6 +62,7 @@ namespace GM
 		* @return void
 		*/
 		void ResizeScreen(const int width, const int height);
+
 		/**
 		* CreatePost
 		* 创建后期
@@ -97,20 +98,16 @@ namespace GM
 
 	private:
 		/**
-		* 创建渲染面
-		* @brief 屏幕两倍大小的三角面，比矩形效率要高一些
-		* @author LiuTao
-		* @since 2020.09.01
+		* @brief 创建渲染面
+		*屏幕两倍大小的三角面，比矩形效率要高一些
 		* @param width: 等效矩形的宽度
 		* @param height: 等效矩形的高度
 		* @return osg::Geometry* 返回几何节点指针
 		*/
 		osg::Geometry* _CreateScreenTriangle(const int width, const int height);
 		/**
-		* 给渲染面重设尺寸
-		* @brief 屏幕两倍大小的三角面，比矩形效率要高一些
-		* @author LiuTao
-		* @since 2020.12.07
+		* @brief 给渲染面重设尺寸
+		* 屏幕两倍大小的三角面，比矩形效率要高一些
 		* @param width: 等效矩形的宽度
 		* @param height: 等效矩形的高度
 		* @return void

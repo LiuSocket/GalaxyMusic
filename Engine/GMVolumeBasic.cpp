@@ -19,7 +19,6 @@
 
 using namespace GM;
 
-/** @brief 构造 */
 CGMVolumeBasic::CGMVolumeBasic():
 	m_pKernelData(nullptr), m_pConfigData(nullptr), m_pCommonUniform(nullptr),
 	m_iScreenWidth(1920), m_iScreenHeight(1080),
@@ -35,22 +34,10 @@ CGMVolumeBasic::CGMVolumeBasic():
 	m_iRandom.seed(0);
 }
 
-/** @brief 更新(在主相机更新姿态之前) */
-void CGMVolumeBasic::Update(double dDeltaTime)
-{
-	// 4 帧一个循环，4个像素之间的抖动
-	m_fShakeU = ((m_iShakeCount / 2) % 2) - 0.5f;
-	m_fShakeV = (((m_iShakeCount + 1) / 2) % 2) - 0.5f;
-
-	m_iShakeCount++;
-}
-
-/** @brief 析构 */
 CGMVolumeBasic::~CGMVolumeBasic()
 {
 }
 
-/** @brief 初始化 */
 void CGMVolumeBasic::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCommonUniform* pCommonUniform)
 {
 	m_pKernelData = pKernelData;
@@ -72,7 +59,15 @@ void CGMVolumeBasic::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData
 	_InitTAA(pConfigData->strCorePath);
 }
 
-/** @brief 更新(在主相机更新姿态之后) */
+void CGMVolumeBasic::Update(double dDeltaTime)
+{
+	// 4 帧一个循环，4个像素之间的抖动
+	m_fShakeU = ((m_iShakeCount / 2) % 2) - 0.5f;
+	m_fShakeV = (((m_iShakeCount + 1) / 2) % 2) - 0.5f;
+
+	m_iShakeCount++;
+}
+
 void CGMVolumeBasic::UpdateLater(double dDeltaTime)
 {
 	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
@@ -103,10 +98,10 @@ bool CGMVolumeBasic::ActiveTAA(osg::Texture* pTex, osg::Texture* pVectorTex)
 {
 	if (!m_statesetTAA.valid()) return false;
 
-	CGMKit::AddTexture(m_statesetTAA.get(), pTex, "currentTex", m_iUnitTAA++);
-	CGMKit::AddTexture(m_statesetTAA.get(), pVectorTex, "velocityTex", m_iUnitTAA++);
+	CGMKit::AddTexture(m_statesetTAA, pTex, "currentTex", m_iUnitTAA++);
+	CGMKit::AddTexture(m_statesetTAA, pVectorTex, "velocityTex", m_iUnitTAA++);
 
-	GM_Root->addChild(m_TAACamera.get());
+	GM_Root->addChild(m_TAACamera);
 	return true;
 }
 

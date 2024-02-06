@@ -142,7 +142,7 @@ namespace GM
 		* @param width: 屏幕宽度
 		* @param height: 屏幕高度
 		*/
-		virtual void ResizeScreen(const int width, const int height);
+		void ResizeScreen(const int width, const int height);
 
 		/**
 		* @brief 生成体积云需要的柏拉图实体（介于12面体和20面体之间的实体）

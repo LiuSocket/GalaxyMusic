@@ -80,7 +80,7 @@ CGMEngine* CGMEngine::getSingletonPtr(void)
 /** @brief 构造 */
 CGMEngine::CGMEngine():
 	m_pKernelData(nullptr), m_pConfigData(nullptr), m_pDataManager(nullptr), m_pManipulator(nullptr),
-	m_bInit(false),
+	m_bInit(false), m_bRendering(true),
 	m_dTimeLastFrame(0.0), m_fDeltaStep(0.0f), m_fConstantStep(0.1f),
 	m_fGalaxyDiameter(1e21),
 	m_pGalaxy(nullptr), m_pAudio(nullptr), m_pPost(nullptr),
@@ -133,7 +133,7 @@ bool CGMEngine::Init()
 
 	GM_Root = new osg::Group();
 	GM_View = new osgViewer::View();
-	GM_View->setSceneData(GM_Root.get());
+	GM_View->setSceneData(GM_Root);
 
 	m_pSceneTex = new osg::Texture2D();
 	m_pSceneTex->setTextureSize(m_pConfigData->iScreenWidth, m_pConfigData->iScreenHeight);
@@ -223,32 +223,39 @@ bool CGMEngine::Update()
 		float updateStep = m_fConstantStep;
 		while (fInnerDeltaTime >= updateStep)
 		{
-			_InnerUpdate(updateStep);
+			if(m_bRendering)
+				_InnerUpdate(updateStep);
 			fInnerDeltaTime -= updateStep;
 		}
 		m_fDeltaStep = fInnerDeltaTime;
 
-		m_pCommonUniform->Update(deltaTime);
-		m_pDataManager->Update(deltaTime);
-		m_pGalaxy->Update(deltaTime);
+		if (m_bRendering)
+		{
+			m_pCommonUniform->Update(deltaTime);
+			m_pDataManager->Update(deltaTime);
+			m_pGalaxy->Update(deltaTime);
+		}
 		m_pAudio->Update(deltaTime);
 
-		// 临时将流浪地球计划的进展接口写在这里
-		m_pGalaxy->SetWanderingEarthProgress(float(m_pAudio->GetAudioCurrentTime())/float(m_pAudio->GetAudioDuration()));
-		// 更新涟漪效果
-		m_pCommonUniform->SetAudioLevel(m_pAudio->GetLevel());
+		if (m_bRendering)
+		{
+			// 临时将流浪地球计划的进展接口写在这里
+			m_pGalaxy->SetWanderingEarthProgress(float(m_pAudio->GetAudioCurrentTime()) / float(m_pAudio->GetAudioDuration()));
+			// 更新涟漪效果
+			m_pCommonUniform->SetAudioLevel(m_pAudio->GetLevel());
 
-		GM_Viewer->advance(deltaTime);
-		GM_Viewer->eventTraversal();
-		GM_Viewer->updateTraversal();
+			GM_Viewer->advance(deltaTime);
+			GM_Viewer->eventTraversal();
+			GM_Viewer->updateTraversal();
 
-		// 在主相机改变位置后再更新
-		_UpdateLater(deltaTime);
+			// 在主相机改变位置后再更新
+			_UpdateLater(deltaTime);
 
-		GM_Viewer->renderingTraversals();
+			GM_Viewer->renderingTraversals();
 
-		// 渲染结束后再更新场景层级信息，否则会在临界点闪烁
-		_UpdateScenes();
+			// 渲染结束后再更新场景层级信息，否则会在临界点闪烁
+			_UpdateScenes();
+		}
 	}
 	return true;
 }
@@ -910,7 +917,6 @@ bool CGMEngine::_UpdateLater(const double dDeltaTime)
 
 	m_pCommonUniform->UpdateLater(dDeltaTime);
 	m_pGalaxy->UpdateLater(dDeltaTime);
-
 	return true;
 }
 

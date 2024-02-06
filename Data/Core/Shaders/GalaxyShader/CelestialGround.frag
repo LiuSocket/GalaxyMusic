@@ -32,6 +32,7 @@ float DEM(in float normDEM)
 	return sign(x)*x*x*1e4;
 }
 
+#ifdef WANDERING
 // lat:[-1.0, 1.0]
 float SeaLevel(in float lat, in float seaLevel_66_Progress)
 {
@@ -40,6 +41,7 @@ float SeaLevel(in float lat, in float seaLevel_66_Progress)
 	seaLevel = mix(seaLevel, clamp(abs(lat), 0, 1)*15000-9000, smoothstep(0.3, 0.8, wanderProgress));
 	return seaLevel;
 }
+#endif // WANDERING	
 
 void main()
 {
@@ -91,7 +93,7 @@ void main()
 	// [0.0,0.1] seaLevel + 66m
 	rockMask = mix(rockMask, smoothstep(-10.0, 0.0, elev2Sea), seaLevel_66_Progress);
 
-	color = mix(vec3(0.1,0.25,0.0), baseColor.rgb, clamp(elev2Sea*0.005, 1-0.7*seaLevel_66_Progress, 1.0));
+	color = mix(vec3(0.01,0.2,0.0), baseColor.rgb, clamp(elev2Sea*0.005, 1-0.7*seaLevel_66_Progress, 1.0));
 	color *= 0.02 + ambient + 0.5*diffuse;
 
 	vec3 oceanColor = mix(vec3(0.06,0.13,0.2), vec3(0.2,0.3,0.3), exp2(min(0, elev2Sea)*0.01));
