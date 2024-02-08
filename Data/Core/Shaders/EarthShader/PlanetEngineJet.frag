@@ -7,15 +7,15 @@ uniform float unit;
 
 in vec3 viewPos;
 in float dotNV;
+in float jetLength;
 
 void main()
 {
 	float lenV = length(viewPos);
 	float minDistance = 2e6/unit;
-	if(unit < 1e6 && lenV < minDistance) discard;
+	if((unit < 1e6 && lenV < minDistance) || jetLength < 1e-7) discard;
 
-	float fall = gl_TexCoord[0].x;
-	float alpha = fall;
+	float alpha = gl_TexCoord[0].x*clamp(5*(gl_TexCoord[0].x-1+jetLength),0,1);
 
 	float wave = 0.9 + 0.1*sin(gl_TexCoord[0].x*30 + times*(10+10*gl_TexCoord[0].y));
 	float intensity = gl_TexCoord[0].y*wave;

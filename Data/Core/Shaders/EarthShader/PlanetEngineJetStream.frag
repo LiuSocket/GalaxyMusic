@@ -5,14 +5,15 @@ uniform float times;
 uniform float unit;
 
 in vec3 viewPos;
+in float jetLength;
 
 void main()
 {
 	float lenV = length(viewPos);
 	float maxDistance = 4e6/unit;
-	if(lenV > maxDistance) discard;
+	if(lenV > maxDistance || jetLength < 1e-7) discard;
 
-	float fade = gl_TexCoord[0].y;	
+	float fade = gl_TexCoord[0].y*clamp(5*(gl_TexCoord[0].y-1+jetLength),0,1);
 	float wave = 0.9 + 0.1*sin(gl_TexCoord[0].y*30 + times*(10+10*gl_TexCoord[0].z));
 	float intensity = gl_TexCoord[0].z*wave;
 	vec3 color = mix(vec3(0.0, 0.3, 1.0), vec3(0.4, 0.7, 1.0), fade);

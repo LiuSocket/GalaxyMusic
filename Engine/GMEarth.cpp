@@ -220,9 +220,9 @@ CGMEarth::CGMEarth() : CGMPlanet(),
 	m_strGalaxyShaderPath("Shaders/GalaxyShader/"),
 	m_strEarthShaderPath("Shaders/EarthShader/"),
 	m_fCloudBottom(5e3f), m_fCloudTop(1e4f),
-	m_fEngineIntensityUniform(new osg::Uniform("engineIntensity", 1.0f)),
 	m_vEarthCoordScaleUniform(new osg::Uniform("coordScale_Earth", osg::Vec4f(1.0f, 1.0f, 1.0f, 1.0f))),//UV缩放，四层够用了
 	m_fWanderProgressUniform(new osg::Uniform("wanderProgress", 0.0f)),
+	m_fEngineStartRatioUniform(new osg::Uniform("engineStartRatio", 0.0f)),
 	m_pEarthTail(nullptr)
 {
 	m_pEarthRoot_1 = new osg::Group();
@@ -333,8 +333,6 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 		(fDEMTexSize - 1.0f) / fDEMTexSize);
 	m_vEarthCoordScaleUniform->set(vCoordScale);
 
-	//流浪地球初始化
-	m_fEngineIntensityUniform->set(m_pConfigData->bWanderingEarth ? 1.0f : 0.0f);
 	return true;
 }
 
@@ -518,7 +516,7 @@ void CGMEarth::SetUniform(
 
 	if (m_pConfigData->bWanderingEarth)
 	{
-		m_pEarthTail->SetUniform(m_vViewLightUniform);
+		m_pEarthTail->SetUniform(m_vViewLightUniform, m_fEngineStartRatioUniform);
 	}
 }
 
@@ -616,6 +614,8 @@ void CGMEarth::SetWanderingEarthProgress(const float fProgress)
 	if (!m_pConfigData->bWanderingEarth) return;
 
 	m_fWanderProgressUniform->set(osg::clampBetween(fProgress, 0.0f, 1.0f));
+	// 发动机在月球危机时开启
+	m_fEngineStartRatioUniform->set(fmaxf((fProgress-0.4f)*10.0f, 0.0f));
 }
 
 bool CGMEarth::CreateEarth()
@@ -860,10 +860,10 @@ bool CGMEarth::_CreateEarth_1()
 	m_pSSEarthGround_1->addUniform(m_fGroundTopUniform);
 	m_pSSEarthGround_1->addUniform(m_vPlanetRadiusUniform);
 	m_pSSEarthGround_1->addUniform(m_fMinDotULUniform);
-	m_pSSEarthGround_1->addUniform(m_fEngineIntensityUniform);
 	m_pSSEarthGround_1->addUniform(m_pCommonUniform->GetScreenSize());
 	m_pSSEarthGround_1->addUniform(m_vEarthCoordScaleUniform);
 	m_pSSEarthGround_1->addUniform(m_pCommonUniform->GetUnit());
+	m_pSSEarthGround_1->addUniform(m_fEngineStartRatioUniform);
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthGround_1,
@@ -916,6 +916,10 @@ bool CGMEarth::_CreateEarth_1()
 		osg::ref_ptr<osg::Uniform> pCloudTailUniform = new osg::Uniform("tailTex", iCloudUnit++);
 		m_pSSEarthCloud_1->addUniform(pCloudTailUniform);
 
+		m_pSSEarthCloud_1->setTextureAttributeAndModes(iCloudUnit, m_aIllumTex, iOnOverride);
+		osg::ref_ptr<osg::Uniform> pCloudIllumUniform = new osg::Uniform("illumTex", iCloudUnit++);
+		m_pSSEarthCloud_1->addUniform(pCloudIllumUniform);
+
 		m_pSSEarthCloud_1->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthCloud_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
@@ -928,10 +932,10 @@ bool CGMEarth::_CreateEarth_1()
 	m_pSSEarthCloud_1->addUniform(m_fAtmosHeightUniform);
 	m_pSSEarthCloud_1->addUniform(m_vPlanetRadiusUniform);
 	m_pSSEarthCloud_1->addUniform(m_fMinDotULUniform);
-	m_pSSEarthCloud_1->addUniform(m_fEngineIntensityUniform);
 	m_pSSEarthCloud_1->addUniform(m_pCommonUniform->GetScreenSize());
 	m_pSSEarthCloud_1->addUniform(m_vEarthCoordScaleUniform);
 	m_pSSEarthCloud_1->addUniform(m_pCommonUniform->GetUnit());
+	m_pSSEarthCloud_1->addUniform(m_fEngineStartRatioUniform);
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthCloud_1,
@@ -1055,10 +1059,10 @@ bool CGMEarth::_CreateEarth_2()
 	m_pSSEarthGround_2->addUniform(m_fGroundTopUniform);
 	m_pSSEarthGround_2->addUniform(m_vPlanetRadiusUniform);
 	m_pSSEarthGround_2->addUniform(m_fMinDotULUniform);
-	m_pSSEarthGround_2->addUniform(m_fEngineIntensityUniform);
 	m_pSSEarthGround_2->addUniform(m_pCommonUniform->GetScreenSize());
 	m_pSSEarthGround_2->addUniform(m_vEarthCoordScaleUniform);
 	m_pSSEarthGround_2->addUniform(m_pCommonUniform->GetUnit());
+	m_pSSEarthGround_2->addUniform(m_fEngineStartRatioUniform);
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthGround_2,
@@ -1111,6 +1115,10 @@ bool CGMEarth::_CreateEarth_2()
 		osg::ref_ptr<osg::Uniform> pCloudTailUniform = new osg::Uniform("tailTex", iCloudUnit++);
 		m_pSSEarthCloud_2->addUniform(pCloudTailUniform);
 
+		m_pSSEarthCloud_2->setTextureAttributeAndModes(iCloudUnit, m_aIllumTex, iOnOverride);
+		osg::ref_ptr<osg::Uniform> pCloudIllumUniform = new osg::Uniform("illumTex", iCloudUnit++);
+		m_pSSEarthCloud_2->addUniform(pCloudIllumUniform);
+
 		m_pSSEarthCloud_2->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthCloud_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
@@ -1123,10 +1131,10 @@ bool CGMEarth::_CreateEarth_2()
 	m_pSSEarthCloud_2->addUniform(m_fAtmosHeightUniform);
 	m_pSSEarthCloud_2->addUniform(m_vPlanetRadiusUniform);
 	m_pSSEarthCloud_2->addUniform(m_fMinDotULUniform);
-	m_pSSEarthCloud_2->addUniform(m_fEngineIntensityUniform);
 	m_pSSEarthCloud_2->addUniform(m_pCommonUniform->GetScreenSize());
 	m_pSSEarthCloud_2->addUniform(m_vEarthCoordScaleUniform);
 	m_pSSEarthCloud_2->addUniform(m_pCommonUniform->GetUnit());
+	m_pSSEarthCloud_2->addUniform(m_fEngineStartRatioUniform);
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthCloud_2,
@@ -1189,9 +1197,9 @@ bool CGMEarth::_CreateWanderingEarth()
 	//_GenEarthEngineTexture();
 	
 	// 临时添加的生成流浪地球版本的各个贴图的工具函数
-	std::string strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_base_real_";
-	std::string strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/engineBody";
-	std::string strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_base_";
+	//std::string strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_base_real_";
+	//std::string strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/engineBody";
+	//std::string strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_base_";
 	//_MixWEETexture(strPath_0, strPath_1, strOut, 0);
 	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_cloud_real_";
 	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/bloom";
@@ -1243,6 +1251,7 @@ bool CGMEarth::_GenEarthEnginePoint_1()
 	pSSPlanetEnginePoint->setRenderBinDetails(BIN_PLANET_POINT, "DepthSortedBin");
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetUnit());
+	pSSPlanetEnginePoint->addUniform(m_fEngineStartRatioUniform);
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, m_pEarthTail->GetTAATex(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
@@ -1281,6 +1290,7 @@ bool CGMEarth::_GenEarthEnginePoint_2()
 	pSSPlanetEnginePoint->setRenderBinDetails(BIN_PLANET_POINT, "DepthSortedBin");
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetUnit());
+	pSSPlanetEnginePoint->addUniform(m_fEngineStartRatioUniform);
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, m_pEarthTail->GetTAATex(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
@@ -1321,6 +1331,7 @@ bool CGMEarth::_GenEarthEngineJetLine_1()
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetTime());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetUnit());
+	pSSPlanetEngineJet->addUniform(m_fEngineStartRatioUniform);
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEngineJet->setTextureAttributeAndModes(0, m_pEarthTail->GetTAATex(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
@@ -1361,6 +1372,7 @@ bool CGMEarth::_GenEarthEngineJetLine_2()
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetTime());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetUnit());
+	pSSPlanetEngineJet->addUniform(m_fEngineStartRatioUniform);
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEngineJet->setTextureAttributeAndModes(0, m_pEarthTail->GetTAATex(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
@@ -1403,6 +1415,7 @@ bool CGMEarth::_GenEarthEngineBody_1()
 	pSSEngineBody->addUniform(m_fGroundTopUniform);
 	pSSEngineBody->addUniform(m_fEyeAltitudeUniform);
 	pSSEngineBody->addUniform(m_fAtmosHeightUniform);
+	pSSEngineBody->addUniform(m_fEngineStartRatioUniform);
 
 	int iTexUnit = 0;
 	// base color贴图
@@ -1457,6 +1470,7 @@ bool CGMEarth::_GenEarthEngineBody_2()
 	pSSEngineBody->addUniform(m_fGroundTopUniform);
 	pSSEngineBody->addUniform(m_fEyeAltitudeUniform);
 	pSSEngineBody->addUniform(m_fAtmosHeightUniform);
+	pSSEngineBody->addUniform(m_fEngineStartRatioUniform);
 
 	int iTexUnit = 0;
 	// base color 贴图
@@ -1501,6 +1515,7 @@ bool CGMEarth::_GenEarthEngineStream()
 	pSSEngineStream->setRenderBinDetails(BIN_PLANET_JET, "DepthSortedBin"); // to do
 	pSSEngineStream->addUniform(m_pCommonUniform->GetTime());
 	pSSEngineStream->addUniform(m_pCommonUniform->GetUnit());
+	pSSEngineStream->addUniform(m_fEngineStartRatioUniform);
 
 	// 喷射流噪声贴图
 	pSSEngineStream->setTextureAttributeAndModes(0,
@@ -1649,7 +1664,7 @@ bool CGMEarth::_AddTex2DArray(osg::Texture2DArray* pTex, const std::string& file
 
 void CGMEarth::_GenEarthEngineData()
 {
-	osg::ref_ptr<osg::Node> pNode = osgDB::readNodeFile("D:/GM/max/sphere/theWanderingEarth/theWanderingEarthEngineLocation.ive");
+	osg::ref_ptr<osg::Node> pNode = osgDB::readNodeFile("D:/GMHelp/max/sphere/theWanderingEarth/theWanderingEarthEngineLocation.ive");
 	if (!pNode.valid()) return;
 
 	CGenEngineDataVisitor cGenDataVisitor;

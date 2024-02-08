@@ -50,6 +50,7 @@ const vec3 modelSunDir = (spinMatrix*vec4(-1,0,0,0)).xyz;
 
 uniform float unit;
 uniform float times;
+uniform float engineStartRatio;
 uniform float pixelLength;
 uniform float tailVisible;
 uniform vec2 shakeVec;
@@ -175,16 +176,16 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 	float wrap = clamp((ratioXY-0.2)*5,0,1);
 	shapeUVW.xy *= (1.5+2*wrap)*shapeScale;
 	shapeUVW.z *= 0.2+0.1*wrap;		
-	shapeUVW.z -= times*0.001;
+	shapeUVW.z -= times*0.005;
 	shapeUVW += offsetUVW*(0.2 + 0.5*wrap);
 
 	vec4 shape4 = texture3D(noiseShapeTex, fract(shapeUVW));
 	float texDens = max(0, shape4.x - 0.35*shape4.y - 0.11*shape4.z - 0.09*shape4.w);
 
 	// fade by ratioR
-	float sphereAltFade = clamp(1 - (ratioR - EARTH_ATMOS_RATIO)*6, 0, 1);	
-	float torqueTailFade = sqrt(clamp((2.3 - ratioR)*2, 0, 1));
-	float propulsionTailFade = sqrt(clamp((0.95*TAIL_LENGTH/ATMOS_RADIUS - ratioR)*0.5, 0, 1));
+	float sphereAltFade = clamp(engineStartRatio-0.5,0,1)*clamp(1-(ratioR-EARTH_ATMOS_RATIO)*6, 0, 1);	
+	float torqueTailFade = sqrt(clamp((clamp((engineStartRatio-0.5)*0.5,0,1)*(2.3-EARTH_ATMOS_RATIO) + EARTH_ATMOS_RATIO - ratioR)*2, 0, 1));
+	float propulsionTailFade = sqrt(clamp((mix(1, 0.95*TAIL_LENGTH/ATMOS_RADIUS, min(engineStartRatio*0.4,1)) - ratioR)*0.5, 0, 1));
 	float altFade = mix(torqueTailFade, sphereAltFade, clamp(2*(ratioXY-0.5), 0, 1));
 	altFade = mix(propulsionTailFade, altFade, clamp((ratioXY-TAIL_ATMOS_RATIO)*10, 0, 1));
 
@@ -248,7 +249,7 @@ void Tail(commonParam cP, inout vec4 tailColor, inout float lenTail)
 		float lenS = lenStartStep + lenStep; // distance from eye to this step
 		for(int i = int(startStepNum);all(bvec3(tailC.a<ALPHA_MAX, lenStep<(lenRange*0.999), lenS<(cP.lenMin+lenD))); i++)
 		{
-			lenS = lenStartStep + lenStep*(1-0.003*cP.noiseD);
+			lenS = lenStartStep + lenStep*(1-0.01*cP.noiseD);
 			vec3 modelStepPos = cP.modelEyePos + cP.modelPixDir*lenS;
 			vec3 modelStepDir = normalize(modelStepPos);
 

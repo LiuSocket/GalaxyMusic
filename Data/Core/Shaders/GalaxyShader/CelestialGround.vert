@@ -9,6 +9,7 @@ uniform sampler2DArray DEMTex;
 
 out vec2 texCoord_0;
 out vec3 texCoord_1;
+out vec4 modelVertex;
 out vec4 viewPos;
 out vec3 viewNormal;
 
@@ -21,7 +22,7 @@ float DEM(in float normDEM)
 void main()
 {
 	viewNormal = normalize(gl_NormalMatrix*gl_Normal);
-	vec4 modelVertex = gl_Vertex;
+	modelVertex = gl_Vertex;
 	viewPos = gl_ModelViewMatrix*modelVertex;
 
 #ifdef EARTH

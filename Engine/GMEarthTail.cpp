@@ -311,6 +311,7 @@ void CGMEarthTail::MakeEarthTail()
 	pSSTailEnvelope->addUniform(m_pCommonUniform->GetUnit());
 	pSSTailEnvelope->addUniform(m_pCommonUniform->GetTime());
 	pSSTailEnvelope->addUniform(m_vViewLightUniform);
+	pSSTailEnvelope->addUniform(m_fEngineStartRatioUniform);
 
 	osg::ref_ptr<osg::Texture2D> pNoise2DTex = new osg::Texture2D;
 	pNoise2DTex->setImage(osgDB::readImageFile(m_pConfigData->strCorePath + "Textures/Volume/noise2D.dds"));
@@ -380,9 +381,10 @@ void CGMEarthTail::SetEarthTailRotate(const osg::Quat& qRotate)
 	m_mWorld2TailMatUniform->set(mWorld2TailMatrix);
 }
 
-void CGMEarthTail::SetUniform(osg::Uniform* pViewLight)
+void CGMEarthTail::SetUniform(osg::Uniform* pViewLight, osg::Uniform* pEngineStartRatio)
 {
 	m_vViewLightUniform = pViewLight;
+	m_fEngineStartRatioUniform = pEngineStartRatio;
 }
 
 osg::Geometry* CGMEarthTail::_MakeTailBoxGeometry(const float fLength, const float fRadius) const
@@ -671,6 +673,7 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->addUniform(m_pCommonUniform->GetEyeUpDir());
 	pSS->addUniform(m_pCommonUniform->GetMainInvProjMatrix());
 	pSS->addUniform(m_pCommonUniform->GetDeltaVPMatrix());
+	pSS->addUniform(m_fEngineStartRatioUniform);
 
 	int iUnit = 0;
 	CGMKit::AddTexture(pSS, m_vectorMap_1, "lastVectorTex", iUnit++);

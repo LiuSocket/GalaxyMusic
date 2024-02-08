@@ -8,6 +8,7 @@ uniform sampler2D tailTex;
 in float diffuse;
 in vec3 viewPos;
 in vec3 viewVertUp;
+in float engineIntensity;
 
 out vec4 color;
 
@@ -22,7 +23,7 @@ void main()
 	float vertAlt = max(0, gl_TexCoord[0].z);
 
 	float illumAlt = clamp(vertAlt*unit*0.0001,0,1);
-	vec3 illum = vec3(0.3,0.7,1.0)*illumAlt*illumAlt*illumAlt;
+	vec3 illum = vec3(0.3,0.7,1.0)*(illumAlt*illumAlt*illumAlt*engineIntensity);
 	vec4 baseColor = texture(baseColorTex, gl_TexCoord[0].xy);
 	color = vec4(max(illum,vec3(diffuse))*baseColor.rgb, baseColor.a);
 	color.a -= clamp(1-(maxDistance-lenV)/(0.9*maxDistance), 0, 1);

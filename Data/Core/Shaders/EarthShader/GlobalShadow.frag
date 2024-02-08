@@ -26,7 +26,7 @@ void main()
 	vec3 wanderingCloudCoord = cloudCoord;
 	wanderingCloudCoord.z += 6;
 	float wanderingCloudAlpha = texture(cloudTex, wanderingCloudCoord).a;
-	cloudAlpha = mix(cloudAlpha, wanderingCloudAlpha, clamp((wanderProgress-0.7)*100, 0, 1));
+	cloudAlpha = mix(cloudAlpha, wanderingCloudAlpha, clamp((wanderProgress-0.46)*25, 0, 1));
 #endif // WANDERING	
 	// cloud detail
 	vec4 detail4 = texture(cloudDetailTex, texCoord_1.xy*27);

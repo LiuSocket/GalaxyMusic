@@ -7,6 +7,8 @@ uniform vec3 viewLight;
 uniform float minDotUL;
 
 #ifdef WANDERING
+uniform sampler2D tailTex;
+uniform float engineStartRatio;
 uniform float wanderProgress;
 #endif // WANDERING	
 

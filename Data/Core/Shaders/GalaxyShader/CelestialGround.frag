@@ -1,4 +1,5 @@
 const float PROGRESS_0 = 0.1;
+const float M_PI = 3.1415926;
 
 uniform sampler2DArray baseTex;
 uniform vec2 planetRadius;
@@ -12,17 +13,13 @@ uniform sampler2DArray DEMTex;
 uniform sampler2DArray illumTex;
 uniform sampler2D globalShadowTex;
 
-#ifdef WANDERING
-uniform sampler2D tailTex;
-uniform float engineIntensity;
-#endif // WANDERING
-
 #else // not EARTH
 uniform vec4 coordScale;
 #endif // EARTH
 
 in vec2 texCoord_0;
 in vec3 texCoord_1;
+in vec4 modelVertex;
 in vec4 viewPos;
 in vec3 viewNormal;
 
@@ -33,12 +30,12 @@ float DEM(in float normDEM)
 }
 
 #ifdef WANDERING
-// lat:[-1.0, 1.0]
-float SeaLevel(in float lat, in float seaLevel_66_Progress)
+// latCoord:[-1.0, 1.0]
+float SeaLevel(in float latCoord, in float seaLevelAddProgress)
 {
 	// [0.0,0.1] seaLevel + 66m
-	float seaLevel = 66*seaLevel_66_Progress;
-	seaLevel = mix(seaLevel, clamp(abs(lat), 0, 1)*15000-9000, smoothstep(0.3, 0.8, wanderProgress));
+	float seaLevel = 66*seaLevelAddProgress;
+	seaLevel = mix(seaLevel, mix(-300, 600, abs(latCoord)), smoothstep(0.15, 0.3, wanderProgress));
 	return seaLevel;
 }
 #endif // WANDERING	
@@ -68,38 +65,44 @@ void main()
 
 #ifdef EARTH
 	vec3 illumCoord = texCoord_1;
-	illumCoord.xy = (illumCoord.xy - 0.5)*celestialCoordScale.y + 0.5;
+	illumCoord.xy = (illumCoord.xy - 0.5)*celestialCoordScale.z + 0.5;
 	vec4 illum = texture(illumTex, illumCoord);
 	vec3 illumCity = illum.rgb*(vec3(1)-smoothstep(0.0, 0.1, diffuse));
 	float rockMask = 1 - baseColor.a;
 
 	vec3 viewHalf = normalize(viewLight - viewDir);
 	float dotNH = max(dot(viewVertUp, viewHalf), 0);
+	vec3 specualr = mix(vec3(1.0,0.5,0.0),vec3(0.6,0.4,0.3),max(0,dotVUL))*pow(dotNH, 100)*sqrt(diffuse);
 #ifdef WANDERING
-	float seaLevel_66_Progress = min(1, wanderProgress/PROGRESS_0);
+	float seaLevelAddProgress = min(1, wanderProgress/PROGRESS_0);
 	vec3 wanderingBaseCoord = baseCoord;
 	wanderingBaseCoord.z += 6;
 	vec4 wanderingColor = texture(baseTex, wanderingBaseCoord);
-	baseColor.rgb = mix(baseColor.rgb, wanderingColor.rgb, seaLevel_66_Progress);
-	vec3 ambient = vec3(0.07,0.11,0.15)*exp2(min(0, texCoord_0.y-0.48)*25);
+	baseColor.rgb = mix(baseColor.rgb, wanderingColor.rgb, seaLevelAddProgress);
+
+	vec3 modelVertUp = normalize(modelVertex.xyz);
+	float engineStart = smoothstep(0.0, 0.1,
+		max(abs(modelVertUp.z), 0.4) + 0.05*cos(modelVertUp.z*1.5*M_PI)*modelVertUp.x - 1 + engineStartRatio);
+	vec3 ambient = vec3(0.07,0.11,0.15)*(exp2(min(0, texCoord_0.y-0.48)*25)*engineStart);
 
 	vec3 DEMCoord = texCoord_1;
 	DEMCoord.xy = (DEMCoord.xy - 0.5)*celestialCoordScale.w + 0.5;
 	float elev = DEM(texture(DEMTex, DEMCoord).r);
 	vertAlt = elev/unit;
-	float lat = texCoord_0.y*2-1;
-	float seaLevel = SeaLevel(lat, seaLevel_66_Progress);
+	float latCoord = texCoord_0.y*2-1;
+	float seaLevel = SeaLevel(latCoord, seaLevelAddProgress);
 	float elev2Sea = elev-seaLevel;
 	// [0.0,0.1] seaLevel + 66m
-	rockMask = mix(rockMask, smoothstep(-10.0, 0.0, elev2Sea), seaLevel_66_Progress);
+	rockMask = mix(rockMask, smoothstep(-10.0, 0.0, elev2Sea), seaLevelAddProgress);
+	illumCity = max(vec3(0), rockMask*(illumCity - seaLevelAddProgress));
 
-	color = mix(vec3(0.01,0.2,0.0), baseColor.rgb, clamp(elev2Sea*0.005, 1-0.7*seaLevel_66_Progress, 1.0));
+	color = mix(vec3(0.0,0.1,0.0), baseColor.rgb, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));
 	color *= 0.02 + ambient + 0.5*diffuse;
 
-	vec3 oceanColor = mix(vec3(0.06,0.13,0.2), vec3(0.2,0.3,0.3), exp2(min(0, elev2Sea)*0.01));
-	oceanColor = oceanColor*(ambient + 0.5*diffuse) + clamp(-elev2Sea*0.01, 0, 1)*vec3(0.5,0.4,0.3)*pow(dotNH, 200)*sqrt(diffuse);
+	vec3 oceanColor = mix(vec3(0.06,0.13,0.2), vec3(0.2,0.3,0.3), seaLevelAddProgress*exp2(min(0, elev2Sea)*0.01));
+	oceanColor = oceanColor*(ambient + 0.5*diffuse) + clamp(-elev2Sea*0.01, 0, 1)*specualr;
 #else // not WANDERING
-	vec3 oceanColor = vec3(0.08,0.1,0.12)*diffuse + vec3(1.0,0.9,0.7)*pow(dotNH, 200)*sqrt(diffuse);
+	vec3 oceanColor = vec3(0.08,0.1,0.12)*diffuse + specualr;
 #endif // WANDERING	or not
 	color = mix(oceanColor, color, rockMask);
 #endif // EARTH
@@ -120,12 +123,9 @@ void main()
 	color = ToneMapping(color);
 
 #ifdef EARTH
-#ifdef WANDERING
-	illumCity *= clamp(20*(texCoord_0.y-0.45), 0, 1);
-#endif // WANDERING	
 	color = mix(color, vec3(1), illumCity);
 #ifdef WANDERING
-	vec3 illumEngine = engineIntensity*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
+	vec3 illumEngine = engineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
 	color = mix(color, vec3(1), illumEngine);
 	if(unit > 1e6)
 	{

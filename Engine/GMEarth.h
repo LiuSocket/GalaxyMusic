@@ -303,9 +303,9 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_fMinDotULUniform;				//!< 有光区域的最小DotUL值(-1,0)
 		osg::ref_ptr<osg::Uniform>						m_fEyeAltitudeUniform;			//!< 眼点海拔Uniform
 		osg::ref_ptr<osg::Uniform>						m_mView2ECEFUniform;			//!< view空间转ECEF的矩阵
-		osg::ref_ptr<osg::Uniform>						m_fEngineIntensityUniform;		//!< 行星发动机输出功率Uniform
 		osg::ref_ptr<osg::Uniform>						m_vEarthCoordScaleUniform;		//!< 地球贴图的纹理坐标缩放
 		osg::ref_ptr<osg::Uniform>						m_fWanderProgressUniform;		//!< 流浪地球计划进展Uniform
+		osg::ref_ptr<osg::Uniform>						m_fEngineStartRatioUniform;		//!< 发动机开启比例Uniform
 
 		osg::ref_ptr<osgDB::Options>					m_pDDSOptions;					//!< dds的纹理操作
 		osg::ref_ptr<osg::Texture2DArray>				m_aEarthBaseTex;				//!< 地球base color纹理

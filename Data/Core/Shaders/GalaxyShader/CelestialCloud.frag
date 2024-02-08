@@ -1,5 +1,7 @@
 #pragma import_defines(SATURN)
 
+const float M_PI = 3.1415926;
+
 #ifdef SATURN
 uniform float cosNorthLight;
 uniform sampler2D ringTex;
@@ -9,9 +11,8 @@ in vec3 shadowVertPos;
 #ifdef EARTH
 
 #ifdef WANDERING
-uniform sampler2D tailTex;
-uniform float engineIntensity;
 uniform vec3 screenSize;
+uniform sampler2DArray illumTex;
 #endif // WANDERING
 
 uniform float unit;
@@ -30,6 +31,7 @@ uniform sampler2DArray cloudTex;
 
 in vec2 texCoord_0;
 in vec3 texCoord_1;
+in vec4 modelVertex;
 in vec4 viewPos;
 in vec3 viewNormal;
 
@@ -48,10 +50,14 @@ void main()
 	vec4 baseColor = texture(cloudTex, cloudCoord);
 #ifdef EARTH
 #ifdef WANDERING
+	vec3 illumCoord = texCoord_1;
+	illumCoord.xy = (illumCoord.xy - 0.5)*celestialCoordScale.z + 0.5;
+	vec4 illum = texture(illumTex, illumCoord);
+
 	vec3 wanderingCloudCoord = cloudCoord;
 	wanderingCloudCoord.z += 6;
 	vec4 wanderingColor = texture(cloudTex, wanderingCloudCoord);
-	baseColor.a = mix(baseColor.a, wanderingColor.a, clamp((wanderProgress-0.7)*100, 0, 1));
+	baseColor.a = mix(baseColor.a, wanderingColor.a, clamp((wanderProgress-0.46)*25, 0, 1));
 #endif // WANDERING	
 	float lenV = length(viewPos.xyz);
 	// cloud detail
@@ -90,9 +96,12 @@ void main()
 #ifdef EARTH
 	color = 0.03 + diffuse;
 #ifdef WANDERING
-	vec3 ambient = vec3(0.07,0.11,0.15)*exp2(min(0, texCoord_0.y-0.48)*25);
+	vec3 modelVertUp = normalize(modelVertex.xyz);
+	float engineStart = smoothstep(0.0, 0.1,
+		max(abs(modelVertUp.z), 0.4) + 0.05*cos(modelVertUp.z*1.5*M_PI)*modelVertUp.x - 1 + engineStartRatio);
+	vec3 ambient = vec3(0.07,0.11,0.15)*(engineStart*exp2(min(0, texCoord_0.y-0.48)*25));
 	color = 0.03 + ambient + 0.5*diffuse;
-	vec3 illumEngine = engineIntensity*(1-exp2(-baseColor.r*vec3(0.1,0.2,0.3)));
+	vec3 illumEngine = engineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
 	color += illumEngine;
 #endif // WANDERING
 #endif // EARTH
