@@ -1,6 +1,7 @@
 #ifdef EARTH
 
 uniform float unit;
+uniform float wanderProgress;
 uniform vec3 screenSize;
 uniform sampler2D baseColorTex;
 uniform sampler2D tailTex;
@@ -22,11 +23,13 @@ void main()
 	vec3 viewEngineUp = normalize(viewVertUp);
 	float vertAlt = max(0, gl_TexCoord[0].z);
 
-	float illumAlt = clamp(vertAlt*unit*0.0001,0,1);
+	float illumAlt = clamp(vertAlt*unit*1e-4,0,1);
 	vec3 illum = vec3(0.3,0.7,1.0)*(illumAlt*illumAlt*illumAlt*engineIntensity);
 	vec4 baseColor = texture(baseColorTex, gl_TexCoord[0].xy);
 	color = vec4(max(illum,vec3(diffuse))*baseColor.rgb, baseColor.a);
 	color.a -= clamp(1-(maxDistance-lenV)/(0.9*maxDistance), 0, 1);
+	// building progress
+	color.a *= step(0, wanderProgress*10-vertAlt*unit*1e-4);
 
 	// radius at the vertex point
 	float Rv = gl_TexCoord[0].w;

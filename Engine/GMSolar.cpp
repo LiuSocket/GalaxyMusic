@@ -31,26 +31,28 @@
 using namespace GM;
 
 /*************************************************************************
+constexpr
+*************************************************************************/
+constexpr auto RING_SEGMENT			= 128;				// 行星光环（半圈）有多少段梯型;
+constexpr auto ASTEROID_NUM			= 16384;			// 小行星带上的点精灵数量
+constexpr auto GM_YEAR				= 1800.0;			// 本系统的“地球”公转周期。单位：秒
+constexpr auto GM_YEAR_REAL			= 31558150.0; 		// 一恒星年。单位：秒（365.25636*24*60*60）
+
+constexpr auto SUN_RADIUS			= 6.963e8;			// 太阳半径，单位：米;
+constexpr auto SUN_BLOOM_SCALE		= 10.0;				// 太阳辉光板的放大比例（半径与太阳半径的比值）
+
+constexpr auto GM_AU				= 1.495978707e11; 		// 天文单位，单位：米
+constexpr auto GM_R_MERCURY			= GM_AU * 0.3871; 		// 水星轨道半径，单位：米
+constexpr auto GM_R_VENUS			= GM_AU * 0.7233; 		// 金星轨道半径，单位：米
+constexpr auto GM_R_MARS			= GM_AU * 1.52;			// 火星轨道半径，单位：米
+constexpr auto GM_R_JUPITER			= GM_AU * 5.20; 		// 木星轨道半径，单位：米
+constexpr auto GM_R_SATURN			= GM_AU * 9.55;			// 土星轨道半径，单位：米
+constexpr auto GM_R_URANUS			= GM_AU * 19.22; 		// 天王星轨道半径，单位：米
+constexpr auto GM_R_NEPTUNE			= GM_AU * 30.11; 		// 海王星轨道半径，单位：米
+
+/*************************************************************************
 Macro Defines
 *************************************************************************/
-
-#define RING_SEGMENT			(128)			// 行星光环（半圈）有多少段梯型
-#define ASTEROID_NUM			(16384)			// 小行星带上的点精灵数量
-#define GM_YEAR					(3600.000) 		// 本系统的“地球”公转周期。单位：秒
-#define GM_YEAR_REAL			(31558150.0) 	// 一恒星年。单位：秒（365.25636*24*60*60）
-
-#define SUN_RADIUS				(6.963e8)		// 太阳半径，单位：米
-#define SUN_BLOOM_SCALE			(10.0)			// 太阳辉光板的放大比例（半径与太阳半径的比值）
-
-#define GM_AU					(1.495978707e11) 	// 天文单位，单位：米
-#define GM_R_MERCURY			(GM_AU*0.3871) 		// 水星轨道半径，单位：米
-#define GM_R_VENUS				(GM_AU*0.7233) 		// 金星轨道半径，单位：米
-#define GM_R_MARS				(GM_AU*1.52) 		// 火星轨道半径，单位：米
-#define GM_R_JUPITER			(GM_AU*5.20) 		// 木星轨道半径，单位：米
-#define GM_R_SATURN				(GM_AU*9.55) 		// 土星轨道半径，单位：米
-#define GM_R_URANUS				(GM_AU*19.22) 		// 天王星轨道半径，单位：米
-#define GM_R_NEPTUNE			(GM_AU*30.11) 		// 海王星轨道半径，单位：米
-
 #define GROUND_BASE_UNIT		(0) 		// 天体地面的基础纹理单元
 #define GROUND_INSCAT_UNIT		(2) 		// 天体地面上的大气“内散射”纹理单元
 
@@ -135,7 +137,7 @@ CGMSolar::CGMSolar() : m_iCenterCelestialBody(0),
 	m_vPlanetNorth(0.0, 0.0, 1.0), m_vPlanetAxisX(1.0, 0.0, 0.0),
 	m_qSolarRotate(osg::Quat(osg::PI*0.3, osg::Vec3d(1, 0, 0), osg::PI*0.2, osg::Vec3d(0, 1, 0), osg::PI*0.1, osg::Vec3d(0, 0, 1))),
 	m_qPlanetRotate(osg::Quat()),
-	m_vSolarPos_Hie1(0.0, 0.0, 0.0), m_vSolarPos_Hie2(0.0, 0.0, 0.0), m_fEyeAltitude(1e10f),
+	m_vSolarPos_Hie1(0.0, 0.0, 0.0), m_vSolarPos_Hie2(0.0, 0.0, 0.0), m_fEyeAltitude(1e10f), m_fWanderingEarthProgress(0.0f),
 	m_fBackgroundSunScaleUniform(new osg::Uniform("backgroundSunScale", 1.0f)),
 	m_fBackgroundSunAlphaUniform(new osg::Uniform("backgroundSunAlpha", 1.0f)),
 	m_fSunEdgeUniform(new osg::Uniform("sunEdgePos", 0.1f)),
@@ -246,8 +248,7 @@ bool CGMSolar::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData,
 		m_fAtmosHeightUniform,
 		m_fMinDotULUniform,
 		m_fEyeAltitudeUniform,
-		m_mView2ECEFUniform.get()
-	);
+		m_mView2ECEFUniform);
 
 	m_3DShapeTex = _Load3DShapeNoise();
 
@@ -351,7 +352,8 @@ bool CGMSolar::Update(double dDeltaTime)
 	int iHie = m_pKernelData->iHierarchy;
 	if (0 == iHie || 1 == iHie || 2 == iHie)
 	{
-		osg::Quat qPlanetSpin = _GetPlanetSpin(fTimes);
+		_UpdatePlanetSpin(dDeltaTime);
+		osg::Quat qPlanetSpin = _GetPlanetSpin();
 		osg::Quat qPlanetInclination = _GetPlanetInclination(fTimes);
 		osg::Quat qPlanetTurn = _GetPlanetTurn(fTimes);
 		m_qPlanetRotate = qPlanetSpin * qPlanetInclination * qPlanetTurn;
@@ -1082,6 +1084,7 @@ void CGMSolar::SetSupernovaHiePos(const osg::Vec3f& vHiePos)
 
 void CGMSolar::SetWanderingEarthProgress(const float fProgress)
 {
+	m_fWanderingEarthProgress = fProgress;
 	m_pEarth->SetWanderingEarthProgress(fProgress);
 }
 
@@ -3003,24 +3006,28 @@ osg::Geometry* CGMSolar::_CreateScreenTriangle(const int width, const int height
 	return pGeometry;
 }
 
-double CGMSolar::_GetPlanetSpinAngle(const double fTime) const
+void CGMSolar::_UpdatePlanetSpin(double dDeltaTime)
 {
-	//如果当前是流浪地球，就停止自传，并按照电影设定，把欧亚大陆置于永日，美周大陆永夜
-	if (m_pConfigData->bWanderingEarth && (3 == m_iCenterCelestialBody))
-	{
-		return 1.8;
-	}
-	else
+	int iCenterCelestialBody = 0;
+	for (auto& itr : m_sCelestialBodyVector)
 	{
 		// 将所有天体的自转速度都加速240倍(地球6分钟转一圈)，以保证视觉效果
-		return fTime * osg::PI * 2 * 240 / m_sCelestialBodyVector.at(m_iCenterCelestialBody).fSpinPeriod;
+		// 真实的自转速度应该根据本系统的公转速度倍率来调整
+		double fDeltaSpin = dDeltaTime * (GM_YEAR_REAL / GM_YEAR) * osg::PI * 2 / itr.fSpinPeriod;
+		//流浪地球模式，逐渐停止自传
+		if (m_pConfigData->bWanderingEarth && (3 == iCenterCelestialBody))
+			fDeltaSpin *= 1 - osg::clampBetween((m_fWanderingEarthProgress - 0.1) * 10, 0.0, 1.0);
+
+		itr.fSpin += fDeltaSpin;
+		if (itr.fSpin > osg::PI * 2) itr.fSpin -= osg::PI * 2;
+
+		iCenterCelestialBody++;
 	}
 }
 
-osg::Quat CGMSolar::_GetPlanetSpin(const double fTime) const
+osg::Quat CGMSolar::_GetPlanetSpin() const
 {
-	double fSpinAngle = _GetPlanetSpinAngle(fTime);
-	return osg::Quat(fSpinAngle, osg::Vec3d(0, 0, 1));
+	return osg::Quat(m_sCelestialBodyVector.at(m_iCenterCelestialBody).fSpin, osg::Vec3d(0, 0, 1));
 }
 
 double CGMSolar::_GetPlanetObliquityAngle(const double fTime) const

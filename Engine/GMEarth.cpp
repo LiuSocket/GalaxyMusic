@@ -516,7 +516,10 @@ void CGMEarth::SetUniform(
 
 	if (m_pConfigData->bWanderingEarth)
 	{
-		m_pEarthTail->SetUniform(m_vViewLightUniform, m_fEngineStartRatioUniform);
+		m_pEarthTail->SetUniform(
+			m_vViewLightUniform,
+			m_fEngineStartRatioUniform,
+			m_mView2ECEFUniform);
 	}
 }
 
@@ -615,7 +618,7 @@ void CGMEarth::SetWanderingEarthProgress(const float fProgress)
 
 	m_fWanderProgressUniform->set(osg::clampBetween(fProgress, 0.0f, 1.0f));
 	// 发动机在月球危机时开启
-	m_fEngineStartRatioUniform->set(fmaxf((fProgress-0.4f)*10.0f, 0.0f));
+	m_fEngineStartRatioUniform->set(fmaxf((fProgress-0.3f)*10.0f, 0.0f));
 }
 
 bool CGMEarth::CreateEarth()
@@ -849,6 +852,7 @@ bool CGMEarth::_CreateEarth_1()
 		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
 		m_pSSEarthGround_1->addUniform(pGroundTailUniform);
 
+		m_pSSEarthGround_1->addUniform(m_fEngineStartRatioUniform);
 		m_pSSEarthGround_1->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthGround_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
@@ -863,7 +867,6 @@ bool CGMEarth::_CreateEarth_1()
 	m_pSSEarthGround_1->addUniform(m_pCommonUniform->GetScreenSize());
 	m_pSSEarthGround_1->addUniform(m_vEarthCoordScaleUniform);
 	m_pSSEarthGround_1->addUniform(m_pCommonUniform->GetUnit());
-	m_pSSEarthGround_1->addUniform(m_fEngineStartRatioUniform);
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthGround_1,
@@ -920,6 +923,7 @@ bool CGMEarth::_CreateEarth_1()
 		osg::ref_ptr<osg::Uniform> pCloudIllumUniform = new osg::Uniform("illumTex", iCloudUnit++);
 		m_pSSEarthCloud_1->addUniform(pCloudIllumUniform);
 
+		m_pSSEarthCloud_1->addUniform(m_fEngineStartRatioUniform);
 		m_pSSEarthCloud_1->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthCloud_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
@@ -935,7 +939,6 @@ bool CGMEarth::_CreateEarth_1()
 	m_pSSEarthCloud_1->addUniform(m_pCommonUniform->GetScreenSize());
 	m_pSSEarthCloud_1->addUniform(m_vEarthCoordScaleUniform);
 	m_pSSEarthCloud_1->addUniform(m_pCommonUniform->GetUnit());
-	m_pSSEarthCloud_1->addUniform(m_fEngineStartRatioUniform);
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthCloud_1,
@@ -1048,6 +1051,7 @@ bool CGMEarth::_CreateEarth_2()
 		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
 		m_pSSEarthGround_2->addUniform(pGroundTailUniform);
 
+		m_pSSEarthGround_2->addUniform(m_fEngineStartRatioUniform);
 		m_pSSEarthGround_2->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthGround_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
@@ -1062,7 +1066,6 @@ bool CGMEarth::_CreateEarth_2()
 	m_pSSEarthGround_2->addUniform(m_pCommonUniform->GetScreenSize());
 	m_pSSEarthGround_2->addUniform(m_vEarthCoordScaleUniform);
 	m_pSSEarthGround_2->addUniform(m_pCommonUniform->GetUnit());
-	m_pSSEarthGround_2->addUniform(m_fEngineStartRatioUniform);
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthGround_2,
@@ -1119,6 +1122,7 @@ bool CGMEarth::_CreateEarth_2()
 		osg::ref_ptr<osg::Uniform> pCloudIllumUniform = new osg::Uniform("illumTex", iCloudUnit++);
 		m_pSSEarthCloud_2->addUniform(pCloudIllumUniform);
 
+		m_pSSEarthCloud_2->addUniform(m_fEngineStartRatioUniform);
 		m_pSSEarthCloud_2->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthCloud_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
@@ -1134,7 +1138,6 @@ bool CGMEarth::_CreateEarth_2()
 	m_pSSEarthCloud_2->addUniform(m_pCommonUniform->GetScreenSize());
 	m_pSSEarthCloud_2->addUniform(m_vEarthCoordScaleUniform);
 	m_pSSEarthCloud_2->addUniform(m_pCommonUniform->GetUnit());
-	m_pSSEarthCloud_2->addUniform(m_fEngineStartRatioUniform);
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthCloud_2,
@@ -1416,6 +1419,7 @@ bool CGMEarth::_GenEarthEngineBody_1()
 	pSSEngineBody->addUniform(m_fEyeAltitudeUniform);
 	pSSEngineBody->addUniform(m_fAtmosHeightUniform);
 	pSSEngineBody->addUniform(m_fEngineStartRatioUniform);
+	pSSEngineBody->addUniform(m_fWanderProgressUniform);
 
 	int iTexUnit = 0;
 	// base color贴图
@@ -1471,6 +1475,7 @@ bool CGMEarth::_GenEarthEngineBody_2()
 	pSSEngineBody->addUniform(m_fEyeAltitudeUniform);
 	pSSEngineBody->addUniform(m_fAtmosHeightUniform);
 	pSSEngineBody->addUniform(m_fEngineStartRatioUniform);
+	pSSEngineBody->addUniform(m_fWanderProgressUniform);
 
 	int iTexUnit = 0;
 	// base color 贴图

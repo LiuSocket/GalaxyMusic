@@ -41,7 +41,7 @@ namespace GM
 		SGMCelestialBody()
 			: fOrbitalRadius(1e11), fOrbitalPeriod(1.0), fStartTrueAnomaly(0.0),
 			fEquatorRadius(0.01), fPolarRadius(0.01), fObliquity(0.0), fSpinPeriod(1.0),
-			fGroundTop(1000.0f), fCloudTop(8e3f), eAtmosHeight(EGMAH_0),
+			fSpin(0.0), fGroundTop(1000.0f), fCloudTop(8e3f), eAtmosHeight(EGMAH_0),
 			vAtmosColor(osg::Vec4f(1, 1, 1, 1)),
 			fRingMinRadius(0), fRingMaxRadius(0)
 		{}
@@ -52,7 +52,7 @@ namespace GM
 			double ringMinRadius = 0, double ringMaxRadius = 0)
 			: fOrbitalRadius(orbitalRadius), fOrbitalPeriod(period), fStartTrueAnomaly(startTrueAnomaly),
 			fEquatorRadius(equatorRadius), fPolarRadius(polarRadius), fObliquity(obliquity), fSpinPeriod(spinPeriod),
-			fGroundTop(groundTop), fCloudTop(cloudTop), eAtmosHeight(atmosH), vAtmosColor(atmosColor),
+			fSpin(0.0), fGroundTop(groundTop), fCloudTop(cloudTop), eAtmosHeight(atmosH), vAtmosColor(atmosColor),
 			fRingMinRadius(ringMinRadius), fRingMaxRadius(ringMaxRadius)	
 		{}
 
@@ -63,6 +63,7 @@ namespace GM
 		double fPolarRadius;			// 天体两级半径，单位：米
 		double fObliquity;				// 天体的自转轴平面与黄道面夹角（有向），单位：弧度
 		double fSpinPeriod;				// 天体的自转周期，单位：秒
+		double fSpin;					// 天体当前帧的自转角度，单位：弧度
 		float fGroundTop;				// 地面最高山顶的海拔高，单位：米
 		float fCloudTop;				// 岩石行星的云顶海拔高，单位：米
 		EGMAtmosHeight eAtmosHeight;	// 天体的大气厚度，单位：千米
@@ -342,17 +343,15 @@ namespace GM
 		osg::Geometry* _CreateScreenTriangle(const int width, const int height);
 
 		/**
-		* @brief 获取某一时刻当前天体自转角度
-		* @param fTime: 程序运行时间，单位：秒
-		* @return double 当前天体自转角度，单位：弧度
+		* @brief 更新天体自转角度
+		* @param dDeltaTime: 上一帧间隔时间，单位：秒
 		*/
-		double _GetPlanetSpinAngle(const double fTime) const;
+		void _UpdatePlanetSpin(double dDeltaTime);
 		/**
 		* @brief 获取某一时刻当前天体自转四元数
-		* @param fTime: 程序运行时间，单位：秒
 		* @return osg::Quat 当前天体自转四元数
 		*/
-		osg::Quat _GetPlanetSpin(const double fTime) const;
+		osg::Quat _GetPlanetSpin() const;
 		/**
 		* @brief 获取某一时刻当前天体自转轴倾角
 		* @param fTime: 程序运行时间，单位：秒
@@ -408,6 +407,7 @@ namespace GM
 		osg::Vec3d										m_vSolarPos_Hie1;				//!< 太阳在第1层级空间下的坐标
 		osg::Vec3d										m_vSolarPos_Hie2;				//!< 太阳在第2层级空间下的坐标
 		double											m_fEyeAltitude;					//!< 眼点海拔，单位：米
+		float											m_fWanderingEarthProgress;		//!< 流浪地球计划进展[0.0,1.0]
 
 		osg::ref_ptr<osg::Geometry>						m_pPlanetGeom_1;				//!< 第1层级行星共用球体
 		osg::ref_ptr<osg::Geometry>						m_pPlanetGeom_2;				//!< 第2层级行星共用球体
@@ -440,7 +440,7 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_fPlanetLineAlphaUniform;		//!< 行星轨迹线的alpha的Uniform
 		osg::ref_ptr<osg::Uniform>						m_vPlanetRadiusUniform;			//!< 行星的两个半径（第二层级）
 		osg::ref_ptr<osg::Uniform>						m_fPlanetPointAlphaUniform;		//!< 行星点精灵的alpha的Uniform
-		osg::ref_ptr<osg::Uniform>						m_vViewLightUniform;			//!< 2层级view空间的光源方向
+		osg::ref_ptr<osg::Uniform>						m_vViewLightUniform;			//!< view空间的光源方向
 		osg::ref_ptr<osg::Uniform>						m_mRingShadowMatrixUniform;		//!< 2层级光环转阴影空间的矩阵
 		osg::ref_ptr<osg::Uniform>						m_mPlanetShadowMatrixUniform;	//!< 2层级行星转阴影空间的矩阵
 		osg::ref_ptr<osg::Uniform>						m_fNorthDotLightUniform;		//!< 行星自转轴与阳光前进方向的点乘

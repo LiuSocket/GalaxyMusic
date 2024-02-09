@@ -34,7 +34,7 @@ CGMEarthTail::CGMEarthTail(): CGMVolumeBasic(),
 	m_strEarthShaderPath("Shaders/EarthShader/"), m_strGalaxyShaderPath("Shaders/GalaxyShader/"),
 	m_bVisible(false),
 	m_fTailVisibleUniform(new osg::Uniform("tailVisible", 1.0f)),
-	m_mWorld2TailMatUniform(new osg::Uniform("world2ModelMatrix", osg::Matrixf()))
+	m_mWorld2ECEFUniform(new osg::Uniform("world2ECEFMatrix", osg::Matrixf()))
 {
 }
 
@@ -377,14 +377,18 @@ void CGMEarthTail::SetEarthTailRotate(const osg::Quat& qRotate)
 	if (!m_pTailTransform2.valid()) return;
 
 	m_pTailTransform2->asPositionAttitudeTransform()->setAttitude(qRotate);
-	osg::Matrixf mWorld2TailMatrix = osg::Matrixd::inverse(osg::Matrixd(qRotate));
-	m_mWorld2TailMatUniform->set(mWorld2TailMatrix);
+	osg::Matrixf mWorld2ECEFMatrix = osg::Matrixd::inverse(osg::Matrixd(qRotate));
+	m_mWorld2ECEFUniform->set(mWorld2ECEFMatrix);
 }
 
-void CGMEarthTail::SetUniform(osg::Uniform* pViewLight, osg::Uniform* pEngineStartRatio)
+void CGMEarthTail::SetUniform(
+	osg::Uniform* pViewLight,
+	osg::Uniform* pEngineStartRatio,
+	osg::Uniform* pView2ECEF)
 {
 	m_vViewLightUniform = pViewLight;
 	m_fEngineStartRatioUniform = pEngineStartRatio;
+	m_mView2ECEFUniform = pView2ECEF;
 }
 
 osg::Geometry* CGMEarthTail::_MakeTailBoxGeometry(const float fLength, const float fRadius) const
@@ -664,7 +668,9 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->addUniform(m_fTailVisibleUniform);
 	pSS->addUniform(m_vShakeVectorUniform);
 	pSS->addUniform(m_vDeltaShakeUniform);
-	pSS->addUniform(m_mWorld2TailMatUniform);
+	pSS->addUniform(m_mWorld2ECEFUniform);
+	pSS->addUniform(m_mView2ECEFUniform);
+	pSS->addUniform(m_vViewLightUniform);
 	pSS->addUniform(m_pCommonUniform->GetUnit());
 	pSS->addUniform(m_pCommonUniform->GetTime());
 	pSS->addUniform(m_pCommonUniform->GetScreenSize());

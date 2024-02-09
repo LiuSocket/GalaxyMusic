@@ -57,7 +57,7 @@ void main()
 	vec3 wanderingCloudCoord = cloudCoord;
 	wanderingCloudCoord.z += 6;
 	vec4 wanderingColor = texture(cloudTex, wanderingCloudCoord);
-	baseColor.a = mix(baseColor.a, wanderingColor.a, clamp((wanderProgress-0.46)*25, 0, 1));
+	baseColor.a = mix(baseColor.a, wanderingColor.a, clamp((wanderProgress-0.36)*25, 0, 1));
 #endif // WANDERING	
 	float lenV = length(viewPos.xyz);
 	// cloud detail

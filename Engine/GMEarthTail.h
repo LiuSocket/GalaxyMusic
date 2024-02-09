@@ -83,7 +83,10 @@ namespace GM
 		void SetEarthTailRotate(const osg::Quat& qRotate);
 
 		/* @brief 传递Uniform */
-		void SetUniform(osg::Uniform* pViewLight, osg::Uniform* pEngineStartRatio);
+		void SetUniform(
+			osg::Uniform* pViewLight,
+			osg::Uniform* pEngineStartRatio,
+			osg::Uniform* pView2ECEF);
 
 	private:
 		/**
@@ -147,7 +150,8 @@ namespace GM
 
 		bool											m_bVisible;						//!< 流浪地球尾迹是否可见
 		osg::ref_ptr<osg::Uniform>						m_fTailVisibleUniform;			//!< 流浪地球尾迹可见度的Uniform
-		osg::ref_ptr<osg::Uniform>						m_mWorld2TailMatUniform;		//!< “2级世界空间”转“尾迹空间”的矩阵
+		osg::ref_ptr<osg::Uniform>						m_mWorld2ECEFUniform;			//!< “2级世界空间”转 ECEF 的矩阵
+		osg::ref_ptr<osg::Uniform>						m_mView2ECEFUniform;			//!< view空间转ECEF的矩阵
 		osg::ref_ptr<osg::Uniform>						m_vViewLightUniform;			//!< view空间的光源方向
 		osg::ref_ptr<osg::Uniform>						m_fEngineStartRatioUniform;		//!< 发动机开启比例Uniform
 	};

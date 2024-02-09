@@ -6,6 +6,7 @@ struct commonParam {
 	vec4 norm;
 	vec3 modelEyePos;
 	vec3 modelPixDir;
+	vec3 modelSunDir;
 	float scattering;
 	float dotNorm;
 	float lenUnit;
@@ -46,7 +47,7 @@ const mat4 spinMatrix = mat4(
 	sinSpin,	cosSpin,	0,	0,
 	0,					0,	1,	0,
 	0,					0,	0,	1);
-const vec3 modelSunDir = (spinMatrix*vec4(-1,0,0,0)).xyz;
+//vec3 modelSunDir = (spinMatrix*vec4(-1,0,0,0)).xyz;
 
 uniform float unit;
 uniform float times;
@@ -59,12 +60,14 @@ uniform vec3 screenSize;
 uniform vec3 eyeFrontDir;
 uniform vec3 eyeRightDir;
 uniform vec3 eyeUpDir;
+uniform vec3 viewLight;
 uniform vec4 noiseVec4;
 uniform mat4 invProjMatrix;
 uniform mat4 deltaViewProjMatrix;
 uniform mat4 osg_ViewMatrixInverse;
-// model space(Wandering Earth Space), world up is "y", earth tail direction is "z", 
-uniform mat4 world2ModelMatrix;
+// world up is "y", earth tail direction is near "z", 
+uniform mat4 world2ECEFMatrix;
+uniform mat4 view2ECEFMatrix;
 
 uniform sampler2D lastVectorTex;
 uniform sampler2D blueNoiseTex;
@@ -185,7 +188,7 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 	// fade by ratioR
 	float sphereAltFade = clamp(engineStartRatio-0.5,0,1)*clamp(1-(ratioR-EARTH_ATMOS_RATIO)*6, 0, 1);	
 	float torqueTailFade = sqrt(clamp((clamp((engineStartRatio-0.5)*0.5,0,1)*(2.3-EARTH_ATMOS_RATIO) + EARTH_ATMOS_RATIO - ratioR)*2, 0, 1));
-	float propulsionTailFade = sqrt(clamp((mix(1, 0.95*TAIL_LENGTH/ATMOS_RADIUS, min(engineStartRatio*0.4,1)) - ratioR)*0.5, 0, 1));
+	float propulsionTailFade = sqrt(clamp((0.95*TAIL_LENGTH/ATMOS_RADIUS - ratioR)*0.5, 0, 1))*clamp(engineStartRatio+0.9-ratioR,0,1);
 	float altFade = mix(torqueTailFade, sphereAltFade, clamp(2*(ratioXY-0.5), 0, 1));
 	altFade = mix(propulsionTailFade, altFade, clamp((ratioXY-TAIL_ATMOS_RATIO)*10, 0, 1));
 
@@ -273,7 +276,7 @@ void Tail(commonParam cP, inout vec4 tailColor, inout float lenTail)
 				for(int k = 0; k < LIGHT_SAMPLE; k++)
 				{
 					float lenK = (1+0.1*cP.noiseD)*LIGHT_LEN[k];
-					vec3 modelStepPosK = modelStepPos - modelSunDir*lenK;
+					vec3 modelStepPosK = modelStepPos - cP.modelSunDir*lenK;
 					vec3 modelStepDirK = normalize(modelStepPosK);
 					float atmosDensK = AtmosDens(modelStepPosK, modelStepDirK);
 					densLight += atmosDensK;
@@ -281,7 +284,7 @@ void Tail(commonParam cP, inout vec4 tailColor, inout float lenTail)
 				float beersLawOut = Dens2Bright(denSum*5e7)*Dens2Bright(densLight);
 				vec3 diffuse = vec3(70,90,120)*cP.scattering*beersLawOut;
 				// earth shadow
-				float dotVUL = dot(modelStepDir, modelSunDir);
+				float dotVUL = dot(modelStepDir, cP.modelSunDir);
 				diffuse *= smoothstep(vec3(-0.55,-0.52,-0.5), vec3(0.2,0.24,0.28), vec3(dotVUL));
 				// all color
 				vec3 chrome = ambient + diffuse; 
@@ -315,9 +318,11 @@ void main()
 	vec3 WVD = localDir;
 	vec3 WCP = osg_ViewMatrixInverse[3].xyz;
 	// eye position in model space
-	vec3 modelEyePos = (world2ModelMatrix*vec4(WCP,1)).xyz;
+	vec3 modelEyePos = (world2ECEFMatrix*vec4(WCP,1)).xyz;
 	// pixel direction in model space
-	vec3 modelPixDir = (world2ModelMatrix*vec4(WVD,0)).xyz;
+	vec3 modelPixDir = (world2ECEFMatrix*vec4(WVD,0)).xyz;
+	// sun direction in model space
+	vec3 modelSunDir = (view2ECEFMatrix*vec4(viewLight,0)).xyz;
 
 	vec2 rayMarchScreenSize = screenSize.xy*screenSize.z;
 	vec2 projCoord = gl_FragCoord.xy/rayMarchScreenSize;
@@ -365,6 +370,7 @@ void main()
 	cP.norm = norm_0;
 	cP.modelEyePos = modelEyePos;
 	cP.modelPixDir = modelPixDir;
+	cP.modelSunDir = modelSunDir;
 	cP.scattering = scattering;
 	cP.dotNorm = dotNorm.x;
 	cP.lenUnit = lenUnit.x;

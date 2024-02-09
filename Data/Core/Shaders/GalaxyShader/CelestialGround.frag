@@ -1,4 +1,5 @@
 const float PROGRESS_0 = 0.1;
+const float PROGRESS_1 = 0.2;
 const float M_PI = 3.1415926;
 
 uniform sampler2DArray baseTex;
@@ -35,7 +36,7 @@ float SeaLevel(in float latCoord, in float seaLevelAddProgress)
 {
 	// [0.0,0.1] seaLevel + 66m
 	float seaLevel = 66*seaLevelAddProgress;
-	seaLevel = mix(seaLevel, mix(-300, 600, abs(latCoord)), smoothstep(0.15, 0.3, wanderProgress));
+	seaLevel = mix(seaLevel, mix(-300, 600, abs(latCoord)), smoothstep(PROGRESS_0, PROGRESS_1, wanderProgress));
 	return seaLevel;
 }
 #endif // WANDERING	
@@ -74,7 +75,7 @@ void main()
 	float dotNH = max(dot(viewVertUp, viewHalf), 0);
 	vec3 specualr = mix(vec3(1.0,0.5,0.0),vec3(0.6,0.4,0.3),max(0,dotVUL))*pow(dotNH, 100)*sqrt(diffuse);
 #ifdef WANDERING
-	float seaLevelAddProgress = min(1, wanderProgress/PROGRESS_0);
+	float seaLevelAddProgress = clamp(wanderProgress/PROGRESS_0,0,1);
 	vec3 wanderingBaseCoord = baseCoord;
 	wanderingBaseCoord.z += 6;
 	vec4 wanderingColor = texture(baseTex, wanderingBaseCoord);
