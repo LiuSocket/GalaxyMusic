@@ -219,6 +219,7 @@ CGMEarth Methods
 CGMEarth::CGMEarth() : CGMPlanet(),
 	m_strGalaxyShaderPath("Shaders/GalaxyShader/"),
 	m_strEarthShaderPath("Shaders/EarthShader/"),
+	m_fCurrentObliquity(osg::DegreesToRadians(23.44)), m_fNorthRotateSpeed(0.0),
 	m_fCloudBottom(5e3f), m_fCloudTop(1e4f),
 	m_vEarthCoordScaleUniform(new osg::Uniform("coordScale_Earth", osg::Vec4f(1.0f, 1.0f, 1.0f, 1.0f))),//UV缩放，四层够用了
 	m_fWanderProgressUniform(new osg::Uniform("wanderProgress", 0.0f)),
@@ -604,8 +605,14 @@ void CGMEarth::SetVisible(const bool bVisible)
 	}
 }
 
-void CGMEarth::SetEarthRotate(const osg::Quat& qRotate)
+void CGMEarth::SetEarthRotate(const double fSpin, const double fObliquity, const double fTrueAnomaly)
 {
+	m_fCurrentObliquity = fObliquity;
+
+	osg::Quat qPlanetSpin = osg::Quat(fSpin, osg::Vec3d(0, 0, 1));
+	osg::Quat qPlanetInclination = osg::Quat(fObliquity, osg::Vec3d(1, 0, 0));
+	osg::Quat qPlanetTurn = osg::Quat(fTrueAnomaly, osg::Vec3d(0, 0, 1));
+	osg::Quat qRotate = qPlanetSpin * qPlanetInclination * qPlanetTurn;
 	m_pPlanet_2_Transform->asPositionAttitudeTransform()->setAttitude(qRotate);
 
 	if (m_pConfigData->bWanderingEarth)
@@ -618,7 +625,7 @@ void CGMEarth::SetWanderingEarthProgress(const float fProgress)
 
 	m_fWanderProgressUniform->set(osg::clampBetween(fProgress, 0.0f, 1.0f));
 	// 发动机在月球危机时开启
-	m_fEngineStartRatioUniform->set(fmaxf((fProgress-0.3f)*10.0f, 0.0f));
+	m_fEngineStartRatioUniform->set(fmaxf((fProgress-0.25f)*10.0f, 0.0f));
 }
 
 bool CGMEarth::CreateEarth()

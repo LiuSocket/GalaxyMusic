@@ -1,5 +1,5 @@
 const float PROGRESS_0 = 0.1;
-const float PROGRESS_1 = 0.2;
+const float PROGRESS_1 = 0.15;
 const float M_PI = 3.1415926;
 
 uniform sampler2DArray baseTex;
@@ -84,7 +84,7 @@ void main()
 	vec3 modelVertUp = normalize(modelVertex.xyz);
 	float engineStart = smoothstep(0.0, 0.1,
 		max(abs(modelVertUp.z), 0.4) + 0.05*cos(modelVertUp.z*1.5*M_PI)*modelVertUp.x - 1 + engineStartRatio);
-	vec3 ambient = vec3(0.07,0.11,0.15)*(exp2(min(0, texCoord_0.y-0.48)*25)*engineStart);
+	vec3 ambient = vec3(0.07,0.11,0.15)*(exp2(-abs(texCoord_0.y-0.5)*25)+exp2(min(0,texCoord_0.y-0.67)*50))*engineStart;
 
 	vec3 DEMCoord = texCoord_1;
 	DEMCoord.xy = (DEMCoord.xy - 0.5)*celestialCoordScale.w + 0.5;

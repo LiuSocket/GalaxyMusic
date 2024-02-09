@@ -190,7 +190,7 @@ CGMSolar::CGMSolar() : m_iCenterCelestialBody(0),
 		osg::Vec4f(1.0, 0.6, 0.4, 1.0)));
 	// 地球
 	m_sCelestialBodyVector.push_back(SGMCelestialBody(GM_AU, GM_YEAR, 0, 6378137, 6356752,
-		osg::DegreesToRadians(23.44), 23.9345*fSecondPerHour, 8848.0f, m_pEarth->GetCloudTopHeight(), EGMAH_64,
+		m_pEarth->GetCurrentObliquity(), 23.9345 * fSecondPerHour, 8848.0f, m_pEarth->GetCloudTopHeight(), EGMAH_64,
 		osg::Vec4f(ATMOS_R, ATMOS_G, ATMOS_B, 1.0)));
 	// 火星
 	// https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html
@@ -333,7 +333,7 @@ bool CGMSolar::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData,
 	{
 		CGMXmlNode sJupiter = aXML.GetChild("Jupiter");
 		double fTrueAnomaly = sJupiter.GetPropDouble("trueAnomaly");
-		m_sCelestialBodyVector.at(5).fStartTrueAnomaly = fTrueAnomaly;
+		m_sCelestialBodyVector.at(5).fTrueAnomaly = fTrueAnomaly;
 	}
 
 	// 清洗小行星带数据
@@ -348,17 +348,10 @@ bool CGMSolar::Init(SGMKernelData * pKernelData, SGMConfigData * pConfigData,
 /** @brief 更新 */
 bool CGMSolar::Update(double dDeltaTime)
 {
-	double fTimes = osg::Timer::instance()->time_s();
-	int iHie = m_pKernelData->iHierarchy;
-	if (0 == iHie || 1 == iHie || 2 == iHie)
-	{
-		_UpdatePlanetSpin(dDeltaTime);
-		osg::Quat qPlanetSpin = _GetPlanetSpin();
-		osg::Quat qPlanetInclination = _GetPlanetInclination(fTimes);
-		osg::Quat qPlanetTurn = _GetPlanetTurn(fTimes);
-		m_qPlanetRotate = qPlanetSpin * qPlanetInclination * qPlanetTurn;
-	}
+	_UpdatePlanetRotate(dDeltaTime);
+	m_qPlanetRotate = _GetPlanetSpin() * _GetPlanetInclination() * _GetPlanetTurn();
 
+	int iHie = m_pKernelData->iHierarchy;
 	switch (iHie)
 	{
 	case 0:
@@ -371,8 +364,7 @@ bool CGMSolar::Update(double dDeltaTime)
 		double fHieR = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalRadius
 			/ m_pKernelData->fUnitArray->at(1);
 		// 天体真近点角
-		double fSunTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fStartTrueAnomaly
-			+ fTimes * osg::PI * 2 / m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalPeriod;
+		double fSunTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fTrueAnomaly;
 		osg::Vec3d vSolarPos = osg::Vec3d(-fHieR * cos(fSunTheta), -fHieR * sin(fSunTheta), 0);
 		osg::Matrix mSolarRotate = osg::Matrix::identity();
 		mSolarRotate.setRotate(m_qPlanetRotate.inverse());
@@ -391,8 +383,7 @@ bool CGMSolar::Update(double dDeltaTime)
 		double fHieR = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalRadius
 			/ m_pKernelData->fUnitArray->at(2);
 		// 天体真近点角
-		double fSunTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fStartTrueAnomaly
-			+ fTimes * osg::PI * 2 / m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalPeriod;
+		double fSunTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fTrueAnomaly;
 		m_vSolarPos_Hie2 = osg::Vec3d(-fHieR * cos(fSunTheta), -fHieR * sin(fSunTheta), 0);
 		m_pStar_2_Transform->asPositionAttitudeTransform()->setPosition(m_vSolarPos_Hie2);
 		m_pSunBloomTransform->setPosition(m_vSolarPos_Hie2);
@@ -408,15 +399,12 @@ bool CGMSolar::Update(double dDeltaTime)
 		m_pPlanet_2_Transform->asPositionAttitudeTransform()->setAttitude(m_qPlanetRotate);
 
 		// 第2层级空间下，行星的北极轴/自转轴
-		//流浪地球的北极轴需要实时变化，以保证切向加速度
+		// 流浪地球的北极轴需要实时变化，以保证切向加速度
 		m_vPlanetNorth = m_qPlanetRotate * osg::Vec3d(0, 0, 1);
 		m_vPlanetNorth.normalize();
 		// 第2层级空间下，行星的X轴(经纬0°)
 		m_vPlanetAxisX = m_qPlanetRotate * osg::Vec3d(1, 0, 0);
 		m_vPlanetAxisX.normalize();
-
-		// 地球模块内部需要更新旋转节点
-		m_pEarth->SetEarthRotate(m_qPlanetRotate);
 	}
 	break;
 	default:
@@ -439,8 +427,7 @@ bool CGMSolar::Update(double dDeltaTime)
 	// 木星公转半径
 	double fJupiterR = m_sCelestialBodyVector.at(5).fOrbitalRadius;
 	// 木星的真近点角
-	double fPlanetTheta = m_sCelestialBodyVector.at(5).fStartTrueAnomaly
-		+ fTimes * osg::PI * 2 / m_sCelestialBodyVector.at(5).fOrbitalPeriod;
+	double fPlanetTheta = m_sCelestialBodyVector.at(5).fTrueAnomaly;
 	fPlanetTheta = fmod(fPlanetTheta, osg::PI * 2);
 	// 木星位置
 	m_vJupiterPosUniform->set(osg::Vec2f(fJupiterR*cos(fPlanetTheta), fJupiterR*sin(fPlanetTheta)));
@@ -885,8 +872,7 @@ bool CGMSolar::SaveSolarData()
 	aXML.Create(m_pConfigData->strCorePath + "Users/SolarData.cfg", "SolarSystem");
 	CGMXmlNode sNode = aXML.AddChild("Jupiter");
 	// 保存真近点角，单位：弧度
-	double fTrueAnomaly = m_sCelestialBodyVector.at(5).fStartTrueAnomaly
-		+ fTimes * osg::PI * 2 / m_sCelestialBodyVector.at(5).fOrbitalPeriod;
+	double fTrueAnomaly = m_sCelestialBodyVector.at(5).fTrueAnomaly;
 	fTrueAnomaly = fmod(fTrueAnomaly, osg::PI * 2);
 	sNode.SetPropDouble("trueAnomaly", fTrueAnomaly);
 	aXML.Save();
@@ -1005,10 +991,8 @@ bool CGMSolar::GetNearestCelestialBody(const SGMVector3& vSearchHiePos,
 		m_pCommonUniform->GetTime()->get(fTimes);
 		// 天体的公转半径
 		double fHieR = itr.fOrbitalRadius / m_pKernelData->fUnitArray->at(iHie);
-		// 天体的真近点角
-		double fTheta = itr.fStartTrueAnomaly + fTimes * osg::PI * 2 / itr.fOrbitalPeriod;
 		// 当前遍历的天体的位置
-		SGMVector3 vItrHiePos = SGMVector3(fHieR*cos(fTheta), fHieR*sin(fTheta), 0);
+		SGMVector3 vItrHiePos = SGMVector3(fHieR*cos(itr.fTrueAnomaly), fHieR*sin(itr.fTrueAnomaly), 0);
 		// 当前遍历天体与查询位置的距离
 		double fDis = (vItrHiePos - vSearchHiePos).Length();
 		if (fDis < fNearest3)
@@ -1028,8 +1012,7 @@ void CGMSolar::GetCelestialBody(SGMVector3& vPlanetPos, double & fOrbitalPeriod)
 	m_pCommonUniform->GetTime()->get(fTimes);
 	double fHieR = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalRadius;
 	// 行星的真近点角
-	double fTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fStartTrueAnomaly
-		+ fTimes * osg::PI * 2 / m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalPeriod;
+	double fTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fTrueAnomaly;
 
 	vPlanetPos = SGMVector3(fHieR*cos(fTheta), fHieR*sin(fTheta), 0);
 	fOrbitalPeriod = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalPeriod;
@@ -1214,9 +1197,7 @@ SGMVector3 CGMSolar::UpdateCelestialBody(const SGMVector3& vTargetHiePos)
 		// 目标行星公转半径
 		double fPlanetR = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalRadius;
 		// 目标行星的真近点角
-		double fPlanetTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fStartTrueAnomaly
-			+ fTimes * osg::PI * 2 / m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalPeriod;
-		fPlanetTheta = fmod(fPlanetTheta, osg::PI * 2);
+		double fPlanetTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fTrueAnomaly;
 		// 目标行星位置
 		SGMVector3 vPlanetPos(fPlanetR*cos(fPlanetTheta),fPlanetR*sin(fPlanetTheta),0);
 
@@ -1225,7 +1206,7 @@ SGMVector3 CGMSolar::UpdateCelestialBody(const SGMVector3& vTargetHiePos)
 		for (auto& itr : m_sCelestialBodyVector)
 		{
 			// 行星的真近点角
-			double fTheta = itr.fStartTrueAnomaly + fTimes * osg::PI * 2 / itr.fOrbitalPeriod;
+			double fTheta = itr.fTrueAnomaly;
 			// 行星在3级空间的位置
 			SGMVector3 vPos(itr.fOrbitalRadius*cos(fTheta), itr.fOrbitalRadius*sin(fTheta), 0);
 			double fDistance = (vPos - vTargetHiePos * fUnit).Length();
@@ -1251,9 +1232,7 @@ SGMVector3 CGMSolar::UpdateCelestialBody(const SGMVector3& vTargetHiePos)
 			// 中心行星公转半径
 			double fCenterPlanetR = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalRadius;
 			// 中心行星的真近点角
-			double fCenterPlanetTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fStartTrueAnomaly
-				+ fTimes * osg::PI * 2 / m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalPeriod;
-			fCenterPlanetTheta = fmod(fCenterPlanetTheta, osg::PI * 2);
+			double fCenterPlanetTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fTrueAnomaly;
 			// 中心行星在2级空间的恒星坐标系下的位置，注意：并不是中心行星在2级空间下的位置
 			SGMVector3 vCenterPlanetPos(
 				fCenterPlanetR*cos(fCenterPlanetTheta),
@@ -1265,10 +1244,8 @@ SGMVector3 CGMSolar::UpdateCelestialBody(const SGMVector3& vTargetHiePos)
 			double fHieNearest = vTargetHiePos.Length();
 			for (auto& itr : m_sCelestialBodyVector)
 			{
-				// 行星的真近点角
-				double fTheta = itr.fStartTrueAnomaly + fTimes * osg::PI * 2 / itr.fOrbitalPeriod;
 				// 行星在恒星坐标系下的位置
-				SGMVector3 vPos(itr.fOrbitalRadius*cos(fTheta), itr.fOrbitalRadius*sin(fTheta), 0);
+				SGMVector3 vPos(itr.fOrbitalRadius*cos(itr.fTrueAnomaly), itr.fOrbitalRadius*sin(itr.fTrueAnomaly), 0);
 
 				double fHieDistance = (vTargetSolarHiePos - vPos / fUnit).Length();
 				if (fHieDistance < fHieNearest)
@@ -2009,7 +1986,7 @@ bool CGMSolar::_CreatePlanets()
 	// step_2.0 - 添加行星
 	for (auto& itr : m_sCelestialBodyVector)
 	{
-		_AddPlanet(itr.fOrbitalRadius, itr.fOrbitalPeriod, itr.fStartTrueAnomaly);
+		_AddPlanet(itr.fOrbitalRadius, itr.fOrbitalPeriod, itr.fTrueAnomaly);
 	}
 	// 行星添加完毕后，设置行星数量Uniform
 	m_fPlanetNumUniform->set(float(m_iPlanetCount));
@@ -3006,7 +2983,7 @@ osg::Geometry* CGMSolar::_CreateScreenTriangle(const int width, const int height
 	return pGeometry;
 }
 
-void CGMSolar::_UpdatePlanetSpin(double dDeltaTime)
+void CGMSolar::_UpdatePlanetRotate(double dDeltaTime)
 {
 	int iCenterCelestialBody = 0;
 	for (auto& itr : m_sCelestialBodyVector)
@@ -3014,12 +2991,57 @@ void CGMSolar::_UpdatePlanetSpin(double dDeltaTime)
 		// 将所有天体的自转速度都加速240倍(地球6分钟转一圈)，以保证视觉效果
 		// 真实的自转速度应该根据本系统的公转速度倍率来调整
 		double fDeltaSpin = dDeltaTime * (GM_YEAR_REAL / GM_YEAR) * osg::PI * 2 / itr.fSpinPeriod;
+		double fObliquity = itr.fObliquity;
+		double fDeltaTrueAnomaly = dDeltaTime * osg::PI * 2 / itr.fOrbitalPeriod;
+
 		//流浪地球模式，逐渐停止自传
 		if (m_pConfigData->bWanderingEarth && (3 == iCenterCelestialBody))
-			fDeltaSpin *= 1 - osg::clampBetween((m_fWanderingEarthProgress - 0.1) * 10, 0.0, 1.0);
+		{
+			constexpr double fProgress_0 = 0.1;
+			constexpr double fProgress_1 = 0.15;
+			constexpr double fProgress_2 = 0.25;
 
+			fDeltaSpin *= 1 - osg::clampBetween((m_fWanderingEarthProgress - fProgress_0) / (fProgress_1 - fProgress_0), 0.0, 1.0);
+			if (m_fWanderingEarthProgress > fProgress_1)
+			{
+				fObliquity = m_pEarth->GetCurrentObliquity();
+				if (m_fWanderingEarthProgress < fProgress_2)
+				{
+					double fT = GM_ENGINE.GetAudioDuration() * 1e-3 * 0.1;
+					double fS = osg::PI_2 - itr.fObliquity;
+					// 角加速度
+					double fRotateAccel = 4 * fS / (fT * fT);
+					// 先加速后减速
+					if (m_fWanderingEarthProgress > 0.5*(fProgress_1 + fProgress_2)) fRotateAccel *= -1;
+
+					double fNorthRotateSpeed = m_pEarth->GetNorthRotateSpeed() + fRotateAccel * dDeltaTime;
+					m_pEarth->SetNorthRotateSpeed(fNorthRotateSpeed);
+					// 偏转角
+					fObliquity = min(osg::PI_2, fObliquity + dDeltaTime * fNorthRotateSpeed);
+				}
+				else
+				{
+					m_pEarth->SetNorthRotateSpeed(0);
+					fObliquity = osg::PI_2;
+				}
+			}
+			else
+			{
+				m_pEarth->SetNorthRotateSpeed(0);
+			}
+		}
+		// 更新自转角
 		itr.fSpin += fDeltaSpin;
 		if (itr.fSpin > osg::PI * 2) itr.fSpin -= osg::PI * 2;
+		// 更新真近点角
+		itr.fTrueAnomaly += fDeltaTrueAnomaly;
+		if (itr.fTrueAnomaly > osg::PI * 2) itr.fTrueAnomaly -= osg::PI * 2;
+		// 地球模块内部需要更新旋转节点
+		if (m_pConfigData->bWanderingEarth && (3 == iCenterCelestialBody))
+		{
+			// 由于itr.fObliquity中存放的是真实的偏转角，所以不能在流浪地球模式中传给地球，而是实时计算
+			m_pEarth->SetEarthRotate(itr.fSpin, fObliquity, itr.fTrueAnomaly);
+		}
 
 		iCenterCelestialBody++;
 	}
@@ -3030,36 +3052,24 @@ osg::Quat CGMSolar::_GetPlanetSpin() const
 	return osg::Quat(m_sCelestialBodyVector.at(m_iCenterCelestialBody).fSpin, osg::Vec3d(0, 0, 1));
 }
 
-double CGMSolar::_GetPlanetObliquityAngle(const double fTime) const
+osg::Quat CGMSolar::_GetPlanetInclination() const
 {
+	double fObliquity = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fObliquity;
 	//如果当前是流浪地球，就将地球横过来
 	if (m_pConfigData->bWanderingEarth && (3 == m_iCenterCelestialBody))
 	{
-		return osg::PI_2;
+		fObliquity = m_pEarth->GetCurrentObliquity();
 	}
-	else
-	{
-		return m_sCelestialBodyVector.at(m_iCenterCelestialBody).fObliquity;
-	}
-}
-
-osg::Quat CGMSolar::_GetPlanetInclination(const double fTime) const
-{
-	double fObliquity = _GetPlanetObliquityAngle(fTime);
 	return osg::Quat(fObliquity, osg::Vec3d(1, 0, 0));
 }
 
-osg::Quat CGMSolar::_GetPlanetTurn(const double fTime) const
+osg::Quat CGMSolar::_GetPlanetTurn() const
 {
+	double fPlanetTheta = 0.0;
 	if (m_pConfigData->bWanderingEarth && (3 == m_iCenterCelestialBody))
 	{
-		// 地球的真近点角
-		double fSunTheta = m_sCelestialBodyVector.at(3).fStartTrueAnomaly
-			+ fTime * osg::PI * 2 / m_sCelestialBodyVector.at(3).fOrbitalPeriod;
-		return osg::Quat(fSunTheta, osg::Vec3d(0, 0, 1));
+		// 流浪地球的真近点角
+		fPlanetTheta = m_sCelestialBodyVector.at(3).fTrueAnomaly;
 	}
-	else
-	{
-		return osg::Quat(0.0, osg::Vec3d(0, 0, 1));
-	}
+	return osg::Quat(fPlanetTheta, osg::Vec3d(0, 0, 1));
 }

@@ -99,7 +99,7 @@ void main()
 	vec3 modelVertUp = normalize(modelVertex.xyz);
 	float engineStart = smoothstep(0.0, 0.1,
 		max(abs(modelVertUp.z), 0.4) + 0.05*cos(modelVertUp.z*1.5*M_PI)*modelVertUp.x - 1 + engineStartRatio);
-	vec3 ambient = vec3(0.07,0.11,0.15)*(engineStart*exp2(min(0, texCoord_0.y-0.48)*25));
+	vec3 ambient = vec3(0.07,0.11,0.15)*(exp2(-abs(texCoord_0.y-0.5)*25)+exp2(min(0,texCoord_0.y-0.67)*50))*engineStart;
 	color = 0.03 + ambient + 0.5*diffuse;
 	vec3 illumEngine = engineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
 	color += illumEngine;

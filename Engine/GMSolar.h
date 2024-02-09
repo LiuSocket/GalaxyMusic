@@ -39,7 +39,7 @@ namespace GM
 	struct SGMCelestialBody
 	{
 		SGMCelestialBody()
-			: fOrbitalRadius(1e11), fOrbitalPeriod(1.0), fStartTrueAnomaly(0.0),
+			: fOrbitalRadius(1e11), fOrbitalPeriod(1.0), fTrueAnomaly(0.0),
 			fEquatorRadius(0.01), fPolarRadius(0.01), fObliquity(0.0), fSpinPeriod(1.0),
 			fSpin(0.0), fGroundTop(1000.0f), fCloudTop(8e3f), eAtmosHeight(EGMAH_0),
 			vAtmosColor(osg::Vec4f(1, 1, 1, 1)),
@@ -50,7 +50,7 @@ namespace GM
 			float groundTop, float cloudTop, EGMAtmosHeight atmosH,
 			osg::Vec4f atmosColor = osg::Vec4f(1, 1, 1, 1),
 			double ringMinRadius = 0, double ringMaxRadius = 0)
-			: fOrbitalRadius(orbitalRadius), fOrbitalPeriod(period), fStartTrueAnomaly(startTrueAnomaly),
+			: fOrbitalRadius(orbitalRadius), fOrbitalPeriod(period), fTrueAnomaly(startTrueAnomaly),
 			fEquatorRadius(equatorRadius), fPolarRadius(polarRadius), fObliquity(obliquity), fSpinPeriod(spinPeriod),
 			fSpin(0.0), fGroundTop(groundTop), fCloudTop(cloudTop), eAtmosHeight(atmosH), vAtmosColor(atmosColor),
 			fRingMinRadius(ringMinRadius), fRingMaxRadius(ringMaxRadius)	
@@ -58,7 +58,7 @@ namespace GM
 
 		double fOrbitalRadius;			// 公转轨道半径，单位：米
 		double fOrbitalPeriod;			// 公转周期，单位：s
-		double fStartTrueAnomaly;		// 开始时刻的真近点角，单位：弧度
+		double fTrueAnomaly;			// 真近点角，单位：弧度
 		double fEquatorRadius;			// 天体赤道半径，单位：米
 		double fPolarRadius;			// 天体两级半径，单位：米
 		double fObliquity;				// 天体的自转轴平面与黄道面夹角（有向），单位：弧度
@@ -343,33 +343,25 @@ namespace GM
 		osg::Geometry* _CreateScreenTriangle(const int width, const int height);
 
 		/**
-		* @brief 更新天体自转角度
+		* @brief 更新天体自转相关姿态
 		* @param dDeltaTime: 上一帧间隔时间，单位：秒
 		*/
-		void _UpdatePlanetSpin(double dDeltaTime);
+		void _UpdatePlanetRotate(double dDeltaTime);
 		/**
 		* @brief 获取某一时刻当前天体自转四元数
 		* @return osg::Quat 当前天体自转四元数
 		*/
 		osg::Quat _GetPlanetSpin() const;
 		/**
-		* @brief 获取某一时刻当前天体自转轴倾角
-		* @param fTime: 程序运行时间，单位：秒
-		* @return double 当前天体自转轴倾角度，单位：弧度
-		*/
-		double _GetPlanetObliquityAngle(const double fTime) const;
-		/**
 		* @brief 获取某一时刻当前天体自转轴倾角四元数
-		* @param fTime: 程序运行时间，单位：秒
 		* @return osg::Quat 当前天体自转轴倾角四元数
 		*/
-		osg::Quat _GetPlanetInclination(const double fTime) const;
+		osg::Quat _GetPlanetInclination() const;
 		/**
 		* @brief 获取某一时刻当前天体自转轴偏航角四元数（针对流浪地球）
-		* @param fTime: 程序运行时间，单位：秒
 		* @return osg::Quat 当前天体自转轴偏航角四元数
 		*/
-		osg::Quat _GetPlanetTurn(const double fTime) const;
+		osg::Quat _GetPlanetTurn() const;
 
 		// 变量
 	private:

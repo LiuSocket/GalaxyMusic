@@ -87,9 +87,11 @@ namespace GM
 		void SetVisible(const bool bVisible);
 		/**
 		* @brief 设置地球在第2空间层级下的旋转
-		* @param qRotate 旋转四元数
+		* @param fSpin： 自转，单位：弧度
+		* @param fObliquity： 自转轴倾角，单位：弧度
+		* * @param fTrueAnomaly： 自转轴偏航角，单位：弧度
 		*/
-		void SetEarthRotate(const osg::Quat& qRotate);
+		void SetEarthRotate(const double fSpin, const double fObliquity, const double fTrueAnomaly);
 		/**
 		* @brief 设置“流浪地球计化”的进展
 		* @param fProgress 进展百分比，[0.0, 1.0]
@@ -105,8 +107,33 @@ namespace GM
 		/**
 		* @brief 由于空间层级变化而更新场景
 		* @param iHierarchy:		更新后的空间层级编号
-		* @return bool:				成功true，失败false */
+		* @return bool:				成功true，失败false
+		*/
 		bool UpdateHierarchy(int iHierarchy);
+		/**
+		* @brief 获取地球的自转轴倾角，流浪地球模式下会变化
+		* @return double: 地球的自转轴倾角，单位：弧度
+		*/
+		inline double GetCurrentObliquity() const
+		{
+			return m_fCurrentObliquity;
+		}
+		/**
+		* @brief 设置地球的自转轴倾角旋转的角速度，给流浪地球模式用，正常情况下为0
+		* @return NorthRotateSpeed: 地球的自转轴倾角旋转的角速度，单位：弧度/秒
+		*/
+		inline void SetNorthRotateSpeed(const double fNorthRotateSpeed)
+		{
+			m_fNorthRotateSpeed = fNorthRotateSpeed;
+		}
+		/**
+		* @brief 获取地球的自转轴倾角旋转的角速度，给流浪地球模式用，正常情况下为0
+		* @return double: 地球的自转轴倾角旋转的角速度，单位：弧度/秒
+		*/
+		inline double GetNorthRotateSpeed() const
+		{
+			return m_fNorthRotateSpeed;
+		}
 
 	private:
 
@@ -267,6 +294,8 @@ namespace GM
 		std::string										m_strGalaxyShaderPath;			//!< galaxy shader 路径
 		std::string										m_strEarthShaderPath;			//!< Earth shader 路径
 
+		double											m_fCurrentObliquity;			//!< 自转轴倾角，单位：弧度
+		double											m_fNorthRotateSpeed;			//!< 自转轴倾角旋转的角速度，弧度/秒
 		float											m_fCloudBottom;					//!< 云底高度
 		float											m_fCloudTop;					//!< 云顶高度
 

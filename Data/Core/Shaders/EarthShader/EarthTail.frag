@@ -186,9 +186,9 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 	float texDens = max(0, shape4.x - 0.35*shape4.y - 0.11*shape4.z - 0.09*shape4.w);
 
 	// fade by ratioR
-	float sphereAltFade = clamp(engineStartRatio-0.5,0,1)*clamp(1-(ratioR-EARTH_ATMOS_RATIO)*6, 0, 1);	
-	float torqueTailFade = sqrt(clamp((clamp((engineStartRatio-0.5)*0.5,0,1)*(2.3-EARTH_ATMOS_RATIO) + EARTH_ATMOS_RATIO - ratioR)*2, 0, 1));
-	float propulsionTailFade = sqrt(clamp((0.95*TAIL_LENGTH/ATMOS_RADIUS - ratioR)*0.5, 0, 1))*clamp(engineStartRatio+0.9-ratioR,0,1);
+	float sphereAltFade = clamp(engineStartRatio-0.4,0,1)*clamp(1-(ratioR-EARTH_ATMOS_RATIO)*6, 0, 1);	
+	float torqueTailFade = sqrt(clamp((clamp((engineStartRatio-0.3)*0.5,0,1)*(2.3-EARTH_ATMOS_RATIO)+EARTH_ATMOS_RATIO-ratioR)*2,0,1));
+	float propulsionTailFade = sqrt(clamp((0.95*TAIL_LENGTH/ATMOS_RADIUS - ratioR)*0.5, 0, 1))*clamp(engineStartRatio+1-ratioR,0,1);
 	float altFade = mix(torqueTailFade, sphereAltFade, clamp(2*(ratioXY-0.5), 0, 1));
 	altFade = mix(propulsionTailFade, altFade, clamp((ratioXY-TAIL_ATMOS_RATIO)*10, 0, 1));
 

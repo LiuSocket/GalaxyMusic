@@ -183,7 +183,7 @@ void main()
 #ifdef EARTH
 #ifdef WANDERING
 	float meanSum = (atmosSum.r+atmosSum.g+atmosSum.b)*0.33;
-	atmosSum = mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5*wanderProgress);
+	atmosSum = mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5*clamp(10*(wanderProgress-0.1),0,1));
 #endif // WANDERING
 #else // not EARTH
 	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;
