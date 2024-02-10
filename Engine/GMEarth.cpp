@@ -209,6 +209,45 @@ namespace GM
 		osg::ref_ptr<osg::Image> _pEarthEngineDataImg;
 	};
 
+	/*
+	** 修改行星发动机的方向
+	*/
+	class CChangeEngineDirVisitor : public osg::NodeVisitor
+	{
+	public:
+		CChangeEngineDirVisitor(const double fUnit)
+			: NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN), _fUnit(fUnit)
+		{
+			ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
+			ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
+		}
+
+		void SetUnit(const double fUnit)
+		{
+			ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
+			ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
+		}
+
+		void apply(osg::Node& node) { traverse(node); }
+		void apply(osg::Geode& node)
+		{
+			osg::Geometry* geom = dynamic_cast<osg::Geometry*>(node.getDrawable(0));
+			if (!geom) return;
+
+			osg::ref_ptr<osg::Vec3Array> pVert = dynamic_cast<osg::Vec3Array*>(geom->getVertexArray());
+			if (!pVert.valid()) return;
+
+			for (int i = 0; i < pVert->size(); i++)
+			{
+			}
+
+			traverse(node);
+		}
+	private:
+		osg::EllipsoidModel ellipsoid;
+		double				_fUnit;
+	};
+
 }	// GM
 
 /*************************************************************************
@@ -363,8 +402,31 @@ bool CGMEarth::Update(double dDeltaTime)
 	}
 
 	if (m_pConfigData->bWanderingEarth)
-		m_pEarthTail->Update(dDeltaTime);
+	{
+		float fWanderProgress = 0.0f;
+		m_fWanderProgressUniform->get(fWanderProgress);
+		if (fWanderProgress < 0.1f)
+		{
+			m_pEarthEngineStream->setNodeMask(0);
+			m_pEarthEnginePointNode_1->setNodeMask(0);
+			m_pEarthEnginePointNode_2->setNodeMask(0);
+			m_pEarthEngineJetNode_1->setNodeMask(0);
+			m_pEarthEngineJetNode_2->setNodeMask(0);
 
+			m_pEarthTail->SetVisible(false);
+		}
+		else
+		{
+			m_pEarthEngineStream->setNodeMask(~0);
+			m_pEarthEnginePointNode_1->setNodeMask(~0);
+			m_pEarthEnginePointNode_2->setNodeMask(~0);
+			m_pEarthEngineJetNode_1->setNodeMask(~0);
+			m_pEarthEngineJetNode_2->setNodeMask(~0);
+
+			m_pEarthTail->SetVisible(true);
+		}
+		m_pEarthTail->Update(dDeltaTime);
+	}
 	return true;
 }
 
@@ -625,7 +687,7 @@ void CGMEarth::SetWanderingEarthProgress(const float fProgress)
 
 	m_fWanderProgressUniform->set(osg::clampBetween(fProgress, 0.0f, 1.0f));
 	// 发动机在月球危机时开启
-	m_fEngineStartRatioUniform->set(fmaxf((fProgress-0.25f)*10.0f, 0.0f));
+	m_fEngineStartRatioUniform->set(fmaxf((fProgress-0.3f)*10.0f, 0.0f));
 }
 
 bool CGMEarth::CreateEarth()

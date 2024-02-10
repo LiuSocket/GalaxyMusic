@@ -289,7 +289,7 @@ void Tail(commonParam cP, inout vec4 tailColor, inout float lenTail)
 				// all color
 				vec3 chrome = ambient + diffuse; 
 
-				float tailA = 1 - exp2(-atmosDens * (0.5+0.5*exp2(min(0,1-ratioR))));
+				float tailA = 1 - exp2(-atmosDens * (0.5+0.4*exp2(min(0,1-ratioR))));
 				tailC += vec4(chrome*tailA, tailA)*(1-tailC.a);			
 			}
 

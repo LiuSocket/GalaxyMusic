@@ -68,22 +68,26 @@ void main()
 	vec3 illumCoord = texCoord_1;
 	illumCoord.xy = (illumCoord.xy - 0.5)*celestialCoordScale.z + 0.5;
 	vec4 illum = texture(illumTex, illumCoord);
-	vec3 illumCity = illum.rgb*(vec3(1)-smoothstep(0.0, 0.1, diffuse));
+	vec3 darkness = 1-smoothstep(0.0, 0.1, diffuse);
+	vec3 illumCity = illum.rgb*darkness;
 	float rockMask = 1 - baseColor.a;
 
 	vec3 viewHalf = normalize(viewLight - viewDir);
 	float dotNH = max(dot(viewVertUp, viewHalf), 0);
 	vec3 specualr = mix(vec3(1.0,0.5,0.0),vec3(0.6,0.4,0.3),max(0,dotVUL))*pow(dotNH, 100)*sqrt(diffuse);
 #ifdef WANDERING
-	float seaLevelAddProgress = clamp(wanderProgress/PROGRESS_0,0,1);
+	float seaLevelAddProgress = clamp(wanderProgress/PROGRESS_0, 0, 1);
 	vec3 wanderingBaseCoord = baseCoord;
 	wanderingBaseCoord.z += 6;
 	vec4 wanderingColor = texture(baseTex, wanderingBaseCoord);
+	float engineMask = (1-wanderingColor.a)*seaLevelAddProgress;
 	baseColor.rgb = mix(baseColor.rgb, wanderingColor.rgb, seaLevelAddProgress);
 
-	vec3 modelVertUp = normalize(modelVertex.xyz);
-	float engineStart = smoothstep(0.0, 0.1,
-		max(abs(modelVertUp.z), 0.4) + 0.05*cos(modelVertUp.z*1.5*M_PI)*modelVertUp.x - 1 + engineStartRatio);
+	// for start
+	vec3 MVU = normalize(modelVertex.xyz);
+	float lon = abs(atan(MVU.x, MVU.y))/M_PI;
+	float engineStart = smoothstep(0.0, 0.1, max(MVU.z-1+engineStartRatio*1.1,
+		clamp(2*engineStartRatio-0.2-lon,0,1)*clamp((0.35-abs(MVU.z))*4,0,1)));
 	vec3 ambient = vec3(0.07,0.11,0.15)*(exp2(-abs(texCoord_0.y-0.5)*25)+exp2(min(0,texCoord_0.y-0.67)*50))*engineStart;
 
 	vec3 DEMCoord = texCoord_1;
@@ -95,7 +99,8 @@ void main()
 	float elev2Sea = elev-seaLevel;
 	// [0.0,0.1] seaLevel + 66m
 	rockMask = mix(rockMask, smoothstep(-10.0, 0.0, elev2Sea), seaLevelAddProgress);
-	illumCity = max(vec3(0), rockMask*(illumCity - seaLevelAddProgress));
+	illumCity = max((0.2+0.05*baseColor.rgb)*darkness*engineMask,
+		rockMask*(illumCity - seaLevelAddProgress));
 
 	color = mix(vec3(0.0,0.1,0.0), baseColor.rgb, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));
 	color *= 0.02 + ambient + 0.5*diffuse;

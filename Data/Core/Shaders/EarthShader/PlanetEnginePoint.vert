@@ -18,10 +18,10 @@ void main()
 	noise = gl_MultiTexCoord0.x;
 	intensity = min(1, 1.5*noise*max(0, dot(viewNormal,-viewDir))*exp2(-lenV*unit*1e-8));
 	// for start
-	vec3 modelVertUp = normalize(gl_Vertex.xyz);
-	intensity *= clamp(
-		10*(max(abs(modelVertUp.z), 0.4) + 0.05*cos(modelVertUp.z*1.5*M_PI)*modelVertUp.x - 1 + engineStartRatio),
-		0, 1);
+	vec3 MVU = normalize(gl_Vertex.xyz);
+	float lon = abs(atan(MVU.x, MVU.y))/M_PI;
+	intensity *= max(clamp(10*(MVU.z-1+engineStartRatio),0,1),
+		clamp(10*(2*engineStartRatio-0.2-lon),0,1)*clamp((0.2-abs(MVU.z))*10,0,1));
 	// for near discard
 	float minDistance = 2e6/unit;
 	intensity *= (unit < 1e6) ? clamp((lenV-minDistance)/minDistance, 0, 1) : 1.0;

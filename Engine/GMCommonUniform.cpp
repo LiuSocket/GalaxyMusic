@@ -63,8 +63,10 @@ void CGMCommonUniform::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigDa
 
 void CGMCommonUniform::Update(double dDeltaTime)
 {
-	double fTimes = osg::Timer::instance()->time_s();
-	m_fTimeUniform->set(float(fTimes));
+	float fTimes;
+	m_fTimeUniform->get(fTimes);
+	fTimes += dDeltaTime;
+	m_fTimeUniform->set(fTimes);
 }
 
 void CGMCommonUniform::UpdateLater(double dDeltaTime)

@@ -15,7 +15,8 @@ void main()
 	vec4 modelPos = vec4(vertXY, 0, 1);
 
 	const float PI = 3.14159265358979;
-	float angle = -times*PI*2.0/gl_MultiTexCoord0.x;
+	const float PI2 = PI*2.0;
+	float angle = mod(-times*PI2/gl_MultiTexCoord0.x, PI2);
 	float cosA = cos(angle);
 	float sinA = sin(angle);
 	mat4 rotateMatrix = mat4(

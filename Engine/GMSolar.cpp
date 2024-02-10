@@ -35,7 +35,7 @@ constexpr
 *************************************************************************/
 constexpr auto RING_SEGMENT			= 128;				// 行星光环（半圈）有多少段梯型;
 constexpr auto ASTEROID_NUM			= 16384;			// 小行星带上的点精灵数量
-constexpr auto GM_YEAR				= 1800.0;			// 本系统的“地球”公转周期。单位：秒
+constexpr auto GM_YEAR				= 600.0;			// 本系统的“地球”公转周期。单位：秒
 constexpr auto GM_YEAR_REAL			= 31558150.0; 		// 一恒星年。单位：秒（365.25636*24*60*60）
 
 constexpr auto SUN_RADIUS			= 6.963e8;			// 太阳半径，单位：米;
@@ -361,8 +361,7 @@ bool CGMSolar::Update(double dDeltaTime)
 	case 1:
 	{
 		// 天体公转半径
-		double fHieR = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalRadius
-			/ m_pKernelData->fUnitArray->at(1);
+		double fHieR = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fOrbitalRadius / m_pKernelData->fUnitArray->at(1);
 		// 天体真近点角
 		double fSunTheta = m_sCelestialBodyVector.at(m_iCenterCelestialBody).fTrueAnomaly;
 		osg::Vec3d vSolarPos = osg::Vec3d(-fHieR * cos(fSunTheta), -fHieR * sin(fSunTheta), 0);
@@ -3032,10 +3031,8 @@ void CGMSolar::_UpdatePlanetRotate(double dDeltaTime)
 		}
 		// 更新自转角
 		itr.fSpin += fDeltaSpin;
-		if (itr.fSpin > osg::PI * 2) itr.fSpin -= osg::PI * 2;
 		// 更新真近点角
 		itr.fTrueAnomaly += fDeltaTrueAnomaly;
-		if (itr.fTrueAnomaly > osg::PI * 2) itr.fTrueAnomaly -= osg::PI * 2;
 		// 地球模块内部需要更新旋转节点
 		if (m_pConfigData->bWanderingEarth && (3 == iCenterCelestialBody))
 		{

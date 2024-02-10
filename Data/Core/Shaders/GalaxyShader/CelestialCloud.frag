@@ -57,7 +57,8 @@ void main()
 	vec3 wanderingCloudCoord = cloudCoord;
 	wanderingCloudCoord.z += 6;
 	vec4 wanderingColor = texture(cloudTex, wanderingCloudCoord);
-	baseColor.a = mix(baseColor.a, wanderingColor.a, clamp((wanderProgress-0.36)*25, 0, 1));
+	float wanderingCloud = max(0, min(wanderingColor.a, 1-illum.a*illum.a*1.5));
+	baseColor.a = mix(baseColor.a, wanderingCloud, clamp((wanderProgress-0.36)*25, 0, 1));
 #endif // WANDERING	
 	float lenV = length(viewPos.xyz);
 	// cloud detail
@@ -96,9 +97,12 @@ void main()
 #ifdef EARTH
 	color = 0.03 + diffuse;
 #ifdef WANDERING
-	vec3 modelVertUp = normalize(modelVertex.xyz);
-	float engineStart = smoothstep(0.0, 0.1,
-		max(abs(modelVertUp.z), 0.4) + 0.05*cos(modelVertUp.z*1.5*M_PI)*modelVertUp.x - 1 + engineStartRatio);
+	// for start
+	vec3 MVU = normalize(modelVertex.xyz);
+	float lon = abs(atan(MVU.x, MVU.y))/M_PI;
+	float engineStart = smoothstep(0.0, 0.1, max(MVU.z-1+engineStartRatio*1.1,
+		clamp(2*engineStartRatio-0.2-lon,0,1)*clamp((0.35-abs(MVU.z))*4,0,1)));
+
 	vec3 ambient = vec3(0.07,0.11,0.15)*(exp2(-abs(texCoord_0.y-0.5)*25)+exp2(min(0,texCoord_0.y-0.67)*50))*engineStart;
 	color = 0.03 + ambient + 0.5*diffuse;
 	vec3 illumEngine = engineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
