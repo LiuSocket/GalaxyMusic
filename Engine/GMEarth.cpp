@@ -12,6 +12,8 @@
 
 #include "GMEarth.h"
 #include "GMEngine.h"
+#include "GMEarthTail.h"
+#include "GMEarthEngine.h"
 #include "GMXml.h"
 #include "GMKit.h"
 #include <osg/PointSprite>
@@ -39,237 +41,27 @@ constexpr double EARTH_POLAR = 6356752.0; 			// 地球两极半径
 /*************************************************************************
 Class
 *************************************************************************/
-namespace GM
-{
-	class CRTTFinishCallback : public osg::Camera::DrawCallback
-	{
-	public:
-		CRTTFinishCallback(osg::Image* pBaseImg, osg::Image* pIllumImg, int i)
-			:_pBaseImage(pBaseImg), _pIllumImage(pIllumImg), iCount(i), bWritten(false) {}
-
-		virtual void operator() (osg::RenderInfo& renderInfo) const
-		{
-			if (!bWritten)
-			{
-				std::string strImgNum = std::to_string(iCount);
-				osgDB::writeImageFile(*(_pBaseImage), "../../Data/Core/Textures/Sphere/Earth/engineBody" + strImgNum + ".tif");
-				osgDB::writeImageFile(*(_pIllumImage.get()), "../../Data/Core/Textures/Sphere/Earth/bloom" + strImgNum + ".tif");
-				std::cout << strImgNum << " RTT Finished!" << std::endl;
-
-				bWritten = true;
-			}
-		}
-
-	private:
-		osg::ref_ptr<osg::Image>	_pBaseImage;
-		osg::ref_ptr<osg::Image>	_pIllumImage;
-		int							iCount;
-		mutable bool				bWritten; // 是否已经写入硬盘
-	};
-
-	class CGenEngineDataVisitor : public osg::NodeVisitor
-	{
-	public:
-		CGenEngineDataVisitor(): NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN){}
-
-		void apply(osg::Node& node) { traverse(node); }
-		void apply(osg::Geode& node)
-		{
-			for (unsigned int i = 0; i < node.getNumDrawables(); ++i)
-			{
-				osg::Geometry* geom = dynamic_cast<osg::Geometry*>(node.getDrawable(i));
-				if (geom)
-				{
-					osg::ref_ptr<osg::Vec3Array> pVert = dynamic_cast<osg::Vec3Array*>(geom->getVertexArray());
-					if (!pVert.valid()) continue;
-					// 全球一共1万座行星发动机
-					const int iEngineNum = 10000;
-
-					int iVertNum = pVert->size();
-					if (iVertNum < iEngineNum) continue;
-
-					std::string strEarthPath = "../../Data/Core/Textures/Sphere/Earth/";
-					osg::ref_ptr<osg::Image> pDEMImg = osgDB::readImageFile(strEarthPath + "DEM_bed.tif");
-
-					int iSize = 4 * iEngineNum;
-					float* pData = new float[iSize];		
-					for (int i = 0; i < iEngineNum; i++)
-					{
-						float fLon = pVert->at(i).y() * osg::PI;
-						float fLat = pVert->at(i).z() * osg::PI;
-						float fDEM = CGMKit::GetImageColor(pDEMImg, fLon / (osg::PI * 2) + 0.5, fLat / osg::PI + 0.5, true).r();
-
-						pData[i * 4] = fLon;// 经度（弧度）
-						pData[i * 4 + 1] = fLat;// 纬度（弧度）
-						pData[i * 4 + 2] = max(0.0f, fDEM);// 发动机底部海拔高度（米）
-						pData[i * 4 + 3] = pVert->at(i).x() * 1e5f;// 发动机本身高度（米）
-					}
-					osg::ref_ptr<osg::Image> pEngineDataImage = new osg::Image();
-					pEngineDataImage->setImage(iEngineNum, 1, 1, GL_RGBA32F, GL_RGBA, GL_FLOAT, (unsigned char*)pData, osg::Image::USE_NEW_DELETE);
-					osgDB::writeImageFile(*(pEngineDataImage), strEarthPath + "EarthEngineData.tif");
-					std::cout << "Engine Data generation succeed!" << std::endl;
-				}
-			}
-			traverse(node);
-		}
-	};
-
-	class CGenEngineBodyVisitor : public osg::NodeVisitor
-	{
-	public:
-		CGenEngineBodyVisitor(osg::Image* pDataImg, const double fUnit)
-			: NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN), _fUnit(fUnit),
-			_pEarthEngineDataImg(pDataImg)
-		{
-			ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
-			ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
-		}
-
-		void apply(osg::Node& node) { traverse(node); }
-		void apply(osg::Geode& node)
-		{
-			for (unsigned int k = 0; k< node.getNumDrawables(); ++k)
-			{
-				osg::Geometry* geom = dynamic_cast<osg::Geometry*>(node.getDrawable(k));
-				if (!geom) continue;
-
-				osg::ref_ptr<osg::Vec3Array> pVertOld = dynamic_cast<osg::Vec3Array*>(geom->getVertexArray());
-				osg::ref_ptr<osg::Vec2Array> pCoordOld = dynamic_cast<osg::Vec2Array*>(geom->getTexCoordArray(0));
-				if (!pVertOld.valid() || !pCoordOld.valid()) continue;
-
-				int iEngineNum = _pEarthEngineDataImg->s();
-				int iVertPerEngine = int(pVertOld->size());
-				int iVertNum = iEngineNum * iVertPerEngine;
-
-				geom->setUseVertexBufferObjects(true);
-				geom->setUseDisplayList(false);
-				geom->setDataVariance(osg::Object::STATIC);
-
-				osg::ref_ptr<osg::Vec3Array> pVerts = new osg::Vec3Array();
-				pVerts->reserve(iVertNum);
-				osg::ref_ptr<osg::Vec4Array> pCoords = new osg::Vec4Array;
-				pCoords->reserve(iVertNum);
-				osg::ref_ptr<osg::DrawElementsUInt> pEle = new osg::DrawElementsUInt(GL_TRIANGLES);
-				pEle->reserve(iVertNum);
-
-				for (int i = 0; i < iEngineNum; i++)
-				{
-					osg::Vec4f vData = CGMKit::GetImageColor(_pEarthEngineDataImg, float(i + 0.5) / float(iEngineNum), 0);
-					double fLon = vData.x();
-					double fLat = vData.y();
-					double fDEM = vData.z() / _fUnit;
-					double fX, fY, fZ;
-					ellipsoid.convertLatLongHeightToXYZ(fLat, fLon, fDEM, fX, fY, fZ);
-					osg::Vec3 vSpherePos = osg::Vec3(fX, fY, fZ);
-
-					osg::Vec3 vVertUp = ellipsoid.computeLocalUpVector(vSpherePos.x(), vSpherePos.y(), vSpherePos.z());
-					osg::Vec3 vVertEast = osg::Vec3(0, 0, 1) ^ vVertUp;
-					vVertEast.normalize();
-					osg::Vec3 vVertNorth = vVertUp ^ vVertEast;
-					vVertNorth.normalize();
-
-					// model matrix 模型空间转世界空间矩阵
-					osg::Matrixd mModelMatrix = osg::Matrixd(
-						vVertEast.x(),	vVertEast.y(),	vVertEast.z(),	0,
-						vVertNorth.x(),	vVertNorth.y(),	vVertNorth.z(),	0,
-						vVertUp.x(),	vVertUp.y(),	vVertUp.z(),	0,
-						vSpherePos.x(),	vSpherePos.y(),	vSpherePos.z(),	1);
-
-					// 行星发动机直径分两种，大的30000米，小的21000米
-					float fScale = 1.0 / _fUnit;
-					fScale *= (vData.w() > 1e4) ? 1.0f : 0.7f;
-					// 发动机所在位置的地球半径
-					float fRadius = vSpherePos.length();
-
-					// 绘制发动机主体
-					for (int j = 0; j < iVertPerEngine; j++)
-					{
-						// xy = UV, z = vertex altitude, w = earth radius at the vertex point
-						osg::Vec4 vCoord = osg::Vec4(pCoordOld->at(j).x(), pCoordOld->at(j).y(),
-							pVertOld->at(j).z() * fScale, fRadius);
-
-						pVerts->push_back(mModelMatrix.preMult(pVertOld->at(j) * fScale));
-						pCoords->push_back(vCoord);
-						pEle->push_back(i * iVertPerEngine + j);
-					}
-				}
-
-				geom->setVertexArray(pVerts);
-				geom->setTexCoordArray(0, pCoords);
-				geom->setNormalBinding(osg::Geometry::BIND_OFF);
-				geom->setPrimitiveSet(0, pEle);
-			}
-			traverse(node);
-		}
-	private:
-		osg::EllipsoidModel ellipsoid;
-		double				_fUnit;
-		// 流浪地球行星发动机数据,xy=经纬度（弧度），z=底高（米），w=发动机高度（米）
-		// 图片宽度（s）= 发动机数量，高度（t）= 1
-		osg::ref_ptr<osg::Image> _pEarthEngineDataImg;
-	};
-
-	/*
-	** 修改行星发动机的方向
-	*/
-	class CChangeEngineDirVisitor : public osg::NodeVisitor
-	{
-	public:
-		CChangeEngineDirVisitor(const double fUnit)
-			: NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN), _fUnit(fUnit)
-		{
-			ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
-			ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
-		}
-
-		void SetUnit(const double fUnit)
-		{
-			ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
-			ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
-		}
-
-		void apply(osg::Node& node) { traverse(node); }
-		void apply(osg::Geode& node)
-		{
-			osg::Geometry* geom = dynamic_cast<osg::Geometry*>(node.getDrawable(0));
-			if (!geom) return;
-
-			osg::ref_ptr<osg::Vec3Array> pVert = dynamic_cast<osg::Vec3Array*>(geom->getVertexArray());
-			if (!pVert.valid()) return;
-
-			for (int i = 0; i < pVert->size(); i++)
-			{
-			}
-
-			traverse(node);
-		}
-	private:
-		osg::EllipsoidModel ellipsoid;
-		double				_fUnit;
-	};
-
-}	// GM
 
 /*************************************************************************
 CGMEarth Methods
 *************************************************************************/
 
 /** @brief 构造 */
-CGMEarth::CGMEarth() : CGMPlanet(),
+CGMEarth::CGMEarth() : CGMPlanet(), m_pKernelData(nullptr),m_pCommonUniform(nullptr),
 	m_strGalaxyShaderPath("Shaders/GalaxyShader/"),
 	m_strEarthShaderPath("Shaders/EarthShader/"),
 	m_fCurrentObliquity(osg::DegreesToRadians(23.44)), m_fNorthRotateSpeed(0.0),
 	m_fCloudBottom(5e3f), m_fCloudTop(1e4f),
 	m_vEarthCoordScaleUniform(new osg::Uniform("coordScale_Earth", osg::Vec4f(1.0f, 1.0f, 1.0f, 1.0f))),//UV缩放，四层够用了
 	m_fWanderProgressUniform(new osg::Uniform("wanderProgress", 0.0f)),
-	m_fEngineStartRatioUniform(new osg::Uniform("engineStartRatio", 0.0f)),
-	m_pEarthTail(nullptr)
+	m_pEarthTail(nullptr), m_pEarthEngine(nullptr)
 {
 	m_pEarthRoot_1 = new osg::Group();
 	m_pEarthRoot_2 = new osg::Group();
 
 	m_pEllipsoid = new osg::EllipsoidModel();
 	m_pEarthTail = new CGMEarthTail();
+	m_pEarthEngine = new CGMEarthEngine();
 }
 
 /** @brief 析构 */
@@ -294,15 +86,12 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 
 	if (m_pConfigData->bWanderingEarth)
 	{
-		// 用于存储行星发动机所有参数的图片
-		m_pEarthEngineDataImg = osgDB::readImageFile(strSphereTexPath + "Earth/EarthEngineData.tif");
 		// 初始化流浪地球尾迹
 		m_pEarthTail->Init(pKernelData, pConfigData, pCommonUniform);
-	}
-	for (int i = 0; i <= 2; i++)
-	{
-		osg::ref_ptr<osg::Group> _pRoot = new osg::Group();
-		m_pHieEarthRootVector.push_back(_pRoot);
+		m_pEarthEngine->Init(pKernelData, pConfigData, pCommonUniform);
+
+		m_pEarthRoot_1->addChild(m_pEarthEngine->GetEarthEngineRoot(1));
+		m_pEarthRoot_2->addChild(m_pEarthEngine->GetEarthEngineRoot(2));
 	}
 
 	m_aEarthBaseTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Earth_base_");
@@ -405,27 +194,11 @@ bool CGMEarth::Update(double dDeltaTime)
 	{
 		float fWanderProgress = 0.0f;
 		m_fWanderProgressUniform->get(fWanderProgress);
-		if (fWanderProgress < 0.1f)
-		{
-			m_pEarthEngineStream->setNodeMask(0);
-			m_pEarthEnginePointNode_1->setNodeMask(0);
-			m_pEarthEnginePointNode_2->setNodeMask(0);
-			m_pEarthEngineJetNode_1->setNodeMask(0);
-			m_pEarthEngineJetNode_2->setNodeMask(0);
+		bool bTailVisible = fWanderProgress > 0.1f;
+		m_pEarthTail->SetVisible(bTailVisible);
 
-			m_pEarthTail->SetVisible(false);
-		}
-		else
-		{
-			m_pEarthEngineStream->setNodeMask(~0);
-			m_pEarthEnginePointNode_1->setNodeMask(~0);
-			m_pEarthEnginePointNode_2->setNodeMask(~0);
-			m_pEarthEngineJetNode_1->setNodeMask(~0);
-			m_pEarthEngineJetNode_2->setNodeMask(~0);
-
-			m_pEarthTail->SetVisible(true);
-		}
 		m_pEarthTail->Update(dDeltaTime);
+		m_pEarthEngine->Update(dDeltaTime);
 	}
 	return true;
 }
@@ -443,7 +216,10 @@ bool CGMEarth::UpdateLater(double dDeltaTime)
 	m_pGlobalShadowCamera->setProjectionMatrix(mProjMatrix);
 
 	if (m_pConfigData->bWanderingEarth)
+	{
 		m_pEarthTail->UpdateLater(dDeltaTime);
+		m_pEarthEngine->UpdateLater(dDeltaTime);
+	}
 
 	return true;
 }
@@ -492,58 +268,6 @@ bool CGMEarth::Load()
 			"EarthAtmosphere_2");
 	}
 
-	if (m_pEarthEnginePointNode_1.valid())
-	{
-		CGMKit::LoadShader(m_pEarthEnginePointNode_1->getStateSet(),
-			strEarthShader + "PlanetEnginePoint.vert",
-			strEarthShader + "PlanetEnginePoint.frag",
-			"PlanetEnginePoint_1");
-	}
-	if (m_pEarthEnginePointNode_2.valid())
-	{
-		CGMKit::LoadShader(m_pEarthEnginePointNode_2->getStateSet(),
-			strEarthShader + "PlanetEnginePoint.vert",
-			strEarthShader + "PlanetEnginePoint.frag",
-			"PlanetEnginePoint_2");
-	}
-	if (m_pEarthEngineJetNode_1.valid())
-	{
-		CGMKit::LoadShader(m_pEarthEngineJetNode_1->getStateSet(),
-			strEarthShader + "PlanetEngineJet.vert",
-			strEarthShader + "PlanetEngineJet.frag",
-			"PlanetEngineJet_1");
-	}
-	if (m_pEarthEngineJetNode_2.valid())
-	{
-		CGMKit::LoadShader(m_pEarthEngineJetNode_2->getStateSet(),
-			strEarthShader + "PlanetEngineJet.vert",
-			strEarthShader + "PlanetEngineJet.frag",
-			"PlanetEngineJet_2");
-	}
-	if (m_pEarthEngineBody_1.valid())
-	{
-		CGMKit::LoadShaderWithCommonFrag(m_pEarthEngineBody_1->getStateSet(),
-			strEarthShader + "PlanetEngineBody.vert",
-			strEarthShader + "PlanetEngineBody.frag",
-			strGalaxyShader + "CelestialCommon.frag",
-			"PlanetEngineBody_1");
-	}
-	if (m_pEarthEngineBody_2.valid())
-	{
-		CGMKit::LoadShaderWithCommonFrag(m_pEarthEngineBody_2->getStateSet(),
-			strEarthShader + "PlanetEngineBody.vert",
-			strEarthShader + "PlanetEngineBody.frag",
-			strGalaxyShader + "CelestialCommon.frag",
-			"PlanetEngineBody_2");
-	}
-	if (m_pEarthEngineStream.valid())
-	{
-		CGMKit::LoadShader(m_pEarthEngineStream->getStateSet(),
-			strEarthShader + "PlanetEngineJetStream.vert",
-			strEarthShader + "PlanetEngineJetStream.frag",
-			"PlanetEngineJetStream");
-	}
-
 	if (m_pSSGlobalShadow.valid())
 	{
 		CGMKit::LoadShader(m_pSSGlobalShadow,
@@ -553,7 +277,10 @@ bool CGMEarth::Load()
 	}
 
 	if (m_pConfigData->bWanderingEarth)
+	{
 		m_pEarthTail->Load();
+		m_pEarthEngine->Load();
+	}
 
 	return true;
 }
@@ -580,9 +307,16 @@ void CGMEarth::SetUniform(
 	if (m_pConfigData->bWanderingEarth)
 	{
 		m_pEarthTail->SetUniform(
-			m_vViewLightUniform,
-			m_fEngineStartRatioUniform,
-			m_mView2ECEFUniform);
+			pViewLight,
+			m_pEarthEngine->GetEngineStartRatioUniform(),
+			pView2ECEF);
+		m_pEarthEngine->SetUniform(
+			pViewLight,
+			pGroundTop,
+			pAtmosHeight,
+			pMinDotUL,
+			pEyeAltitude,
+			m_fWanderProgressUniform);
 	}
 }
 
@@ -591,7 +325,10 @@ void CGMEarth::ResizeScreen(const int iW, const int iH)
 	m_pGlobalShadowCamera->resize(iW, iH);
 
 	if (m_pConfigData->bWanderingEarth)
+	{
 		m_pEarthTail->ResizeScreen(iW, iH);
+		m_pEarthEngine->ResizeScreen(iW, iH);
+	}
 }
 
 osg::Node* CGMEarth::GetEarthRoot(const int iHie) const
@@ -636,34 +373,8 @@ void CGMEarth::SetVisible(const bool bVisible)
 	// 流浪地球
 	if (m_pConfigData->bWanderingEarth)
 	{
-		if (bVisible)
-		{
-			if (0 == m_pEarthEnginePointNode_1->getNodeMask())
-			{
-				m_pEarthEnginePointNode_1->setNodeMask(~0);
-				m_pEarthEngineJetNode_1->setNodeMask(~0);
-				m_pEarthEnginePointNode_2->setNodeMask(~0);
-				m_pEarthEngineJetNode_2->setNodeMask(~0);
-				m_pEarthEngineStream->setNodeMask(~0);
-				m_pEarthEngineBody_1->setNodeMask(~0);
-				m_pEarthEngineBody_2->setNodeMask(~0);
-			}
-		}
-		else
-		{
-			if (0 != m_pEarthEnginePointNode_1->getNodeMask())
-			{
-				m_pEarthEnginePointNode_1->setNodeMask(0);
-				m_pEarthEngineJetNode_1->setNodeMask(0);
-				m_pEarthEnginePointNode_2->setNodeMask(0);
-				m_pEarthEngineJetNode_2->setNodeMask(0);
-				m_pEarthEngineStream->setNodeMask(0);
-				m_pEarthEngineBody_1->setNodeMask(0);
-				m_pEarthEngineBody_2->setNodeMask(0);
-			}
-		}
-
 		m_pEarthTail->SetVisible(bVisible);
+		m_pEarthEngine->SetVisible(bVisible);
 	}
 }
 
@@ -687,7 +398,7 @@ void CGMEarth::SetWanderingEarthProgress(const float fProgress)
 
 	m_fWanderProgressUniform->set(osg::clampBetween(fProgress, 0.0f, 1.0f));
 	// 发动机在月球危机时开启
-	m_fEngineStartRatioUniform->set(fmaxf((fProgress-0.3f)*10.0f, 0.0f));
+	m_pEarthEngine->SetWanderingEarthProgress(fProgress);
 }
 
 bool CGMEarth::CreateEarth()
@@ -710,25 +421,6 @@ bool CGMEarth::CreateEarth()
 
 bool CGMEarth::UpdateHierarchy(int iHieNew)
 {
-	if (iHieNew <= 2)
-	{
-		// 移除下一空间层级
-		if (iHieNew > 0 && GM_Root->containsNode(m_pHieEarthRootVector.at(iHieNew - 1)))
-		{
-			GM_Root->removeChild(m_pHieEarthRootVector.at(iHieNew - 1));
-		}
-		// 移除上一空间层级
-		if (iHieNew < 2 && GM_Root->containsNode(m_pHieEarthRootVector.at(iHieNew + 1)))
-		{
-			GM_Root->removeChild(m_pHieEarthRootVector.at(iHieNew + 1));
-		}
-		// 添加当前空间层级
-		if (!(GM_Root->containsNode(m_pHieEarthRootVector.at(iHieNew))))
-		{
-			GM_Root->addChild(m_pHieEarthRootVector.at(iHieNew));
-		}
-	}
-
 	switch (iHieNew)
 	{
 	case 0:
@@ -764,7 +456,10 @@ bool CGMEarth::UpdateHierarchy(int iHieNew)
 	}
 
 	if (m_pConfigData->bWanderingEarth)
+	{
 		m_pEarthTail->UpdateHierarchy(iHieNew);
+		m_pEarthEngine->UpdateHierarchy(iHieNew);
+	}
 
 	return true;
 }
@@ -921,7 +616,7 @@ bool CGMEarth::_CreateEarth_1()
 		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
 		m_pSSEarthGround_1->addUniform(pGroundTailUniform);
 
-		m_pSSEarthGround_1->addUniform(m_fEngineStartRatioUniform);
+		m_pSSEarthGround_1->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
 		m_pSSEarthGround_1->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthGround_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
@@ -992,7 +687,7 @@ bool CGMEarth::_CreateEarth_1()
 		osg::ref_ptr<osg::Uniform> pCloudIllumUniform = new osg::Uniform("illumTex", iCloudUnit++);
 		m_pSSEarthCloud_1->addUniform(pCloudIllumUniform);
 
-		m_pSSEarthCloud_1->addUniform(m_fEngineStartRatioUniform);
+		m_pSSEarthCloud_1->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
 		m_pSSEarthCloud_1->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthCloud_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
@@ -1120,7 +815,7 @@ bool CGMEarth::_CreateEarth_2()
 		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
 		m_pSSEarthGround_2->addUniform(pGroundTailUniform);
 
-		m_pSSEarthGround_2->addUniform(m_fEngineStartRatioUniform);
+		m_pSSEarthGround_2->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
 		m_pSSEarthGround_2->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthGround_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
@@ -1191,7 +886,7 @@ bool CGMEarth::_CreateEarth_2()
 		osg::ref_ptr<osg::Uniform> pCloudIllumUniform = new osg::Uniform("illumTex", iCloudUnit++);
 		m_pSSEarthCloud_2->addUniform(pCloudIllumUniform);
 
-		m_pSSEarthCloud_2->addUniform(m_fEngineStartRatioUniform);
+		m_pSSEarthCloud_2->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
 		m_pSSEarthCloud_2->addUniform(m_fWanderProgressUniform);
 		m_pSSEarthCloud_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
@@ -1263,11 +958,6 @@ bool CGMEarth::_CreateEarth_2()
 
 bool CGMEarth::_CreateWanderingEarth()
 {
-	// 临时添加的生成“行星发动机数据”的工具函数
-	//_GenEarthEngineData();
-	// 临时添加的生成“行星发动机分布图”和“周围bloom图”的工具函数
-	//_GenEarthEngineTexture();
-	
 	// 临时添加的生成流浪地球版本的各个贴图的工具函数
 	//std::string strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_base_real_";
 	//std::string strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/engineBody";
@@ -1282,327 +972,14 @@ bool CGMEarth::_CreateWanderingEarth()
 	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_illum_";
 	//_MixWEETexture(strPath_0, strPath_1, strOut, 2);
 
-	_GenEarthEnginePoint_1();
-	_GenEarthEngineJetLine_1();
-	_GenEarthEnginePoint_2();
-	_GenEarthEngineJetLine_2();
-	_GenEarthEngineBody_1();
-	_GenEarthEngineBody_2();
-
-	_GenEarthEngineStream();
-
-	if ((m_pConfigData->bWanderingEarth) && (EGMRENDER_LOW != m_pConfigData->eRenderQuality))
+	if ((m_pConfigData->bWanderingEarth))
 	{
-		m_pEarthTail->MakeEarthTail();
+		if(EGMRENDER_LOW != m_pConfigData->eRenderQuality)
+			m_pEarthTail->MakeEarthTail();
+
+		m_pEarthEngine->SetTex(m_pEarthTail->GetTAATex(), m_pInscatteringTex);
+		m_pEarthEngine->CreateEngine();
 	}
-
-	return true;
-}
-
-bool CGMEarth::_GenEarthEnginePoint_1()
-{
-	// 流浪地球上的行星发动机的喷射口亮点
-	double fUnit = m_pKernelData->fUnitArray->at(1);
-	m_pEllipsoid->setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / fUnit);
-	m_pEllipsoid->setRadiusPolar(osg::WGS_84_RADIUS_POLAR / fUnit);
-	m_pEarthEnginePointNode_1 = new osg::Geode();
-	m_pEarthEnginePointNode_1->addDrawable(_MakeEnginePointGeometry(m_pEllipsoid, fUnit));
-	m_pEarthRoot_1->addChild(m_pEarthEnginePointNode_1);
-
-	osg::ref_ptr<osg::StateSet> pSSPlanetEnginePoint = m_pEarthEnginePointNode_1->getOrCreateStateSet();
-	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
-	pSSPlanetEnginePoint->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
-	pSSPlanetEnginePoint->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSPlanetEnginePoint->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSSPlanetEnginePoint->setAttributeAndModes(new osg::BlendFunc(
-		GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_DST_ALPHA, GL_ONE), osg::StateAttribute::ON);
-	pSSPlanetEnginePoint->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0, 1, false)); // no zbuffer
-	// 喷射亮点偏移，避免和云层打架
-	osg::ref_ptr<osg::PolygonOffset> pPO = new osg::PolygonOffset(-1.5, -1.5);
-	pSSPlanetEnginePoint->setAttributeAndModes(pPO, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	pSSPlanetEnginePoint->setRenderBinDetails(BIN_PLANET_POINT, "DepthSortedBin");
-	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetScreenSize());
-	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEnginePoint->addUniform(m_fEngineStartRatioUniform);
-
-	// 流浪地球尾迹（吹散的大气）
-	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, m_pEarthTail->GetTAATex(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEnginePoint->addUniform(pTailUniform);
-
-	std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.vert";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.frag";
-	CGMKit::LoadShader(pSSPlanetEnginePoint, strVertPath, strFragPath, "PlanetEnginePoint_1");
-
-	return true;
-}
-
-bool CGMEarth::_GenEarthEnginePoint_2()
-{
-	// 流浪地球上的行星发动机的喷射口亮点
-	double fUnit = m_pKernelData->fUnitArray->at(2);
-	m_pEllipsoid->setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / fUnit);
-	m_pEllipsoid->setRadiusPolar(osg::WGS_84_RADIUS_POLAR / fUnit);
-	m_pEarthEnginePointNode_2 = new osg::Geode();
-	m_pEarthEnginePointNode_2->addDrawable(_MakeEnginePointGeometry(m_pEllipsoid, fUnit));
-	m_pEarthRoot_2->addChild(m_pEarthEnginePointNode_2);
-
-	osg::ref_ptr<osg::StateSet> pSSPlanetEnginePoint = m_pEarthEnginePointNode_2->getOrCreateStateSet();
-	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
-	pSSPlanetEnginePoint->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
-	pSSPlanetEnginePoint->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSPlanetEnginePoint->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSSPlanetEnginePoint->setAttributeAndModes(new osg::BlendFunc(
-		GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_DST_ALPHA, GL_ONE
-	), osg::StateAttribute::ON);
-	pSSPlanetEnginePoint->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0, 1, false)); // no zbuffer
-	// 喷射亮点偏移，避免和云层打架
-	osg::ref_ptr<osg::PolygonOffset> pPO = new osg::PolygonOffset(-1.5, -1.5);
-	pSSPlanetEnginePoint->setAttributeAndModes(pPO, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	pSSPlanetEnginePoint->setRenderBinDetails(BIN_PLANET_POINT, "DepthSortedBin");
-	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetScreenSize());
-	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEnginePoint->addUniform(m_fEngineStartRatioUniform);
-
-	// 流浪地球尾迹（吹散的大气）
-	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, m_pEarthTail->GetTAATex(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEnginePoint->addUniform(pTailUniform);
-
-	std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.vert";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.frag";
-	CGMKit::LoadShader(pSSPlanetEnginePoint, strVertPath, strFragPath, "PlanetEnginePoint_2");
-
-	return true;
-}
-
-bool CGMEarth::_GenEarthEngineJetLine_1()
-{
-	// 流浪地球上的行星发动机的喷射流
-	double fUnit = m_pKernelData->fUnitArray->at(1);
-	m_pEllipsoid->setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / fUnit);
-	m_pEllipsoid->setRadiusPolar(osg::WGS_84_RADIUS_POLAR / fUnit);
-	m_pEarthEngineJetNode_1 = new osg::Geode();
-	m_pEarthEngineJetNode_1->addDrawable(_MakeEngineJetLineGeometry(m_pEllipsoid, fUnit));
-	m_pEarthRoot_1->addChild(m_pEarthEngineJetNode_1);
-
-	osg::ref_ptr<osg::LineWidth> pLineWidth = new osg::LineWidth;
-	pLineWidth->setWidth(2);
-	osg::ref_ptr<osg::StateSet> pSSPlanetEngineJet = m_pEarthEngineJetNode_1->getOrCreateStateSet();
-	pSSPlanetEngineJet->setAttributeAndModes(pLineWidth, osg::StateAttribute::ON);
-	pSSPlanetEngineJet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSPlanetEngineJet->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSSPlanetEngineJet->setAttributeAndModes(new osg::BlendFunc(
-		GL_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_DST_ALPHA, GL_ONE
-	), osg::StateAttribute::ON);
-	pSSPlanetEngineJet->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0, 1, false)); // no zbuffer
-	// 喷射流偏移，避免和云层打架
-	osg::ref_ptr<osg::PolygonOffset> pPO = new osg::PolygonOffset(-1.5, -1.5);
-	pSSPlanetEngineJet->setAttributeAndModes(pPO, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	pSSPlanetEngineJet->setRenderBinDetails(BIN_PLANET_JET, "DepthSortedBin");
-	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetTime());
-	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetScreenSize());
-	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEngineJet->addUniform(m_fEngineStartRatioUniform);
-
-	// 流浪地球尾迹（吹散的大气）
-	pSSPlanetEngineJet->setTextureAttributeAndModes(0, m_pEarthTail->GetTAATex(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEngineJet->addUniform(pTailUniform);
-
-	std::string strJetVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.vert";
-	std::string strJetFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.frag";
-	CGMKit::LoadShader(pSSPlanetEngineJet, strJetVertPath, strJetFragPath, "PlanetEngineJet_1");
-
-	return true;
-}
-
-bool CGMEarth::_GenEarthEngineJetLine_2()
-{
-	// 流浪地球上的行星发动机的喷射流
-	double fUnit = m_pKernelData->fUnitArray->at(2);
-	m_pEllipsoid->setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / fUnit);
-	m_pEllipsoid->setRadiusPolar(osg::WGS_84_RADIUS_POLAR / fUnit);
-	m_pEarthEngineJetNode_2 = new osg::Geode();
-	m_pEarthEngineJetNode_2->addDrawable(_MakeEngineJetLineGeometry(m_pEllipsoid, fUnit));
-	m_pEarthRoot_2->addChild(m_pEarthEngineJetNode_2);
-
-	osg::ref_ptr<osg::LineWidth> pLineWidth = new osg::LineWidth;
-	pLineWidth->setWidth(1);
-	osg::ref_ptr<osg::StateSet> pSSPlanetEngineJet = m_pEarthEngineJetNode_2->getOrCreateStateSet();
-	pSSPlanetEngineJet->setAttributeAndModes(pLineWidth, osg::StateAttribute::ON);
-	pSSPlanetEngineJet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSPlanetEngineJet->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSSPlanetEngineJet->setAttributeAndModes(new osg::BlendFunc(
-		GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_DST_ALPHA, GL_ONE
-	), osg::StateAttribute::ON);
-	pSSPlanetEngineJet->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0, 1, false)); // no zbuffer
-	// 喷射流偏移，避免和云层打架
-	osg::ref_ptr<osg::PolygonOffset> pPO = new osg::PolygonOffset(-1.5, -1.5);
-	pSSPlanetEngineJet->setAttributeAndModes(pPO, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	pSSPlanetEngineJet->setRenderBinDetails(BIN_PLANET_JET, "DepthSortedBin");
-	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetTime());
-	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetScreenSize());
-	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEngineJet->addUniform(m_fEngineStartRatioUniform);
-
-	// 流浪地球尾迹（吹散的大气）
-	pSSPlanetEngineJet->setTextureAttributeAndModes(0, m_pEarthTail->GetTAATex(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEngineJet->addUniform(pTailUniform);
-
-	std::string strJetVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.vert";
-	std::string strJetFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.frag";
-	CGMKit::LoadShader(pSSPlanetEngineJet, strJetVertPath, strJetFragPath, "PlanetEngineJet_2");
-
-	return true;
-}
-
-bool CGMEarth::_GenEarthEngineBody_1()
-{
-	m_pEarthEngineBody_1 = osgDB::readNodeFile(m_pConfigData->strCorePath + m_strCoreModelPath + "theWanderingEarth_engine_LOD5.ive");
-	if (!m_pEarthEngineBody_1.valid()) return false;
-	m_pEarthRoot_1->addChild(m_pEarthEngineBody_1);
-
-	CGenEngineBodyVisitor cBodyVisitor(m_pEarthEngineDataImg, m_pKernelData->fUnitArray->at(1));
-	m_pEarthEngineBody_1->accept(cBodyVisitor);
-
-	osg::ref_ptr<osg::StateSet> pSSEngineBody = m_pEarthEngineBody_1->getOrCreateStateSet();
-	pSSEngineBody->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSEngineBody->setMode(GL_BLEND, osg::StateAttribute::OFF);
-	pSSEngineBody->setMode(GL_CULL_FACE, osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE);
-	pSSEngineBody->setMode(GL_ALPHA_TEST, osg::StateAttribute::ON);
-	osg::AlphaFunc* alphaFunc = new osg::AlphaFunc;
-	alphaFunc->setFunction(osg::AlphaFunc::GEQUAL, 0.5f);
-	pSSEngineBody->setAttributeAndModes(alphaFunc, osg::StateAttribute::ON);
-	pSSEngineBody->setRenderBinDetails(BIN_ROCKSPHERE, "RenderBin");
-	pSSEngineBody->setDefine("ATMOS", osg::StateAttribute::ON);
-	pSSEngineBody->setDefine("EARTH", osg::StateAttribute::ON);
-
-	pSSEngineBody->addUniform(m_pCommonUniform->GetUnit());
-	pSSEngineBody->addUniform(m_pCommonUniform->GetScreenSize());
-	pSSEngineBody->addUniform(m_pCommonUniform->GetViewUp());
-	pSSEngineBody->addUniform(m_vViewLightUniform);
-	pSSEngineBody->addUniform(m_fMinDotULUniform);
-	pSSEngineBody->addUniform(m_fGroundTopUniform);
-	pSSEngineBody->addUniform(m_fEyeAltitudeUniform);
-	pSSEngineBody->addUniform(m_fAtmosHeightUniform);
-	pSSEngineBody->addUniform(m_fEngineStartRatioUniform);
-	pSSEngineBody->addUniform(m_fWanderProgressUniform);
-
-	int iTexUnit = 0;
-	// base color贴图
-	osg::ref_ptr<osg::Uniform> pBaseColorTexUniform = new osg::Uniform("baseColorTex", iTexUnit++);
-	pSSEngineBody->addUniform(pBaseColorTexUniform);
-	// 大气“内散射”纹理
-	pSSEngineBody->setTextureAttributeAndModes(iTexUnit, m_pInscatteringTex, osg::StateAttribute::ON);
-	osg::ref_ptr<osg::Uniform> pInscatteringUniform = new osg::Uniform("inscatteringTex", iTexUnit++);
-	pSSEngineBody->addUniform(pInscatteringUniform);
-	// 流浪地球尾迹（吹散的大气）
-	pSSEngineBody->setTextureAttributeAndModes(iTexUnit, m_pEarthTail->GetTAATex(), osg::StateAttribute::ON);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", iTexUnit++);
-	pSSEngineBody->addUniform(pTailUniform);
-
-	std::string strEarthShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
-	std::string strGalaxyShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
-	CGMKit::LoadShaderWithCommonFrag(pSSEngineBody,
-		strEarthShaderPath + "PlanetEngineBody.vert",
-		strEarthShaderPath + "PlanetEngineBody.frag",
-		strGalaxyShaderPath + "CelestialCommon.frag",
-		"PlanetEngineBody_1");
-
-	return true;
-}
-
-bool CGMEarth::_GenEarthEngineBody_2()
-{
-	m_pEarthEngineBody_2 = osgDB::readNodeFile(m_pConfigData->strCorePath + m_strCoreModelPath + "theWanderingEarth_engine_LOD5.ive");
-	if (!m_pEarthEngineBody_2.valid()) return false;
-	m_pEarthRoot_2->addChild(m_pEarthEngineBody_2);
-
-	CGenEngineBodyVisitor cBodyVisitor(m_pEarthEngineDataImg, m_pKernelData->fUnitArray->at(2));
-	m_pEarthEngineBody_2->accept(cBodyVisitor);
-
-	osg::ref_ptr<osg::StateSet> pSSEngineBody = m_pEarthEngineBody_2->getOrCreateStateSet();
-	pSSEngineBody->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSEngineBody->setMode(GL_BLEND, osg::StateAttribute::OFF);
-	pSSEngineBody->setMode(GL_CULL_FACE, osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE);
-	pSSEngineBody->setMode(GL_ALPHA_TEST, osg::StateAttribute::ON);
-	osg::AlphaFunc* alphaFunc = new osg::AlphaFunc;
-	alphaFunc->setFunction(osg::AlphaFunc::GEQUAL, 0.5f);
-	pSSEngineBody->setAttributeAndModes(alphaFunc, osg::StateAttribute::ON);
-	pSSEngineBody->setRenderBinDetails(BIN_ROCKSPHERE, "RenderBin");
-	pSSEngineBody->setDefine("ATMOS", osg::StateAttribute::ON);
-	pSSEngineBody->setDefine("EARTH", osg::StateAttribute::ON);
-
-	pSSEngineBody->addUniform(m_pCommonUniform->GetUnit());
-	pSSEngineBody->addUniform(m_pCommonUniform->GetScreenSize());
-	pSSEngineBody->addUniform(m_pCommonUniform->GetViewUp());
-	pSSEngineBody->addUniform(m_vViewLightUniform);
-	pSSEngineBody->addUniform(m_fMinDotULUniform);
-	pSSEngineBody->addUniform(m_fGroundTopUniform);
-	pSSEngineBody->addUniform(m_fEyeAltitudeUniform);
-	pSSEngineBody->addUniform(m_fAtmosHeightUniform);
-	pSSEngineBody->addUniform(m_fEngineStartRatioUniform);
-	pSSEngineBody->addUniform(m_fWanderProgressUniform);
-
-	int iTexUnit = 0;
-	// base color 贴图
-	osg::ref_ptr<osg::Uniform> pBaseColorTexUniform = new osg::Uniform("baseColorTex", iTexUnit++);
-	pSSEngineBody->addUniform(pBaseColorTexUniform);
-	// 大气“内散射”纹理
-	pSSEngineBody->setTextureAttributeAndModes(iTexUnit, m_pInscatteringTex, osg::StateAttribute::ON);
-	osg::ref_ptr<osg::Uniform> pInscatteringUniform = new osg::Uniform("inscatteringTex", iTexUnit++);
-	pSSEngineBody->addUniform(pInscatteringUniform);
-	// 流浪地球尾迹（吹散的大气）
-	pSSEngineBody->setTextureAttributeAndModes(iTexUnit, m_pEarthTail->GetTAATex(), osg::StateAttribute::ON);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", iTexUnit++);
-	pSSEngineBody->addUniform(pTailUniform);
-
-	std::string strEarthShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
-	std::string strGalaxyShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
-	CGMKit::LoadShaderWithCommonFrag(pSSEngineBody,
-		strEarthShaderPath + "PlanetEngineBody.vert",
-		strEarthShaderPath + "PlanetEngineBody.frag",
-		strGalaxyShaderPath + "CelestialCommon.frag",
-		"PlanetEngineBody_2");
-
-	return true;
-}
-
-bool CGMEarth::_GenEarthEngineStream()
-{
-	// 流浪地球上的行星发动机的喷射流，用于近地视角
-	double fUnit = m_pKernelData->fUnitArray->at(1);
-	m_pEllipsoid->setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / fUnit);
-	m_pEllipsoid->setRadiusPolar(osg::WGS_84_RADIUS_POLAR / fUnit);
-	m_pEarthEngineStream = new osg::Geode();
-	m_pEarthEngineStream->addDrawable(_MakeEngineJetStreamGeometry(m_pEllipsoid, fUnit));
-	m_pEarthRoot_1->addChild(m_pEarthEngineStream);
-
-	osg::ref_ptr<osg::StateSet> pSSEngineStream = m_pEarthEngineStream->getOrCreateStateSet();
-	pSSEngineStream->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSEngineStream->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSSEngineStream->setAttributeAndModes(new osg::BlendFunc(
-		GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_DST_ALPHA, GL_ONE), osg::StateAttribute::ON);
-	pSSEngineStream->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0, 1, false)); // no zbuffer
-	pSSEngineStream->setRenderBinDetails(BIN_PLANET_JET, "DepthSortedBin"); // to do
-	pSSEngineStream->addUniform(m_pCommonUniform->GetTime());
-	pSSEngineStream->addUniform(m_pCommonUniform->GetUnit());
-	pSSEngineStream->addUniform(m_fEngineStartRatioUniform);
-
-	// 喷射流噪声贴图
-	pSSEngineStream->setTextureAttributeAndModes(0,
-		_CreateTexture2D(m_pConfigData->strCorePath + "Textures/Volume/BlueNoise.jpg", 1),
-		osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	osg::ref_ptr<osg::Uniform> pBlueNoiseUniform = new osg::Uniform("blueNoiseTex", 0);
-	pSSEngineStream->addUniform(pBlueNoiseUniform);
-
-	std::string strShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
-	CGMKit::LoadShader(pSSEngineStream,
-		strShaderPath + "PlanetEngineJetStream.vert",
-		strShaderPath + "PlanetEngineJetStream.frag",
-		"PlanetEngineJetStream");
 
 	return true;
 }
@@ -1736,390 +1113,6 @@ bool CGMEarth::_AddTex2DArray(osg::Texture2DArray* pTex, const std::string& file
 	return true;
 }
 
-void CGMEarth::_GenEarthEngineData()
-{
-	osg::ref_ptr<osg::Node> pNode = osgDB::readNodeFile("D:/GMHelp/max/sphere/theWanderingEarth/theWanderingEarthEngineLocation.ive");
-	if (!pNode.valid()) return;
-
-	CGenEngineDataVisitor cGenDataVisitor;
-	pNode->accept(cGenDataVisitor);
-}
-
-void CGMEarth::_GenEarthEngineTexture()
-{
-	osg::ref_ptr<osg::Geode> pGeode = new osg::Geode();
-	double fUnit = m_pKernelData->fUnitArray->at(2);
-	// 要保证这里是个球体，不能是椭球
-	m_pEllipsoid->setRadiusEquator(6.37e6 / fUnit);
-	m_pEllipsoid->setRadiusPolar(6.37e6 / fUnit);
-	pGeode->addDrawable(_MakeEnginePointGeometry(m_pEllipsoid, fUnit));
-
-	int iH = 2048;
-	int iCharSize = iH * iH * 4;
-	for (int i = 0; i < 5; i++)
-	{
-		osg::ref_ptr<osg::Image> pEngineBodyImage = new osg::Image();
-		osg::ref_ptr<osg::Image> pBloomImage = new osg::Image();
-		unsigned char* pEngineData = new unsigned char[iCharSize];
-		unsigned char* pBloomData = new unsigned char[iCharSize];
-		for (int j = 0; j < iCharSize; j++)
-		{
-			pEngineData[j] = 0;
-			pBloomData[j] = 0;
-		}
-		pEngineBodyImage->setImage(iH, iH, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pEngineData, osg::Image::USE_NEW_DELETE);
-		pBloomImage->setImage(iH, iH, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pBloomData, osg::Image::USE_NEW_DELETE);
-
-		osg::Vec3 vCenter = osg::Vec3(0, 1, 0);
-		osg::Vec3 vUp = osg::Vec3(0, 0, 1);
-		switch (i)
-		{
-		case 0:
-		{
-			// posX
-			vCenter = osg::Vec3(1, 0, 0);
-			vUp = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 1:
-		{
-			// negX
-			vCenter = osg::Vec3(-1, 0, 0);
-			vUp = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 2:
-		{
-			// posY
-			vCenter = osg::Vec3(0, 1, 0);
-			vUp = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 3:
-		{
-			// negY
-			vCenter = osg::Vec3(0, -1, 0);
-			vUp = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 4:
-		{
-			// posZ
-			vCenter = osg::Vec3(0, 0, 1);
-			vUp = osg::Vec3(-1, 0, 0);
-		}
-		break;
-		case 5:
-		{
-			// negZ
-			vCenter = osg::Vec3(0, 0, -1);
-			vUp = osg::Vec3(1, 0, 0);
-		}
-		break;
-		default:
-			break;
-		}
-
-		osg::ref_ptr<osg::Camera> pCamera = new osg::Camera;
-		pCamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
-		pCamera->setClearMask(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		pCamera->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
-		pCamera->setViewport(0, 0, iH, iH);
-		pCamera->setRenderOrder(osg::Camera::PRE_RENDER);
-		pCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
-		pCamera->attach(osg::Camera::COLOR_BUFFER0, pEngineBodyImage);
-		pCamera->attach(osg::Camera::COLOR_BUFFER1, pBloomImage);
-		pCamera->setAllowEventFocus(false);
-		pCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
-		pCamera->setViewMatrixAsLookAt(osg::Vec3(0,0,0), vCenter, vUp);
-		// 需要考虑一个像素的过渡边缘
-		pCamera->setProjectionMatrixAsPerspective(2 * osg::RadiansToDegrees(atan(1024.0 / 1023.0)), 1, 1e-4, 1e-3);
-		pCamera->setProjectionResizePolicy(osg::Camera::FIXED);
-		pCamera->addChild(pGeode);
-
-		CRTTFinishCallback* pRTTFinishCallback = new CRTTFinishCallback(pEngineBodyImage, pBloomImage, i);
-		pCamera->setFinalDrawCallback(pRTTFinishCallback);
-		GM_Root->addChild(pCamera);
-
-		osg::ref_ptr<osg::StateSet> pSS = pCamera->getOrCreateStateSet();
-		pSS->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
-		pSS->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
-		pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-		pSS->setMode(GL_BLEND, osg::StateAttribute::ON);
-		pSS->setAttributeAndModes(new osg::BlendFunc(
-			GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
-		), osg::StateAttribute::ON);
-		pSS->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
-
-		osg::ref_ptr<osg::Texture2D> pEngineTex = new osg::Texture2D;
-		pEngineTex->setImage(osgDB::readImageFile(m_pConfigData->strCorePath + "Textures/Sphere/Earth/EarthEngine.tga"));
-		pEngineTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-		pEngineTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-		pEngineTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_BORDER);
-		pEngineTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_BORDER);
-		pEngineTex->setBorderColor(osg::Vec4(0, 0, 0, 0));
-		pEngineTex->setInternalFormat(GL_RGBA8);
-		pEngineTex->setSourceFormat(GL_RGBA);
-		pEngineTex->setSourceType(GL_UNSIGNED_BYTE);
-
-		int iUnit = 0;
-		CGMKit::AddTexture(pSS, pEngineTex, "engineTex", iUnit++);
-
-		std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineRTT.vert";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineRTT.frag";
-		CGMKit::LoadShader(pSS, strVertPath, strFragPath, "PlanetEngineRTT");
-	}
-}
-
-osg::Geometry* CGMEarth::_MakeEnginePointGeometry(const osg::EllipsoidModel* pEllipsoid, const double fUnit) const
-{
-	osg::Geometry* geom = new osg::Geometry();
-	geom->setUseVertexBufferObjects(true);
-	geom->setUseDisplayList(false);
-	geom->setDataVariance(osg::Object::STATIC);
-
-	int iEngineNum = m_pEarthEngineDataImg->s();
-	osg::ref_ptr<osg::Vec3Array> pVerts = new osg::Vec3Array();
-	osg::ref_ptr<osg::Vec2Array> pCoords = new osg::Vec2Array;
-	osg::ref_ptr<osg::Vec3Array> pNorms = new osg::Vec3Array;
-	osg::ref_ptr<osg::DrawElementsUShort> pEle = new osg::DrawElementsUShort(GL_POINTS);
-	pVerts->reserve(iEngineNum);
-	pCoords->reserve(iEngineNum);
-	pNorms->reserve(iEngineNum);
-	pEle->reserve(iEngineNum);
-
-	std::default_random_engine iRandom;
-	iRandom.seed(0);
-	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
-
-	for (int i = 0; i < iEngineNum; i++)
-	{
-		osg::Vec4f vData = CGMKit::GetImageColor(m_pEarthEngineDataImg, float(i+0.5)/float(iEngineNum), 0);
-		double fLon = vData.x();
-		double fLat = vData.y();
-		double fTopAlt = (vData.z() + vData.w()) / fUnit;
-		double fX, fY, fZ;
-		pEllipsoid->convertLatLongHeightToXYZ(fLat, fLon, fTopAlt, fX, fY, fZ);
-		osg::Vec3 vSpherePos = osg::Vec3(fX, fY, fZ);
-		double fRandom = iPseudoNoise(iRandom) * 1e-4; // 0.0-1.0
-		osg::Vec3 vSphereUp = vSpherePos;
-		vSphereUp.normalize();
-		if (vSphereUp.z() < 0.1)
-		{
-			fRandom = 0.5 + 0.5 * fRandom;
-		}
-
-		// 计算发动机底座直径, 单位：像素
-		float fDiameter = (vData.w() / 11000) * 2048 * (3e4 / 6.36e6) / osg::PI_2;
-		// 计算发动机喷射方向
-		osg::Vec3 vDir = _Pos2Norm(vSpherePos);
-		// 计算发动机喷射口位置
-		osg::Vec3 vPos = vSpherePos + _NozzlePos(vDir, vSphereUp) / fUnit;
-		pVerts->push_back(vPos);
-		pCoords->push_back(osg::Vec2(fRandom, fDiameter));
-		pNorms->push_back(vDir);
-		pEle->push_back(i);
-	}
-
-	geom->setVertexArray(pVerts);
-	geom->setTexCoordArray(0, pCoords);
-	geom->setNormalArray(pNorms);
-	geom->setNormalBinding(osg::Geometry::BIND_PER_PRIMITIVE_SET);
-	geom->addPrimitiveSet(pEle);
-	return geom;
-}
-
-osg::Geometry* CGMEarth::_MakeEngineJetLineGeometry(const osg::EllipsoidModel* pEllipsoid, const double fUnit) const
-{
-	osg::Geometry* geom = new osg::Geometry();
-	geom->setUseVertexBufferObjects(true);
-	geom->setUseDisplayList(false);
-	geom->setDataVariance(osg::Object::STATIC);
-
-	int iEngineNum = m_pEarthEngineDataImg->s();
-	osg::ref_ptr<osg::Vec3Array> pVerts = new osg::Vec3Array();
-	osg::ref_ptr<osg::Vec2Array> pCoords = new osg::Vec2Array;
-	osg::ref_ptr<osg::Vec3Array> pNorms = new osg::Vec3Array;
-	osg::ref_ptr<osg::DrawElementsUShort> pEle = new osg::DrawElementsUShort(GL_LINES);
-	pVerts->reserve(iEngineNum * 2);
-	pCoords->reserve(iEngineNum * 2);
-	pNorms->reserve(iEngineNum * 2);
-	pEle->reserve(iEngineNum * 2);
-
-	std::default_random_engine iRandom;
-	iRandom.seed(0);
-	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
-
-	for (int i = 0; i < iEngineNum; i++)
-	{
-		osg::Vec4f vData = CGMKit::GetImageColor(m_pEarthEngineDataImg, float(i + 0.5) / float(iEngineNum), 0);
-		double fLon = vData.x();
-		double fLat = vData.y();
-		double fTopAlt = (vData.z() + vData.w()) / fUnit;
-		double fX, fY, fZ;
-		pEllipsoid->convertLatLongHeightToXYZ(fLat, fLon, fTopAlt, fX, fY, fZ);
-		osg::Vec3 vSpherePos = osg::Vec3(fX, fY, fZ);
-		osg::Vec3 vSphereUp = vSpherePos;
-		vSphereUp.normalize();
-		// 计算发动机喷射方向
-		osg::Vec3 vVertNorm = _Pos2Norm(vSpherePos);
-		// 计算发动机喷射口位置
-		osg::Vec3 vPos = vSpherePos + _NozzlePos(vVertNorm, vSphereUp) / fUnit;
-
-		// 行星发动机喷射流需要随机一些才自然 
-		double fRandom = iPseudoNoise(iRandom) * 1e-4; // 0.0-1.0
-		double fR = pEllipsoid->getRadiusEquator();
-		double fNormalLength = fR * 0.05;
-		// 如果是推进式发动机，离北极越近，缩放随机越大
-		if (vSphereUp.z() > 0.1)
-		{
-			float fTailScale = 0.3f + 0.7f * pow(osg::clampBetween(vSphereUp.z(), 0.5f, 1.0f), 11);
-			// 发动机高度有两种
-			float fLineScale = (vData.w() > 1e4) ? 1.0f : 0.5f;
-			fNormalLength = fR * fLineScale * (0.01 + 0.15 * fRandom * fTailScale);
-		}
-		else
-		{
-			fRandom = 0.5 + 0.5 * fRandom;
-		}
-
-		pVerts->push_back(vPos);
-		pVerts->push_back(vPos + vVertNorm * fNormalLength);
-
-		pCoords->push_back(osg::Vec2(1, fRandom));
-		pCoords->push_back(osg::Vec2(0, fRandom));
-
-		pNorms->push_back(vVertNorm);
-		pNorms->push_back(vVertNorm);
-
-		pEle->push_back(i * 2);
-		pEle->push_back(i * 2 + 1);
-	}
-
-	geom->setVertexArray(pVerts);
-	geom->setTexCoordArray(0, pCoords);
-	geom->setNormalArray(pNorms);
-	geom->setNormalBinding(osg::Geometry::BIND_PER_PRIMITIVE_SET);
-	geom->addPrimitiveSet(pEle);
-	return geom;
-}
-
-osg::Geometry* CGMEarth::_MakeEngineJetStreamGeometry(const osg::EllipsoidModel* pEllipsoid, const double fUnit) const
-{
-	osg::Geometry* geom = new osg::Geometry();
-	geom->setUseVertexBufferObjects(true);
-	geom->setUseDisplayList(false);
-	geom->setDataVariance(osg::Object::STATIC);
-
-	int iEngineNum = m_pEarthEngineDataImg->s();
-	osg::ref_ptr<osg::Vec3Array> pVerts = new osg::Vec3Array();
-	osg::ref_ptr<osg::Vec4Array> pCoords = new osg::Vec4Array;
-	osg::ref_ptr<osg::DrawElementsUInt> pEle = new osg::DrawElementsUInt(GL_TRIANGLES);
-	pVerts->reserve(iEngineNum * 8);
-	pCoords->reserve(iEngineNum * 8);
-	pEle->reserve(iEngineNum * 12);
-
-	std::default_random_engine iRandom;
-	iRandom.seed(0);
-	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
-
-	for (int i = 0; i < iEngineNum; i++)
-	{
-		osg::Vec4f vData = CGMKit::GetImageColor(m_pEarthEngineDataImg, float(i + 0.5) / float(iEngineNum), 0);
-		double fLon = vData.x();
-		double fLat = vData.y();
-		double fTopAlt = (vData.z() + vData.w()) / fUnit;
-		double fX, fY, fZ;
-		pEllipsoid->convertLatLongHeightToXYZ(fLat, fLon, fTopAlt, fX, fY, fZ);
-		osg::Vec3 vSpherePos = osg::Vec3(fX, fY, fZ);
-		osg::Vec3 vSphereUp = vSpherePos;
-		vSphereUp.normalize();
-		// 计算发动机喷射方向
-		osg::Vec3 vVertNorm = _Pos2Norm(vSpherePos);
-		// 计算发动机喷射口位置
-		osg::Vec3 vPos = vSpherePos + _NozzlePos(vVertNorm, vSphereUp) / fUnit;
-
-		osg::Vec3 vVertBiNorm = osg::Vec3(1, 0, 0);
-		osg::Vec3 vVertTangent = osg::Vec3(0, 1, 0);
-		if (vVertNorm != osg::Vec3(0, 0, 1))
-		{
-			vVertBiNorm = osg::Vec3(0, 0, 1) ^ vVertNorm;
-			vVertBiNorm.normalize();
-			vVertTangent = vVertNorm ^ vVertBiNorm;
-			vVertTangent.normalize();
-		}
-
-		// 行星发动机喷射流需要随机一些才自然 
-		double fRandom = iPseudoNoise(iRandom) * 1e-4; // 0.0-1.0
-		double fR = pEllipsoid->getRadiusEquator();
-		double fNormalLength = fR * 0.05;
-
-		// 行星发动机喷射流半径分两种，大的2500米，小的1700米
-		double fStreamRadius = 2500.0 / fUnit;
-		if (vData.w() < 1e4f)
-			fStreamRadius = 1700.0 / fUnit;
-
-		// 如果是推进式发动机，离北极越近，缩放随机越大
-		if (vSphereUp.z() > 0.1)
-		{
-			float fTailScale = 0.3f + 0.7f * pow(osg::clampBetween(vSphereUp.z(), 0.5f, 1.0f), 11);
-			// 发动机高度有两种
-			float fLineScale = (vData.w() > 1e4) ? 1.0f : 0.5f;
-			fNormalLength = fR * fLineScale * (0.01 + 0.15 * fRandom * fTailScale);
-		}
-		else
-		{
-			fRandom = 0.5 + 0.5 * fRandom;
-		}
-
-		// 绘制十字交叉面片
-		// 喷射流顶端位置
-		osg::Vec3 vStreamTop = vPos + vVertNorm * fNormalLength;
-		// 喷射流长宽比
-		float fRatio = fNormalLength / fStreamRadius;
-
-		pVerts->push_back(vPos - vVertBiNorm * fStreamRadius);
-		pVerts->push_back(vPos + vVertBiNorm * fStreamRadius);
-		pVerts->push_back(vStreamTop - vVertBiNorm * fStreamRadius);
-		pVerts->push_back(vStreamTop + vVertBiNorm * fStreamRadius);
-
-		pVerts->push_back(vPos - vVertTangent * fStreamRadius);
-		pVerts->push_back(vPos + vVertTangent * fStreamRadius);
-		pVerts->push_back(vStreamTop - vVertTangent * fStreamRadius);
-		pVerts->push_back(vStreamTop + vVertTangent * fStreamRadius);
-
-		pCoords->push_back(osg::Vec4(0, 1, fRandom, fRatio));
-		pCoords->push_back(osg::Vec4(1, 1, fRandom, fRatio));
-		pCoords->push_back(osg::Vec4(0, 0, fRandom, fRatio));
-		pCoords->push_back(osg::Vec4(1, 0, fRandom, fRatio));
-
-		pCoords->push_back(osg::Vec4(0, 1, fRandom, fRatio));
-		pCoords->push_back(osg::Vec4(1, 1, fRandom, fRatio));
-		pCoords->push_back(osg::Vec4(0, 0, fRandom, fRatio));
-		pCoords->push_back(osg::Vec4(1, 0, fRandom, fRatio));
-
-		pEle->push_back(i * 8);
-		pEle->push_back(i * 8 + 1);
-		pEle->push_back(i * 8 + 2);
-		pEle->push_back(i * 8 + 1);
-		pEle->push_back(i * 8 + 3);
-		pEle->push_back(i * 8 + 2);
-
-		pEle->push_back(i * 8 + 4);
-		pEle->push_back(i * 8 + 5);
-		pEle->push_back(i * 8 + 6);
-		pEle->push_back(i * 8 + 5);
-		pEle->push_back(i * 8 + 7);
-		pEle->push_back(i * 8 + 6);
-	}
-
-	geom->setVertexArray(pVerts);
-	geom->setTexCoordArray(0, pCoords);
-	geom->setNormalBinding(osg::Geometry::BIND_OFF);
-	geom->addPrimitiveSet(pEle);
-	return geom;
-}
-
 void CGMEarth::_MixWEETexture(
 	const std::string& strPath0, const std::string& strPath1, const std::string& strOut,
 	const int iType)
@@ -2189,22 +1182,4 @@ void CGMEarth::_MixWEETexture(
 		pOutImage->setImage(pImage0->s(), pImage0->t(), 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pData, osg::Image::USE_NEW_DELETE);
 		osgDB::writeImageFile(*(pOutImage.get()), strOut + std::to_string(iFace) + ".tif");
 	}
-}
-
-osg::Vec3 CGMEarth::_Pos2Norm(const osg::Vec3& vECEFPos) const
-{
-	osg::Vec3 vSphereUp = vECEFPos;
-	vSphereUp.normalize();
-	osg::Vec3 vEast = osg::Vec3(0, 0, 1) ^ vSphereUp;
-	vEast.normalize();
-
-	const double fPitch = -osg::PI_4;
-	if (vSphereUp.z() < std::cos(fPitch))
-	{
-		osg::Vec3 vSphereNorm = osg::Quat(fPitch, vEast) * vSphereUp;
-		vSphereNorm.normalize();
-		return vSphereNorm;
-	}
-
-	return osg::Vec3(0, 0, 1);
 }

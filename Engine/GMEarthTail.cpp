@@ -60,6 +60,7 @@ bool CGMEarthTail::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, 
 bool CGMEarthTail::Update(double dDeltaTime)
 {
 	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return true;
+	if(!m_bVisible) return true;
 
 	if (2 == m_pKernelData->iHierarchy)
 	{

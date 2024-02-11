@@ -13,12 +13,18 @@
 
 #include "GMCommonUniform.h"
 #include "GMPlanet.h"
-#include "GMEarthTail.h"
 
 #include <osg/Texture2DArray>
 
 namespace GM
 {
+	/*************************************************************************
+	Class
+	*************************************************************************/
+	class CChangeEngineDirVisitor;
+	class CGMEarthTail;
+	class CGMEarthEngine;
+
 	/*!
 	*  @class CGMEarth
 	*  @brief Galaxy-Music GMEarth
@@ -159,29 +165,6 @@ namespace GM
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateWanderingEarth();
-		/**
-		* @brief 创建流浪地球行星发动机的喷射口亮点，仅用于太空视角
-		* @return bool:			成功true，失败false
-		*/
-		bool _GenEarthEnginePoint_1();
-		bool _GenEarthEnginePoint_2();
-		/**
-		* @brief 创建流浪地球行星发动机的喷射流，仅用于太空视角
-		* @return bool:			成功true，失败false
-		*/
-		bool _GenEarthEngineJetLine_1();
-		bool _GenEarthEngineJetLine_2();
-		/**
-		* @brief 创建流浪地球行星发动机的主体，LOD第4级，用于近地视角
-		* @return bool:			成功true，失败false
-		*/
-		bool _GenEarthEngineBody_1();
-		bool _GenEarthEngineBody_2();
-		/**
-		* @brief 创建流浪地球行星发动机的柱状喷射流面片，LOD第4级，用于近地视角
-		* @return bool:			成功true，失败false
-		*/
-		bool _GenEarthEngineStream();
 
 		/**
 		* @brief 加载2D纹理
@@ -224,37 +207,6 @@ namespace GM
 		* @return bool 成功true，如果纹理指针为空或者增加的图片尺寸和已有图尺寸不同，则返回false
 		*/
 		bool _AddTex2DArray(osg::Texture2DArray* pTex, const std::string& filePreName, bool bFlip = true);
-		/**
-		* @brief 生成行星发动机经、纬、高、尺寸信息，生成后不要再调用
-		*/
-		void _GenEarthEngineData();
-
-		/**
-		* @brief 生成“行星发动机基座图”和“周围bloom图”，仅用于生成贴图，生成后不要再调用
-		*/
-		void _GenEarthEngineTexture();
-
-		/**
-		* @brief 创建流浪地球上的行星发动机的喷射口亮点
-		* @param pEllipsoid				用于描述天体的椭球模型
-		* @param fUnit					当前空间层级的单位长度，单位：米
-		* @return Geometry				返回创建的几何体指针
-		*/
-		osg::Geometry* _MakeEnginePointGeometry(const osg::EllipsoidModel* pEllipsoid, const double fUnit) const;
-		/**
-		* @brief 创建流浪地球上的行星发动机的喷射流
-		* @param pEllipsoid				用于描述天体的椭球模型
-		* @param fUnit					当前空间层级的单位长度，单位：米
-		* @return Geometry				返回创建的几何体指针
-		*/
-		osg::Geometry* _MakeEngineJetLineGeometry(const osg::EllipsoidModel* pEllipsoid, const double fUnit) const;
-		/**
-		* @brief 创建流浪地球上的行星发动机的喷射流，用于近地视角
-		* @param pEllipsoid				用于描述天体的椭球模型
-		* @param fUnit					当前空间层级的单位长度，单位：米
-		* @return Geometry				返回创建的几何体指针
-		*/
-		osg::Geometry* _MakeEngineJetStreamGeometry(const osg::EllipsoidModel* pEllipsoid, const double fUnit) const;
 
 		/**
 		* @brief 临时添加的生成流浪地球版本的各个贴图的工具函数
@@ -266,13 +218,6 @@ namespace GM
 		void _MixWEETexture(
 			const std::string& strPath0, const std::string& strPath1, const std::string& strOut,
 			const int iType);
-
-		/**
-		* @brief 流浪地球的行星发动机的方向
-		* @param vECEFPos: 发动机的ECEF坐标
-		* @return osg::Vec3: 发动机方向
-		*/
-		osg::Vec3 _Pos2Norm(const osg::Vec3& vECEFPos) const;
 
 		/**
 		* @brief 行星发动机喷口偏转后的偏移位置（与垂直向上喷射相比）
@@ -289,7 +234,6 @@ namespace GM
 	private:
 		SGMKernelData*									m_pKernelData;					//!< 内核数据
 		CGMCommonUniform*								m_pCommonUniform;				//!< 公共Uniform
-		std::vector<osg::ref_ptr<osg::Group>>			m_pHieEarthRootVector;			//!< 012空间层级的根节点
 
 		std::string										m_strGalaxyShaderPath;			//!< galaxy shader 路径
 		std::string										m_strEarthShaderPath;			//!< Earth shader 路径
@@ -300,22 +244,15 @@ namespace GM
 		float											m_fCloudTop;					//!< 云顶高度
 
 		osg::ref_ptr<osg::Transform>					m_pPlanet_2_Transform;			//!< 第2层级当前行星变换结点
-		osg::ref_ptr<osg::Group>						m_pEarthRoot_1;					//!< 第1层级地球共用球体
-		osg::ref_ptr<osg::Group>						m_pEarthRoot_2;					//!< 第2层级地球共用球体
-		osg::ref_ptr<osg::Geometry>						m_pEarthGeom_1;					//!< 第1层级地球共用球体
-		osg::ref_ptr<osg::Geometry>						m_pEarthGeom_2;					//!< 第2层级地球共用球体
+		osg::ref_ptr<osg::Group>						m_pEarthRoot_1;					//!< 第1层级地球根节点
+		osg::ref_ptr<osg::Group>						m_pEarthRoot_2;					//!< 第2层级地球根节点
+		osg::ref_ptr<osg::Geometry>						m_pEarthGeom_1;					//!< 第1层级地球几何节点
+		osg::ref_ptr<osg::Geometry>						m_pEarthGeom_2;					//!< 第2层级地球几何节点
 		osg::ref_ptr<osg::Geode>						m_pEarthCloud_1;				//!< 1层级地球云层节点
 		osg::ref_ptr<osg::Geode>						m_pEarthAtmos_1;				//!< 1层级地球大气节点
 		osg::ref_ptr<osg::Geode>						m_pEarthGround_2;				//!< 2层级地球地面节点
 		osg::ref_ptr<osg::Geode>						m_pEarthCloud_2;				//!< 2层级地球云层节点
 		osg::ref_ptr<osg::Geode>						m_pEarthAtmos_2;				//!< 2层级地球大气节点
-		osg::ref_ptr<osg::Geode>						m_pEarthEnginePointNode_1;		//!< 1层级行星发动机喷射口亮点
-		osg::ref_ptr<osg::Geode>						m_pEarthEnginePointNode_2;		//!< 2层级行星发动机喷射口亮点
-		osg::ref_ptr<osg::Geode>						m_pEarthEngineJetNode_1;		//!< 1层级行星发动机喷射流
-		osg::ref_ptr<osg::Geode>						m_pEarthEngineJetNode_2;		//!< 2层级行星发动机喷射流
-		osg::ref_ptr<osg::Geode>						m_pEarthEngineStream;			//!< 行星发动机喷射流柱状面片
-		osg::ref_ptr<osg::Node>							m_pEarthEngineBody_1;			//!< 1层级行星发动机主体
-		osg::ref_ptr<osg::Node>							m_pEarthEngineBody_2;			//!< 2层级行星发动机主体
 		osg::ref_ptr<osg::StateSet>						m_pSSEarthGround_1;				//!< 1层级地球地面状态集
 		osg::ref_ptr<osg::StateSet>						m_pSSEarthCloud_1;				//!< 1层级地球云层状态集
 		osg::ref_ptr<osg::StateSet>						m_pSSEarthAtmos_1;				//!< 1层级地球大气状态集
@@ -334,7 +271,6 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_mView2ECEFUniform;			//!< view空间转ECEF的矩阵
 		osg::ref_ptr<osg::Uniform>						m_vEarthCoordScaleUniform;		//!< 地球贴图的纹理坐标缩放
 		osg::ref_ptr<osg::Uniform>						m_fWanderProgressUniform;		//!< 流浪地球计划进展Uniform
-		osg::ref_ptr<osg::Uniform>						m_fEngineStartRatioUniform;		//!< 发动机开启比例Uniform
 
 		osg::ref_ptr<osgDB::Options>					m_pDDSOptions;					//!< dds的纹理操作
 		osg::ref_ptr<osg::Texture2DArray>				m_aEarthBaseTex;				//!< 地球base color纹理
@@ -350,9 +286,7 @@ namespace GM
 		osg::ref_ptr<osg::Texture2D>					m_pGlobalShadowTex;				//!< 全球云层阴影贴图
 		osg::ref_ptr<osg::Camera>						m_pGlobalShadowCamera;			//!< 全球云层阴影的RTT相机
 
-		// 流浪地球行星发动机数据,xy=经纬度（弧度），z=底高（米），w=发动机高度（米）
-		// 图片宽度（s）= 发动机数量，高度（t）= 1
-		osg::ref_ptr<osg::Image>						m_pEarthEngineDataImg;
 		CGMEarthTail*									m_pEarthTail;					//!< 流浪地球尾迹体渲染模块
+		CGMEarthEngine*									m_pEarthEngine;					//!< 行星发动机模块
 	};
 }	// GM

@@ -135,6 +135,7 @@
     <ClCompile Include="..\Engine\GMCommonUniform.cpp" />
     <ClCompile Include="..\Engine\GMDataManager.cpp" />
     <ClCompile Include="..\Engine\GMEarth.cpp" />
+    <ClCompile Include="..\Engine\GMEarthEngine.cpp" />
     <ClCompile Include="..\Engine\GMEarthTail.cpp" />
     <ClCompile Include="..\Engine\GMEngine.cpp" />
     <ClCompile Include="..\Engine\GMGalaxy.cpp" />
@@ -187,6 +188,7 @@
     <ClInclude Include="..\Engine\GMDataManager.h" />
     <ClInclude Include="..\Engine\GMDispatchCompute.h" />
     <ClInclude Include="..\Engine\GMEarth.h" />
+    <ClInclude Include="..\Engine\GMEarthEngine.h" />
     <ClInclude Include="..\Engine\GMEarthTail.h" />
     <ClInclude Include="..\Engine\GMEngine.h" />
     <ClInclude Include="..\Engine\GMEnums.h" />

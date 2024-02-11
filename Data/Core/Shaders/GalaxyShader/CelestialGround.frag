@@ -86,7 +86,7 @@ void main()
 	// for start
 	vec3 MVU = normalize(modelVertex.xyz);
 	float lon = abs(atan(MVU.x, MVU.y))/M_PI;
-	float engineStart = smoothstep(0.0, 0.1, max(MVU.z-1+engineStartRatio*1.1,
+	float engineStart = smoothstep(0.0, 0.1, max(MVU.z-1+engineStartRatio,
 		clamp(2*engineStartRatio-0.2-lon,0,1)*clamp((0.35-abs(MVU.z))*4,0,1)));
 	vec3 ambient = vec3(0.07,0.11,0.15)*(exp2(-abs(texCoord_0.y-0.5)*25)+exp2(min(0,texCoord_0.y-0.67)*50))*engineStart;
 
