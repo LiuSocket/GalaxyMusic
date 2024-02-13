@@ -8,7 +8,7 @@ uniform float minDotUL;
 
 #ifdef WANDERING
 uniform sampler2D tailTex;
-uniform float engineStartRatio;
+uniform vec2 engineStartRatio;
 uniform float wanderProgress;
 #endif // WANDERING	
 

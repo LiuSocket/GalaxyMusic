@@ -39,7 +39,8 @@ CGMCommonUniform::CGMCommonUniform():
 	m_vEyeFrontDirUniform(new osg::Uniform("eyeFrontDir", osg::Vec3f(0.0f, 0.0f, -1.0f))),
 	m_vEyeRightDirUniform(new osg::Uniform("eyeRightDir", osg::Vec3f(1.0f, 0.0f, 0.0f))),
 	m_vEyeUpDirUniform(new osg::Uniform("eyeUpDir", osg::Vec3f(0.0f, 1.0f, 0.0f))),
-	m_vViewUpUniform(new osg::Uniform("viewUp", osg::Vec3f(0.0f, 1.0f, 0.0f)))
+	m_vViewUpUniform(new osg::Uniform("viewUp", osg::Vec3f(0.0f, 1.0f, 0.0f))),
+	m_fRenderingTime(0.0)
 {
 	for (int i = 0; i < PULSE_NUM; i++)
 	{
@@ -63,10 +64,8 @@ void CGMCommonUniform::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigDa
 
 void CGMCommonUniform::Update(double dDeltaTime)
 {
-	float fTimes;
-	m_fTimeUniform->get(fTimes);
-	fTimes += dDeltaTime;
-	m_fTimeUniform->set(fTimes);
+	m_fRenderingTime += dDeltaTime;
+	m_fTimeUniform->set(float(m_fRenderingTime));
 }
 
 void CGMCommonUniform::UpdateLater(double dDeltaTime)

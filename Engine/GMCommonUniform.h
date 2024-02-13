@@ -176,6 +176,8 @@ namespace GM
 		osg::ref_ptr<osg::Uniform> m_vEyeUpDirUniform;				//!< 主相机上方单位向量，在世界空间
 
 		osg::ref_ptr<osg::Uniform> m_vViewUpUniform;				//!< 眼点view空间Up向量，指向天空
+
+		double m_fRenderingTime;									//!< 三维渲染的持续时间，不是程序运行时长
 	};
 
 }	// GM

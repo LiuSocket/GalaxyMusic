@@ -14,9 +14,7 @@
 #include "GMEngine.h"
 #include "GMEarthTail.h"
 #include "GMEarthEngine.h"
-#include "GMXml.h"
 #include "GMKit.h"
-#include <osg/PointSprite>
 #include <osg/LineWidth>
 #include <osg/Texture2D>
 #include <osg/Texture3D>
@@ -389,7 +387,10 @@ void CGMEarth::SetEarthRotate(const double fSpin, const double fObliquity, const
 	m_pPlanet_2_Transform->asPositionAttitudeTransform()->setAttitude(qRotate);
 
 	if (m_pConfigData->bWanderingEarth)
+	{
+		m_pEarthEngine->SetEarthSpin(fSpin);
 		m_pEarthTail->SetEarthTailRotate(qRotate);
+	}
 }
 
 void CGMEarth::SetWanderingEarthProgress(const float fProgress)
@@ -397,8 +398,6 @@ void CGMEarth::SetWanderingEarthProgress(const float fProgress)
 	if (!m_pConfigData->bWanderingEarth) return;
 
 	m_fWanderProgressUniform->set(osg::clampBetween(fProgress, 0.0f, 1.0f));
-	// 发动机在月球危机时开启
-	m_pEarthEngine->SetWanderingEarthProgress(fProgress);
 }
 
 bool CGMEarth::CreateEarth()

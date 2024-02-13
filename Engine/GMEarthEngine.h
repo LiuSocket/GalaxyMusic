@@ -12,16 +12,13 @@
 #pragma once
 
 #include "GMCommonUniform.h"
-#include "GMPlanet.h"
-
-#include <osg/Texture2DArray>
 
 namespace GM
 {
 	/*************************************************************************
 	Class
 	*************************************************************************/
-	class CEngineDirControlVisitor;
+	class CEEControlVisitor;
 
 	/*!
 	*  @class CGMEarthEngine
@@ -75,10 +72,13 @@ namespace GM
 		*/
 		void SetVisible(const bool bVisible);
 		/**
-		* @brief 设置“流浪地球计化”的进展
-		* @param fProgress 进展百分比，[0.0, 1.0]
+		* @brief 设置地球在第2空间层级下的自转角度
+		* @param fSpin： 自转角度，单位：弧度
 		*/
-		void SetWanderingEarthProgress(const float fProgress);
+		inline void SetEarthSpin(const double fSpin)
+		{
+			m_fEarthSpin = fSpin;
+		}
 		/**
 		* @brief 创建行星发动机
 		* @return bool 成功true， 失败false
@@ -92,10 +92,10 @@ namespace GM
 		*/
 		bool UpdateHierarchy(int iHierarchy);
 
-		/* @brief 获取行星发动机开启比例 */
+		/* @brief 获取行星发动机开启比例，x=转向，y=推进 */
 		inline osg::Uniform* GetEngineStartRatioUniform() const
 		{
-			return m_fEngineStartRatioUniform.get();
+			return m_vEngineStartRatioUniform.get();
 		}
 
 	private:
@@ -192,24 +192,6 @@ namespace GM
 			const std::string& strPath0, const std::string& strPath1, const std::string& strOut,
 			const int iType);
 
-		/**
-		* @brief 流浪地球的行星发动机的方向
-		* @param vECEFPos: 发动机的ECEF坐标
-		* @return osg::Vec3: 发动机方向
-		*/
-		osg::Vec3 _Pos2Norm(const osg::Vec3& vECEFPos) const;
-
-		/**
-		* @brief 行星发动机喷口偏转后的偏移位置（与垂直向上喷射相比）
-		* @param vDir: 发动机的喷射方向（ECEF）
-		* @param vUp: 发动机的上方向（ECEF）
-		* @return osg::Vec3: 喷口偏转后的偏移位置，单位：米
-		*/
-		inline osg::Vec3 _NozzlePos(const osg::Vec3& vDir, const osg::Vec3& vUp) const
-		{
-			return vDir * 1500.0 - vUp * 2000.0;
-		}
-
 		// 变量
 	private:
 		SGMKernelData*									m_pKernelData;					//!< 内核数据
@@ -240,15 +222,14 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_fMinDotULUniform;				//!< 有光区域的最小DotUL值(-1,0)
 		osg::ref_ptr<osg::Uniform>						m_fEyeAltitudeUniform;			//!< 眼点海拔Uniform
 		osg::ref_ptr<osg::Uniform>						m_fWanderProgressUniform;		//!< 流浪地球计划进展Uniform
-		osg::ref_ptr<osg::Uniform>						m_fEngineStartRatioUniform;		//!< 发动机开启比例Uniform
+		osg::ref_ptr<osg::Uniform>						m_vEngineStartRatioUniform;		//!< 开启比例，x=转向，y=推进
 
 		osg::ref_ptr<osgDB::Options>					m_pDDSOptions;					//!< dds的纹理操作
-
-		osg::ref_ptr<CEngineDirControlVisitor>			m_pEngineDirControl;
 		osg::ref_ptr<osg::EllipsoidModel>				m_pEllipsoid;					//!< 椭球模型
-
 		// 流浪地球行星发动机数据,xy=经纬度（弧度），z=底高（米），w=发动机高度（米）
 		// 图片宽度（s）= 发动机数量，高度（t）= 1
 		osg::ref_ptr<osg::Image>						m_pEarthEngineDataImg;
+		osg::ref_ptr<CEEControlVisitor>					m_pEEDirControl;				//!< 行星发动机访问器
+		double											m_fEarthSpin;					//!< 地球的自转角度，单位：弧度
 	};
 }	// GM

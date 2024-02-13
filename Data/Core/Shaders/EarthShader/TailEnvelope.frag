@@ -4,7 +4,7 @@ const float M_PI = 3.141592657;
 
 uniform float unit;
 uniform float times;
-uniform float engineStartRatio;
+uniform vec2 engineStartRatio;
 uniform vec3 viewLight;
 uniform sampler2D noise2DTex;
 
@@ -64,11 +64,11 @@ void main()
 	diffuse *= smoothstep(vec3(-0.55,-0.52,-0.5), vec3(0.2,0.24,0.28), vec3(dotVUL));
 
 	float fade_0 = clamp(v*30, 0, 1)*clamp((v0-v)*6, 0, 1)
-		*(1-exp2(min(0, v - v0*(engineStartRatio - 0.7))*10));
+		*(1-exp2(min(0, v - v0*(engineStartRatio.x - 0.5))*10));
 	float fade_1 = clamp((v-v0)*20, 0, 1)*clamp(v1-v, 0, 1)
-		*(1-exp2(min(0, v - mix(v0, v1, clamp(0.15*(engineStartRatio - 1), 0, 1)))*20));
+		*(1-exp2(min(0, v - mix(v0, v1, clamp(0.15*(engineStartRatio.y - 1), 0, 1)))*20));
 	float fade_2 = clamp((v-v1)*5, 0, 1)*clamp(v2-v, 0, 1)
-		*(1-exp2(min(0, v - mix(v1, v2, clamp(0.15*(engineStartRatio - 1), 0, 1)))*30));
+		*(1-exp2(min(0, v - mix(v1, v2, clamp(0.15*(engineStartRatio.y - 1), 0, 1)))*30));
 
 	float tailCordX = fract(gl_TexCoord[0].x*3);
 	float edgeFade = 4*tailCordX*(1-tailCordX)*(1-dotNC*dotNC);

@@ -86,8 +86,8 @@ void main()
 	// for start
 	vec3 MVU = normalize(modelVertex.xyz);
 	float lon = abs(atan(MVU.x, MVU.y))/M_PI;
-	float engineStart = smoothstep(0.0, 0.1, max(MVU.z-1+engineStartRatio,
-		clamp(2*engineStartRatio-0.2-lon,0,1)*clamp((0.35-abs(MVU.z))*4,0,1)));
+	float engineStart = smoothstep(0.0, 0.2, max(MVU.z-1+engineStartRatio.y,
+		clamp(2*engineStartRatio.x-lon,0,1)*clamp((0.35-abs(MVU.z))*4,0,1)));
 	vec3 ambient = vec3(0.07,0.11,0.15)*(exp2(-abs(texCoord_0.y-0.5)*25)+exp2(min(0,texCoord_0.y-0.67)*50))*engineStart;
 
 	vec3 DEMCoord = texCoord_1;
@@ -99,7 +99,7 @@ void main()
 	float elev2Sea = elev-seaLevel;
 	// [0.0,0.1] seaLevel + 66m
 	rockMask = mix(rockMask, smoothstep(-10.0, 0.0, elev2Sea), seaLevelAddProgress);
-	illumCity = max((0.2+0.05*baseColor.rgb)*darkness*engineMask,
+	illumCity = max((0.2+0.04*baseColor.rgb)*darkness*engineMask,
 		rockMask*(illumCity - seaLevelAddProgress));
 
 	color = mix(vec3(0.0,0.1,0.0), baseColor.rgb, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));

@@ -2,7 +2,7 @@
 
 const float M_PI = 3.1415926;
 
-uniform float engineStartRatio;
+uniform vec2 engineStartRatio;
 uniform float unit;
 
 out float noise;
@@ -18,10 +18,11 @@ void main()
 	noise = gl_MultiTexCoord0.x;
 	intensity = min(1, 1.5*noise*max(0, dot(viewNormal,-viewDir))*exp2(-lenV*unit*1e-8));
 	// for start
+	float startSpeed = 1-0.1*noise;
 	vec3 MVU = normalize(gl_Vertex.xyz);
 	float lon = abs(atan(MVU.x, MVU.y))/M_PI;
-	intensity *= max(clamp(10*(MVU.z-1+engineStartRatio),0,1),
-		clamp(10*(2*engineStartRatio-0.2-lon),0,1)*clamp((0.2-abs(MVU.z))*10,0,1));
+	intensity *= max(clamp(30*(MVU.z-1+engineStartRatio.y*startSpeed),0,1),
+		clamp(30*(2*engineStartRatio.x*startSpeed-lon),0,1)*clamp((0.2-abs(MVU.z))*10,0,1));
 	// for near discard
 	float minDistance = 2e6/unit;
 	intensity *= (unit < 1e6) ? clamp((lenV-minDistance)/minDistance, 0, 1) : 1.0;

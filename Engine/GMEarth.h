@@ -21,7 +21,6 @@ namespace GM
 	/*************************************************************************
 	Class
 	*************************************************************************/
-	class CChangeEngineDirVisitor;
 	class CGMEarthTail;
 	class CGMEarthEngine;
 

@@ -13,13 +13,10 @@
 #include "GMEarthEngine.h"
 #include "GMEngine.h"
 #include "GMEarthTail.h"
-#include "GMXml.h"
 #include "GMKit.h"
 #include <osg/PointSprite>
 #include <osg/LineWidth>
 #include <osg/Texture2D>
-#include <osg/Texture3D>
-#include <osg/PositionAttitudeTransform>
 #include <osg/PolygonOffset>
 #include <osg/Depth>
 #include <osg/AlphaFunc>
@@ -34,8 +31,40 @@ using namespace GM;
 constexpr
 *************************************************************************/
 
-constexpr double EARTH_EQUATOR = 6378137.0; 		// 地球赤道半径
-constexpr double EARTH_POLAR = 6356752.0; 			// 地球两极半径
+constexpr float PROGRESS_0 = 0.1f; 		// 前太阳时代结束，开启刹车时代
+constexpr float PROGRESS_1 = 0.15f; 	// 刹车时代结束，开始调整地球姿态，旋转北极轴
+constexpr float PROGRESS_2 = 0.2f;		// 地球姿态调整中期
+constexpr float PROGRESS_3 = 0.25f;		// 地球姿态调整结束，北极与地球运行方向相反
+constexpr float PROGRESS_4 = 0.3f;		// 全球发动机并网成功，启航
+constexpr float PROGRESS_5 = 0.4f;		// 发动机全功率开启
+
+/*************************************************************************
+Structs
+*************************************************************************/
+// 行星发动机合力产生的加速度
+struct SEarthAcceleration
+{
+	SEarthAcceleration() :fAccelerationFront(0.0), fAccelerationRoll(0.0), qAccelerationTurn(osg::Quat()) {}
+	SEarthAcceleration(const double fAFront, const double fARoll, const osg::Quat& qATurn) :
+		fAccelerationFront(fAFront), fAccelerationRoll(fARoll), qAccelerationTurn(qATurn) {}
+
+	bool operator==(const SEarthAcceleration& r)
+	{
+		return (fAccelerationFront == r.fAccelerationFront)
+			&& (fAccelerationRoll == r.fAccelerationRoll)
+			&& (qAccelerationTurn == r.qAccelerationTurn);
+	}
+	bool operator!=(const SEarthAcceleration& r)
+	{
+		return (fAccelerationFront != r.fAccelerationFront)
+			|| (fAccelerationRoll != r.fAccelerationRoll)
+			|| (qAccelerationTurn != r.qAccelerationTurn);
+	}
+
+	double fAccelerationFront;		// 加速度，单位：m/s2，>= 0
+	double fAccelerationRoll;		// 滚转角加速度，负数代表与地球自转方向相反，单位：弧度/s2
+	osg::Quat qAccelerationTurn;	// 沿着穿过赤道面的轴旋转的角加速度，单位：弧度/s2
+};
 
 /*************************************************************************
 Class
@@ -161,9 +190,9 @@ namespace GM
 					double fDEM = vData.z() / _fUnit;
 					double fX, fY, fZ;
 					ellipsoid.convertLatLongHeightToXYZ(fLat, fLon, fDEM, fX, fY, fZ);
-					osg::Vec3 vSpherePos = osg::Vec3(fX, fY, fZ);
+					osg::Vec3 vBottomPos = osg::Vec3(fX, fY, fZ);
 
-					osg::Vec3 vVertUp = ellipsoid.computeLocalUpVector(vSpherePos.x(), vSpherePos.y(), vSpherePos.z());
+					osg::Vec3 vVertUp = ellipsoid.computeLocalUpVector(vBottomPos.x(), vBottomPos.y(), vBottomPos.z());
 					osg::Vec3 vVertEast = osg::Vec3(0, 0, 1) ^ vVertUp;
 					vVertEast.normalize();
 					osg::Vec3 vVertNorth = vVertUp ^ vVertEast;
@@ -174,13 +203,13 @@ namespace GM
 						vVertEast.x(),	vVertEast.y(),	vVertEast.z(),	0,
 						vVertNorth.x(),	vVertNorth.y(),	vVertNorth.z(),	0,
 						vVertUp.x(),	vVertUp.y(),	vVertUp.z(),	0,
-						vSpherePos.x(),	vSpherePos.y(),	vSpherePos.z(),	1);
+						vBottomPos.x(),	vBottomPos.y(),	vBottomPos.z(),	1);
 
 					// 行星发动机直径分两种，大的30000米，小的21000米
 					float fScale = 1.0 / _fUnit;
 					fScale *= (vData.w() > 1e4) ? 1.0f : 0.7f;
 					// 发动机所在位置的地球半径
-					float fRadius = vSpherePos.length();
+					float fRadius = vBottomPos.length();
 
 					// 绘制发动机主体
 					for (int j = 0; j < iVertPerEngine; j++)
@@ -213,20 +242,105 @@ namespace GM
 	/*
 	** 行星发动机的方向控制器的访问器
 	*/
-	class CEngineDirControlVisitor : public osg::NodeVisitor
+	class CEEControlVisitor : public osg::NodeVisitor
 	{
 	public:
-		CEngineDirControlVisitor()
-			: NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN), _fUnit(1e10)
+		CEEControlVisitor()
+			: NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN), _fUnit(1e10),
+			_sEarthAcceleration(SEarthAcceleration())
 		{
-			ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
-			ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
+			_ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
+			_ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
 		}
 
 		void SetUnit(const double fUnit)
 		{
-			ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
-			ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
+			_ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
+			_ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
+		}
+
+		SEarthAcceleration GetAcceleration() const
+		{
+			return _sEarthAcceleration;
+		}
+		void SetAcceleration(const SEarthAcceleration& sEA)
+		{
+			_sEarthAcceleration = sEA;
+		}
+
+		/*
+		* @brief 计算指定位置的行星发动机在指定的加速度和角加速度下应该喷射的方向
+		* @param vECEFPos: 发动机的ECEF坐标，单位：米
+		* @return Vec3d：发动机的喷射方向，角度没有限制（可以返回向下的方向）
+		*/
+		osg::Vec3d EngineDir(const osg::Vec3d& vECEFPos) const
+		{
+			osg::Vec3 vLocalUp = vECEFPos;
+			vLocalUp.normalize();
+			osg::Vec3 vLocalEast = osg::Vec3(0, 0, 1) ^ vLocalUp;
+			vLocalEast.normalize();
+			osg::Vec3 vLocalNorth = vLocalUp ^ vLocalEast;
+			vLocalNorth.normalize();
+
+			osg::Vec3d vDirNorth = osg::Vec3d(0,0,0);
+			// 如果地球在加速前进，则发动机必有指向北极的分量
+			if (0 < _sEarthAcceleration.fAccelerationFront)
+			{
+				vDirNorth = osg::Vec3(0, 0, 1);
+			}
+
+			osg::Vec3d vDirRoll = osg::Vec3d(0, 0, 0);
+			// 如果地球在滚转，则发动机必有指向东西方向的分量
+			if (0 < _sEarthAcceleration.fAccelerationRoll)
+			{
+				vDirRoll = -vLocalEast;
+			}
+			else if (0 > _sEarthAcceleration.fAccelerationRoll)
+			{
+				vDirRoll = vLocalEast;
+			}
+			else{}
+
+			osg::Vec3d vDirTurn = osg::Vec3d(0, 0, 0);
+
+			// 发动机最低倾斜角度为45°
+			const double fPitch = osg::PI_4;
+			osg::Vec3d vDir = vDirNorth + vDirRoll + vDirTurn;
+			if (osg::Vec3d(0, 0, 0) == vDir || vLocalUp == vDir) return vLocalUp;
+
+			double fCosPitch = vLocalUp * vDir;
+			if (fCosPitch < cos(fPitch))
+			{
+				// 切向量
+				osg::Vec3d vTang = vLocalUp ^ vDir;
+				vTang.normalize();
+				vDir = osg::Quat(fPitch, vTang) * vLocalUp;
+				vDir.normalize();
+			}
+			return vDir;
+		}
+
+		/**
+		* @brief 行星发动机喷口偏转后的位置（ECEF）,单位：米
+		* @param vEngineTopPos: 发动机最高点的位置（ECEF）,单位：米
+		* @param vDir: 发动机的喷射方向（ECEF）
+		* @param vUp: 发动机的上方向（ECEF）
+		* @return osg::Vec3: 喷口偏转后的位置（ECEF），单位：米
+		*/
+		osg::Vec3d EngineNozzlePos(const osg::Vec3d& vEngineTopPos, const osg::Vec3d& vDir, const osg::Vec3d& vUp) const
+		{
+			return vEngineTopPos - vUp * 2000.0 + vDir * 1500.0;
+		}
+		/**
+		* @brief 行星发动机发动机最高点的位置（ECEF）,单位：米
+		* @param vNozzlePos: 喷口偏转后的位置（ECEF）,单位：米
+		* @param vDir: 发动机的喷射方向（ECEF）
+		* @param vUp: 发动机的上方向（ECEF）
+		* @return osg::Vec3: 最高点的位置（ECEF），单位：米
+		*/
+		osg::Vec3d EngineTopPos(const osg::Vec3d& vNozzlePos, const osg::Vec3d& vDir, const osg::Vec3d& vUp) const
+		{
+			return vNozzlePos - vDir * 1500.0 + vUp * 2000.0;
 		}
 
 		void apply(osg::Node& node) { traverse(node); }
@@ -235,18 +349,121 @@ namespace GM
 			osg::Geometry* geom = dynamic_cast<osg::Geometry*>(node.getDrawable(0));
 			if (!geom) return;
 
-			osg::ref_ptr<osg::Vec3Array> pVert = dynamic_cast<osg::Vec3Array*>(geom->getVertexArray());
-			if (!pVert.valid()) return;
-
-			for (int i = 0; i < pVert->size(); i++)
+			switch (geom->getPrimitiveSet(0)->getMode())
 			{
+			case GL_LINES:
+			{
+				osg::ref_ptr<osg::Vec3Array> pVert = dynamic_cast<osg::Vec3Array*>(geom->getVertexArray());
+				osg::ref_ptr<osg::Vec3Array> pNorm = dynamic_cast<osg::Vec3Array*>(geom->getNormalArray());
+				if (!pVert.valid() || !pNorm.valid()) return;
+
+				for (int i = 0; i < pVert->size(); i+=2)
+				{
+					// 原先的喷射流长度
+					double fHieJetLen = (pVert->at(i + 1) - pVert->at(i)).length();
+					// 原先的喷射方向（ECEF）
+					osg::Vec3d vOldDir = pNorm->at(i);
+					// 发动机的上方向（ECEF）
+					osg::Vec3d vUp = pVert->at(i);
+					vUp.normalize();
+					// 计算发动机在垂直往上喷的情况下，喷口最高点位置
+					osg::Vec3d vTopPos = EngineTopPos(pVert->at(i) * _fUnit, vOldDir, vUp);
+					osg::Vec3d vDir = EngineDir(vTopPos);
+					osg::Vec3d vHieNozzlePos = EngineNozzlePos(vTopPos, vDir, vUp) / _fUnit;
+					pVert->at(i) = vHieNozzlePos;
+					pVert->at(i+1) = vHieNozzlePos + vDir * fHieJetLen;
+
+					pNorm->at(i) = vDir;
+					pNorm->at(i+1) = vDir;
+				}
+
+				pVert->dirty();
+				pNorm->dirty();
+			}
+			break;
+			case GL_POINTS:
+			{
+				osg::ref_ptr<osg::Vec3Array> pVert = dynamic_cast<osg::Vec3Array*>(geom->getVertexArray());
+				osg::ref_ptr<osg::Vec3Array> pNorm = dynamic_cast<osg::Vec3Array*>(geom->getNormalArray());
+				if (!pVert.valid() || !pNorm.valid()) return;
+
+				for (int i = 0; i < pVert->size(); i++)
+				{
+					// 原先的喷射方向（ECEF）
+					osg::Vec3d vOldDir = pNorm->at(i);
+					// 发动机的上方向（ECEF）
+					osg::Vec3d vUp = pVert->at(i);
+					vUp.normalize();
+					// 计算发动机在垂直往上喷的情况下，喷口最高点位置
+					osg::Vec3d vTopPos = EngineTopPos(pVert->at(i) * _fUnit, vOldDir, vUp);
+					osg::Vec3d vDir = EngineDir(vTopPos);
+					osg::Vec3d vHieNozzlePos = EngineNozzlePos(vTopPos, vDir, vUp) / _fUnit;
+					pVert->at(i) = vHieNozzlePos;
+					pNorm->at(i) = vDir;
+				}
+
+				pVert->dirty();
+				pNorm->dirty();
+			}
+			break;
+			case GL_TRIANGLES:
+			{
+				osg::ref_ptr<osg::Vec3Array> pVert = dynamic_cast<osg::Vec3Array*>(geom->getVertexArray());
+				if (!pVert.valid()) return;
+
+				for (int i = 0; i < pVert->size(); i += 8)
+				{
+					// 原先的喷射方向（ECEF）
+					osg::Vec3d vOldDir = pVert->at(i + 2) - pVert->at(i);
+					// 喷射流长度
+					double fHieJetLen = vOldDir.normalize();
+					// 喷射流半径
+					double fStreamRadius = 0.5*(pVert->at(i + 1) - pVert->at(i)).length();
+
+					// 发动机的上方向（ECEF）
+					osg::Vec3d vHieOldNozzlePos = (pVert->at(i) + pVert->at(i + 1)) * 0.5;
+					osg::Vec3d vUp = vHieOldNozzlePos;
+					vUp.normalize();
+					// 计算发动机在垂直往上喷的情况下，喷口最高点位置
+					osg::Vec3d vTopPos = EngineTopPos(vHieOldNozzlePos * _fUnit, vOldDir, vUp);
+					osg::Vec3d vDir = EngineDir(vTopPos);
+					osg::Vec3d vHieNozzlePos = EngineNozzlePos(vTopPos, vDir, vUp) / _fUnit;
+					osg::Vec3d vHieStreamTop = vHieNozzlePos + vDir * fHieJetLen;
+
+					osg::Vec3 vVertBiNorm = osg::Vec3(1, 0, 0);
+					osg::Vec3 vVertTangent = osg::Vec3(0, 1, 0);
+					if (vDir != osg::Vec3(0, 0, 1) && vDir != osg::Vec3(0, 0, -1))
+					{
+						vVertBiNorm = osg::Vec3(0, 0, 1) ^ vDir;
+						vVertBiNorm.normalize();
+						vVertTangent = vDir ^ vVertBiNorm;
+						vVertTangent.normalize();
+					}
+
+					pVert->at(i) = vHieNozzlePos - vVertBiNorm * fStreamRadius;
+					pVert->at(i + 1) = vHieNozzlePos + vVertBiNorm * fStreamRadius;
+					pVert->at(i + 2) = vHieStreamTop - vVertBiNorm * fStreamRadius;
+					pVert->at(i + 3) = vHieStreamTop + vVertBiNorm * fStreamRadius;
+
+					pVert->at(i + 4) = vHieNozzlePos - vVertTangent * fStreamRadius;
+					pVert->at(i + 5) = vHieNozzlePos + vVertTangent * fStreamRadius;
+					pVert->at(i + 6) = vHieStreamTop - vVertTangent * fStreamRadius;
+					pVert->at(i + 7) = vHieStreamTop + vVertTangent * fStreamRadius;
+				}
+
+				pVert->dirty();
+			}
+			break;
+			default:
+				break;
 			}
 
 			traverse(node);
 		}
 	private:
-		osg::EllipsoidModel ellipsoid;
+		osg::EllipsoidModel _ellipsoid;
 		double				_fUnit;
+		SEarthAcceleration	_sEarthAcceleration;			//!< 行星发动机合力产生的加速度
 	};
 
 }	// GM
@@ -260,7 +477,8 @@ CGMEarthEngine::CGMEarthEngine() : m_pKernelData(nullptr), m_pCommonUniform(null
 	m_strCoreModelPath("Models/"),
 	m_strGalaxyShaderPath("Shaders/GalaxyShader/"),
 	m_strEarthShaderPath("Shaders/EarthShader/"),
-	m_fEngineStartRatioUniform(new osg::Uniform("engineStartRatio", 0.0f))
+	m_vEngineStartRatioUniform(new osg::Uniform("engineStartRatio", osg::Vec2f(0.0f,0.0f))),
+	m_fEarthSpin(0.0)
 {
 	m_pEarthEngineRoot_1 = new osg::Group();
 	m_pEarthEngineRoot_2 = new osg::Group();
@@ -282,7 +500,7 @@ bool CGMEarthEngine::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData
 
 	// 读取dds时需要垂直翻转
 	m_pDDSOptions = new osgDB::Options("dds_flip");
-	m_pEngineDirControl = new CEngineDirControlVisitor();
+	m_pEEDirControl = new CEEControlVisitor();
 
 	// 用于存储行星发动机所有参数的图片
 	m_pEarthEngineDataImg = osgDB::readImageFile(m_pConfigData->strCorePath + "Textures/Sphere/Earth/EarthEngineData.tif");
@@ -293,9 +511,7 @@ bool CGMEarthEngine::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData
 /** @brief 更新 */
 bool CGMEarthEngine::Update(double dDeltaTime)
 {
-	double fTimes = osg::Timer::instance()->time_s();
 	int iHie = m_pKernelData->iHierarchy;
-
 	switch (iHie)
 	{
 	case 0:
@@ -304,7 +520,6 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 	break;
 	case 1:
 	{
-
 	}
 	break;
 	case 2:
@@ -317,13 +532,94 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 
 	float fWanderProgress = 0.0f;
 	m_fWanderProgressUniform->get(fWanderProgress);
+	// 是否需要显示行星发动机喷射流
 	unsigned int iJetMask = fWanderProgress > 0.1f ? ~0 : 0;
-
 	m_pEarthEngineStream->setNodeMask(iJetMask);
 	m_pEarthEnginePointNode_1->setNodeMask(iJetMask);
 	m_pEarthEnginePointNode_2->setNodeMask(iJetMask);
 	m_pEarthEngineJetNode_1->setNodeMask(iJetMask);
 	m_pEarthEngineJetNode_2->setNodeMask(iJetMask);
+
+	// 暂时根据流浪地球计划进度来设置行星发动机的开启或关闭，由此改变地球的加速度，后续可以让用户自由控制
+	SEarthAcceleration sEA;
+	float fTorqueStart = PROGRESS_4 + (PROGRESS_5 - PROGRESS_4) * 0.1f;// 转向发动机启动要稍微慢一些
+	float fTorqueRatio = 0.0f;// 转向发动机
+	float fPropulsionRatio = 0.0f;//  推进发动机
+
+	if (fWanderProgress < PROGRESS_0)
+	{	
+		// 建造发动机（前太阳时代）
+		sEA = SEarthAcceleration();
+	}
+	else if (fWanderProgress < PROGRESS_1)
+	{
+		// 刹车时代
+		sEA.fAccelerationFront = 0;
+		sEA.fAccelerationRoll = -0.1;
+		sEA.qAccelerationTurn = osg::Quat();
+
+		fTorqueRatio = 1;
+		fPropulsionRatio = 0;
+	}
+	else if (fWanderProgress < PROGRESS_3)
+	{
+		sEA.fAccelerationFront = 0;
+		sEA.fAccelerationRoll = 0;
+		// 地球赤道与黄道交线在ECEF空间的方向
+		osg::Vec3d vTurnAxis = osg::Vec3d(cos(-m_fEarthSpin), sin(-m_fEarthSpin), 0);
+		if (fWanderProgress < PROGRESS_2)
+		{
+			// 重新加速自转，调转地球北极方向
+			sEA.qAccelerationTurn = osg::Quat(0.1, vTurnAxis);
+		}
+		else// 自转减慢到0，让地球北极方向与地球前进方向相反
+		{
+			sEA.qAccelerationTurn = osg::Quat(-0.1, vTurnAxis);
+		}
+
+		fTorqueRatio = 1;
+		fPropulsionRatio = 0;
+	}
+	else if (fWanderProgress < PROGRESS_4)
+	{
+		sEA = SEarthAcceleration();
+	}
+	else if (fWanderProgress < PROGRESS_5)
+	{
+		// 启航
+		sEA.fAccelerationFront = 1.0;
+		sEA.fAccelerationRoll = 0.0;
+		sEA.qAccelerationTurn = osg::Quat();
+
+		fTorqueRatio = fmaxf((fWanderProgress - fTorqueStart) / (PROGRESS_5 - fTorqueStart), 0.0f);
+		fPropulsionRatio = fmaxf((fWanderProgress - PROGRESS_4) / (PROGRESS_5 - PROGRESS_4), 0.0f);
+	}
+	else
+	{
+		// 逃逸时代
+		sEA.fAccelerationFront = 1.0;
+		sEA.fAccelerationRoll = 0.0;
+		sEA.qAccelerationTurn = osg::Quat();
+
+		fTorqueRatio = fmaxf((fWanderProgress - fTorqueStart) / (PROGRESS_5 - fTorqueStart), 0.0f);
+		fPropulsionRatio = fmaxf((fWanderProgress - PROGRESS_4) / (PROGRESS_5 - PROGRESS_4), 0.0f);
+	}
+
+	if (m_pEEDirControl->GetAcceleration() != sEA)
+	{
+		m_pEEDirControl->SetAcceleration(sEA);
+		m_pEEDirControl->SetUnit(m_pKernelData->fUnitArray->at(2));
+		m_pEarthEngineJetNode_2->accept(*m_pEEDirControl);
+		m_pEarthEnginePointNode_2->accept(*m_pEEDirControl);
+
+		m_pEEDirControl->SetUnit(m_pKernelData->fUnitArray->at(1));
+		m_pEarthEngineJetNode_1->accept(*m_pEEDirControl);
+		m_pEarthEnginePointNode_1->accept(*m_pEEDirControl);
+		m_pEarthEngineStream->accept(*m_pEEDirControl);
+	}
+
+	// 每帧更新发动机启动率
+	m_vEngineStartRatioUniform->set(osg::Vec2f(fTorqueRatio, fPropulsionRatio));
 
 	return true;
 }
@@ -461,14 +757,6 @@ void CGMEarthEngine::SetVisible(const bool bVisible)
 	}
 }
 
-void CGMEarthEngine::SetWanderingEarthProgress(const float fProgress)
-{
-	// 发动机在月球危机时开启
-	m_fEngineStartRatioUniform->set(fmaxf((fProgress-0.3f)*10.0f, 0.0f));
-
-	//m_pEarthEngineJetNode_2->accept(*m_pEngineDirManager);
-}
-
 bool CGMEarthEngine::CreateEngine()
 {
 	// 临时添加的生成“行星发动机数据”的工具函数
@@ -517,7 +805,7 @@ bool CGMEarthEngine::_GenEarthEnginePoint_1()
 	pSSPlanetEnginePoint->setRenderBinDetails(BIN_PLANET_POINT, "DepthSortedBin");
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEnginePoint->addUniform(m_fEngineStartRatioUniform);
+	pSSPlanetEnginePoint->addUniform(m_vEngineStartRatioUniform);
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
@@ -556,7 +844,7 @@ bool CGMEarthEngine::_GenEarthEnginePoint_2()
 	pSSPlanetEnginePoint->setRenderBinDetails(BIN_PLANET_POINT, "DepthSortedBin");
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEnginePoint->addUniform(m_fEngineStartRatioUniform);
+	pSSPlanetEnginePoint->addUniform(m_vEngineStartRatioUniform);
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
@@ -597,7 +885,7 @@ bool CGMEarthEngine::_GenEarthEngineJetLine_1()
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetTime());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEngineJet->addUniform(m_fEngineStartRatioUniform);
+	pSSPlanetEngineJet->addUniform(m_vEngineStartRatioUniform);
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEngineJet->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
@@ -638,7 +926,7 @@ bool CGMEarthEngine::_GenEarthEngineJetLine_2()
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetTime());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEngineJet->addUniform(m_fEngineStartRatioUniform);
+	pSSPlanetEngineJet->addUniform(m_vEngineStartRatioUniform);
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEngineJet->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
@@ -681,7 +969,7 @@ bool CGMEarthEngine::_GenEarthEngineBody_1()
 	pSSEngineBody->addUniform(m_fGroundTopUniform);
 	pSSEngineBody->addUniform(m_fEyeAltitudeUniform);
 	pSSEngineBody->addUniform(m_fAtmosHeightUniform);
-	pSSEngineBody->addUniform(m_fEngineStartRatioUniform);
+	pSSEngineBody->addUniform(m_vEngineStartRatioUniform);
 	pSSEngineBody->addUniform(m_fWanderProgressUniform);
 
 	int iTexUnit = 0;
@@ -737,7 +1025,7 @@ bool CGMEarthEngine::_GenEarthEngineBody_2()
 	pSSEngineBody->addUniform(m_fGroundTopUniform);
 	pSSEngineBody->addUniform(m_fEyeAltitudeUniform);
 	pSSEngineBody->addUniform(m_fAtmosHeightUniform);
-	pSSEngineBody->addUniform(m_fEngineStartRatioUniform);
+	pSSEngineBody->addUniform(m_vEngineStartRatioUniform);
 	pSSEngineBody->addUniform(m_fWanderProgressUniform);
 
 	int iTexUnit = 0;
@@ -783,7 +1071,7 @@ bool CGMEarthEngine::_GenEarthEngineStream()
 	pSSEngineStream->setRenderBinDetails(BIN_PLANET_JET, "DepthSortedBin"); // to do
 	pSSEngineStream->addUniform(m_pCommonUniform->GetTime());
 	pSSEngineStream->addUniform(m_pCommonUniform->GetUnit());
-	pSSEngineStream->addUniform(m_fEngineStartRatioUniform);
+	pSSEngineStream->addUniform(m_vEngineStartRatioUniform);
 
 	// 喷射流噪声贴图
 	pSSEngineStream->setTextureAttributeAndModes(0,
@@ -1014,7 +1302,7 @@ osg::Geometry* CGMEarthEngine::_MakeEnginePointGeometry(const osg::EllipsoidMode
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
 	geom->setUseDisplayList(false);
-	geom->setDataVariance(osg::Object::STATIC);
+	geom->setDataVariance(osg::Object::DYNAMIC);
 
 	int iEngineNum = m_pEarthEngineDataImg->s();
 	osg::ref_ptr<osg::Vec3Array> pVerts = new osg::Vec3Array();
@@ -1038,11 +1326,11 @@ osg::Geometry* CGMEarthEngine::_MakeEnginePointGeometry(const osg::EllipsoidMode
 		double fTopAlt = (vData.z() + vData.w()) / fUnit;
 		double fX, fY, fZ;
 		pEllipsoid->convertLatLongHeightToXYZ(fLat, fLon, fTopAlt, fX, fY, fZ);
-		osg::Vec3 vSpherePos = osg::Vec3(fX, fY, fZ);
+		osg::Vec3 vTopPos = osg::Vec3(fX, fY, fZ);
 		double fRandom = iPseudoNoise(iRandom) * 1e-4; // 0.0-1.0
-		osg::Vec3 vSphereUp = vSpherePos;
-		vSphereUp.normalize();
-		if (vSphereUp.z() < 0.1)
+		osg::Vec3 vECEFUp = vTopPos;
+		vECEFUp.normalize();
+		if (vECEFUp.z() < 0.1)
 		{
 			fRandom = 0.4 + 0.6 * fRandom;
 		}
@@ -1050,9 +1338,9 @@ osg::Geometry* CGMEarthEngine::_MakeEnginePointGeometry(const osg::EllipsoidMode
 		// 计算发动机底座直径, 单位：像素
 		float fDiameter = (vData.w() / 11000) * 2048 * (3e4 / 6.36e6) / osg::PI_2;
 		// 计算发动机喷射方向
-		osg::Vec3 vDir = _Pos2Norm(vSpherePos);
+		osg::Vec3 vDir = m_pEEDirControl->EngineDir(vTopPos);
 		// 计算发动机喷射口位置
-		osg::Vec3 vPos = vSpherePos + _NozzlePos(vDir, vSphereUp) / fUnit;
+		osg::Vec3 vPos = m_pEEDirControl->EngineNozzlePos(vTopPos * fUnit, vDir, vECEFUp) / fUnit;
 		pVerts->push_back(vPos);
 		pCoords->push_back(osg::Vec2(fRandom, fDiameter));
 		pNorms->push_back(vDir);
@@ -1072,7 +1360,7 @@ osg::Geometry* CGMEarthEngine::_MakeEngineJetLineGeometry(const osg::EllipsoidMo
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
 	geom->setUseDisplayList(false);
-	geom->setDataVariance(osg::Object::STATIC);
+	geom->setDataVariance(osg::Object::DYNAMIC);
 
 	int iEngineNum = m_pEarthEngineDataImg->s();
 	osg::ref_ptr<osg::Vec3Array> pVerts = new osg::Vec3Array();
@@ -1096,22 +1384,22 @@ osg::Geometry* CGMEarthEngine::_MakeEngineJetLineGeometry(const osg::EllipsoidMo
 		double fTopAlt = (vData.z() + vData.w()) / fUnit;
 		double fX, fY, fZ;
 		pEllipsoid->convertLatLongHeightToXYZ(fLat, fLon, fTopAlt, fX, fY, fZ);
-		osg::Vec3 vSpherePos = osg::Vec3(fX, fY, fZ);
-		osg::Vec3 vSphereUp = vSpherePos;
-		vSphereUp.normalize();
+		osg::Vec3 vTopPos = osg::Vec3(fX, fY, fZ);
+		osg::Vec3 vECEFUp = vTopPos;
+		vECEFUp.normalize();
 		// 计算发动机喷射方向
-		osg::Vec3 vVertNorm = _Pos2Norm(vSpherePos);
+		osg::Vec3 vVertNorm = m_pEEDirControl->EngineDir(vTopPos);
 		// 计算发动机喷射口位置
-		osg::Vec3 vPos = vSpherePos + _NozzlePos(vVertNorm, vSphereUp) / fUnit;
+		osg::Vec3 vPos = m_pEEDirControl->EngineNozzlePos(vTopPos * fUnit, vVertNorm, vECEFUp) / fUnit;
 
 		// 行星发动机喷射流需要随机一些才自然 
 		double fRandom = iPseudoNoise(iRandom) * 1e-4; // 0.0-1.0
 		double fR = pEllipsoid->getRadiusEquator();
 		double fNormalLength = fR * 0.05;
 		// 如果是推进式发动机，离北极越近，缩放随机越大
-		if (vSphereUp.z() > 0.1)
+		if (vECEFUp.z() > 0.1)
 		{
-			float fTailScale = 0.3f + 0.7f * pow(osg::clampBetween(vSphereUp.z(), 0.5f, 1.0f), 11);
+			float fTailScale = 0.3f + 0.7f * pow(osg::clampBetween(vECEFUp.z(), 0.5f, 1.0f), 11);
 			// 发动机高度有两种
 			float fLineScale = (vData.w() > 1e4) ? 1.0f : 0.2f;
 			fNormalLength = fR * (0.01 + 0.15 * fRandom * fTailScale * fLineScale);
@@ -1147,7 +1435,7 @@ osg::Geometry* CGMEarthEngine::_MakeEngineJetStreamGeometry(const osg::Ellipsoid
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
 	geom->setUseDisplayList(false);
-	geom->setDataVariance(osg::Object::STATIC);
+	geom->setDataVariance(osg::Object::DYNAMIC);
 
 	int iEngineNum = m_pEarthEngineDataImg->s();
 	osg::ref_ptr<osg::Vec3Array> pVerts = new osg::Vec3Array();
@@ -1169,13 +1457,13 @@ osg::Geometry* CGMEarthEngine::_MakeEngineJetStreamGeometry(const osg::Ellipsoid
 		double fTopAlt = (vData.z() + vData.w()) / fUnit;
 		double fX, fY, fZ;
 		pEllipsoid->convertLatLongHeightToXYZ(fLat, fLon, fTopAlt, fX, fY, fZ);
-		osg::Vec3 vSpherePos = osg::Vec3(fX, fY, fZ);
-		osg::Vec3 vSphereUp = vSpherePos;
-		vSphereUp.normalize();
+		osg::Vec3 vTopPos = osg::Vec3(fX, fY, fZ);
+		osg::Vec3 vECEFUp = vTopPos;
+		vECEFUp.normalize();
 		// 计算发动机喷射方向
-		osg::Vec3 vVertNorm = _Pos2Norm(vSpherePos);
+		osg::Vec3 vVertNorm = m_pEEDirControl->EngineDir(vTopPos);
 		// 计算发动机喷射口位置
-		osg::Vec3 vPos = vSpherePos + _NozzlePos(vVertNorm, vSphereUp) / fUnit;
+		osg::Vec3 vPos = m_pEEDirControl->EngineNozzlePos(vTopPos* fUnit, vVertNorm, vECEFUp) / fUnit;
 
 		osg::Vec3 vVertBiNorm = osg::Vec3(1, 0, 0);
 		osg::Vec3 vVertTangent = osg::Vec3(0, 1, 0);
@@ -1198,9 +1486,9 @@ osg::Geometry* CGMEarthEngine::_MakeEngineJetStreamGeometry(const osg::Ellipsoid
 			fStreamRadius = 1700.0 / fUnit;
 
 		// 如果是推进式发动机，离北极越近，缩放随机越大
-		if (vSphereUp.z() > 0.1)
+		if (vECEFUp.z() > 0.1)
 		{
-			float fTailScale = 0.3f + 0.7f * pow(osg::clampBetween(vSphereUp.z(), 0.5f, 1.0f), 11);
+			float fTailScale = 0.3f + 0.7f * pow(osg::clampBetween(vECEFUp.z(), 0.5f, 1.0f), 11);
 			// 发动机高度有两种
 			float fLineScale = (vData.w() > 1e4) ? 1.0f : 0.2f;
 			fNormalLength = fR * (0.01 + 0.15 * fRandom * fTailScale * fLineScale);
@@ -1327,22 +1615,4 @@ void CGMEarthEngine::_MixWEETexture(
 		pOutImage->setImage(pImage0->s(), pImage0->t(), 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pData, osg::Image::USE_NEW_DELETE);
 		osgDB::writeImageFile(*(pOutImage.get()), strOut + std::to_string(iFace) + ".tif");
 	}
-}
-
-osg::Vec3 CGMEarthEngine::_Pos2Norm(const osg::Vec3& vECEFPos) const
-{
-	osg::Vec3 vSphereUp = vECEFPos;
-	vSphereUp.normalize();
-	osg::Vec3 vEast = osg::Vec3(0, 0, 1) ^ vSphereUp;
-	vEast.normalize();
-
-	const double fPitch = -osg::PI_4;
-	if (vSphereUp.z() < std::cos(fPitch))
-	{
-		osg::Vec3 vSphereNorm = osg::Quat(fPitch, vEast) * vSphereUp;
-		vSphereNorm.normalize();
-		return vSphereNorm;
-	}
-
-	return osg::Vec3(0, 0, 1);
 }

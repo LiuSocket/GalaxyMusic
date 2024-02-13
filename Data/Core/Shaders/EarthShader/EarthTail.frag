@@ -39,21 +39,12 @@ const float LAST_SCLAE = 128;
 const float RANGE_MAX = 3;
 const float M_PI = 3.141592657;
 const float ALPHA_MAX = 0.99;
-const float EARTH_SPIN = 1.7; // to do become uniform
-const float cosSpin = cos(EARTH_SPIN);
-const float sinSpin = sin(EARTH_SPIN);
-const mat4 spinMatrix = mat4(
-	cosSpin,	-sinSpin,	0,	0,
-	sinSpin,	cosSpin,	0,	0,
-	0,					0,	1,	0,
-	0,					0,	0,	1);
-//vec3 modelSunDir = (spinMatrix*vec4(-1,0,0,0)).xyz;
 
 uniform float unit;
 uniform float times;
-uniform float engineStartRatio;
 uniform float pixelLength;
 uniform float tailVisible;
+uniform vec2 engineStartRatio;
 uniform vec2 shakeVec;
 uniform vec2 deltaShakeVec;
 uniform vec3 screenSize;
@@ -186,9 +177,9 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 	float texDens = max(0, shape4.x - 0.35*shape4.y - 0.11*shape4.z - 0.09*shape4.w);
 
 	// fade by ratioR
-	float sphereAltFade = clamp(engineStartRatio-0.4,0,1)*clamp(1-(ratioR-EARTH_ATMOS_RATIO)*6, 0, 1);	
-	float torqueTailFade = sqrt(clamp((clamp((engineStartRatio-0.3)*0.5,0,1)*(2.3-EARTH_ATMOS_RATIO)+EARTH_ATMOS_RATIO-ratioR)*2,0,1));
-	float propulsionTailFade = sqrt(clamp((0.95*TAIL_LENGTH/ATMOS_RADIUS - ratioR)*0.5, 0, 1))*clamp(engineStartRatio+1-ratioR,0,1);
+	float sphereAltFade = clamp(engineStartRatio.x-0.3,0,1)*clamp(1-(ratioR-EARTH_ATMOS_RATIO)*6, 0, 1);	
+	float torqueTailFade = sqrt(clamp((clamp((engineStartRatio.x-0.2)*0.5,0,1)*(2.3-EARTH_ATMOS_RATIO)+EARTH_ATMOS_RATIO-ratioR)*2,0,1));
+	float propulsionTailFade = sqrt(clamp((0.95*TAIL_LENGTH/ATMOS_RADIUS - ratioR)*0.5, 0, 1))*clamp(engineStartRatio.y+1-ratioR,0,1);
 	float altFade = mix(torqueTailFade, sphereAltFade, clamp(2*(ratioXY-0.5), 0, 1));
 	altFade = mix(propulsionTailFade, altFade, clamp((ratioXY-TAIL_ATMOS_RATIO)*10, 0, 1));
 
