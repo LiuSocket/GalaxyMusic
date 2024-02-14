@@ -11,13 +11,12 @@ out vec3 shadowVertPos;
 
 out vec2 texCoord_0;
 out vec3 texCoord_1;
-out vec4 modelVertex;
 out vec4 viewPos;
 out vec3 viewNormal;
 
 void main()
 {
-	modelVertex = gl_Vertex;
+	vec4 modelVertex = gl_Vertex;
 	vec3 up = normalize(modelVertex.xyz);
 	modelVertex.xyz += up*cloudTop;
 	viewPos = gl_ModelViewMatrix*modelVertex;

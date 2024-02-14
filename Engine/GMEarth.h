@@ -242,7 +242,7 @@ namespace GM
 		float											m_fCloudBottom;					//!< 云底高度
 		float											m_fCloudTop;					//!< 云顶高度
 
-		osg::ref_ptr<osg::Transform>					m_pPlanet_2_Transform;			//!< 第2层级当前行星变换结点
+		osg::ref_ptr<osg::Transform>					m_pShadow_2_Transform;			//!< 第2层级当前全球阴影变换结点
 		osg::ref_ptr<osg::Group>						m_pEarthRoot_1;					//!< 第1层级地球根节点
 		osg::ref_ptr<osg::Group>						m_pEarthRoot_2;					//!< 第2层级地球根节点
 		osg::ref_ptr<osg::Geometry>						m_pEarthGeom_1;					//!< 第1层级地球几何节点

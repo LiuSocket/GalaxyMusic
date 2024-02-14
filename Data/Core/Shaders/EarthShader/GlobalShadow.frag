@@ -1,9 +1,12 @@
 #version 400 compatibility
-#extension GL_EXT_texture_array : enable
-
 #pragma import_defines(WANDERING)
 
 #ifdef WANDERING
+const float PROGRESS_0 = 0.1;
+const float PROGRESS_1 = 0.15;
+const float PROGRESS_2 = 0.2;
+const float PROGRESS_3 = 0.25;
+const float PROGRESS_4 = 0.31;// must be a little larger than 0.3, or you will see tail flash
 uniform float wanderProgress;
 #endif // WANDERING	
 
@@ -12,6 +15,7 @@ uniform vec4 coordScale_Earth;
 uniform sampler2DArray cloudTex;
 uniform sampler2D cloudDetailTex;
 
+in vec2 texCoord_0;
 in vec3 texCoord_1;
 in vec4 viewPos;
 
@@ -26,7 +30,12 @@ void main()
 	vec3 wanderingCloudCoord = cloudCoord;
 	wanderingCloudCoord.z += 6;
 	float wanderingCloudAlpha = texture(cloudTex, wanderingCloudCoord).a;
-	cloudAlpha = mix(cloudAlpha, wanderingCloudAlpha, clamp((wanderProgress-0.46)*25, 0, 1));
+
+	float torqueArea = clamp((0.3-abs(texCoord_0.y*2-1))*4,0,1); torqueArea *= torqueArea;
+	float torqueStart = float(wanderProgress>PROGRESS_0 && wanderProgress<PROGRESS_3)*torqueArea;
+	float allStart = max(torqueStart, clamp((wanderProgress-(PROGRESS_4+0.05))*25, 0, 1));
+
+	cloudAlpha = mix(cloudAlpha, wanderingCloudAlpha, allStart);
 #endif // WANDERING	
 	// cloud detail
 	vec4 detail4 = texture(cloudDetailTex, texCoord_1.xy*27);

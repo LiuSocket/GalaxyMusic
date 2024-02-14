@@ -190,11 +190,6 @@ bool CGMEarth::Update(double dDeltaTime)
 
 	if (m_pConfigData->bWanderingEarth)
 	{
-		float fWanderProgress = 0.0f;
-		m_fWanderProgressUniform->get(fWanderProgress);
-		bool bTailVisible = fWanderProgress > 0.1f;
-		m_pEarthTail->SetVisible(bTailVisible);
-
 		m_pEarthTail->Update(dDeltaTime);
 		m_pEarthEngine->Update(dDeltaTime);
 	}
@@ -307,7 +302,8 @@ void CGMEarth::SetUniform(
 		m_pEarthTail->SetUniform(
 			pViewLight,
 			m_pEarthEngine->GetEngineStartRatioUniform(),
-			pView2ECEF);
+			pView2ECEF,
+			m_fWanderProgressUniform);
 		m_pEarthEngine->SetUniform(
 			pViewLight,
 			pGroundTop,
@@ -384,7 +380,7 @@ void CGMEarth::SetEarthRotate(const double fSpin, const double fObliquity, const
 	osg::Quat qPlanetInclination = osg::Quat(fObliquity, osg::Vec3d(1, 0, 0));
 	osg::Quat qPlanetTurn = osg::Quat(fTrueAnomaly, osg::Vec3d(0, 0, 1));
 	osg::Quat qRotate = qPlanetSpin * qPlanetInclination * qPlanetTurn;
-	m_pPlanet_2_Transform->asPositionAttitudeTransform()->setAttitude(qRotate);
+	m_pShadow_2_Transform->asPositionAttitudeTransform()->setAttitude(qRotate);
 
 	if (m_pConfigData->bWanderingEarth)
 	{
@@ -506,9 +502,9 @@ bool CGMEarth::_CreateGlobalCloudShadow()
 		pShadowEarth->addDrawable(pShadowEarthGeom);
 		if (2 == i)
 		{
-			m_pPlanet_2_Transform = new osg::PositionAttitudeTransform();
-			m_pPlanet_2_Transform->addChild(pShadowEarth);
-			m_pGlobalShadowCamera->addChild(m_pPlanet_2_Transform);
+			m_pShadow_2_Transform = new osg::PositionAttitudeTransform();
+			m_pShadow_2_Transform->addChild(pShadowEarth);
+			m_pGlobalShadowCamera->addChild(m_pShadow_2_Transform);
 		}
 		else
 		{

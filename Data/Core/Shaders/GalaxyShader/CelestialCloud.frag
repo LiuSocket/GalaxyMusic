@@ -1,7 +1,5 @@
 #pragma import_defines(SATURN)
 
-const float M_PI = 3.1415926;
-
 #ifdef SATURN
 uniform float cosNorthLight;
 uniform sampler2D ringTex;
@@ -31,7 +29,6 @@ uniform sampler2DArray cloudTex;
 
 in vec2 texCoord_0;
 in vec3 texCoord_1;
-in vec4 modelVertex;
 in vec4 viewPos;
 in vec3 viewNormal;
 
@@ -49,7 +46,7 @@ void main()
 	
 	vec4 baseColor = texture(cloudTex, cloudCoord);
 #ifdef EARTH
-#ifdef WANDERING
+#ifdef WANDERING		
 	vec3 illumCoord = texCoord_1;
 	illumCoord.xy = (illumCoord.xy - 0.5)*celestialCoordScale.z + 0.5;
 	vec4 illum = texture(illumTex, illumCoord);
@@ -58,7 +55,12 @@ void main()
 	wanderingCloudCoord.z += 6;
 	vec4 wanderingColor = texture(cloudTex, wanderingCloudCoord);
 	float wanderingCloud = max(0, min(wanderingColor.a, 1-illum.a*illum.a*1.5));
-	baseColor.a = mix(baseColor.a, wanderingCloud, clamp((wanderProgress-0.36)*25, 0, 1));
+
+	float torqueArea = clamp((0.3-abs(texCoord_0.y*2-1))*4,0,1); torqueArea *= torqueArea;
+	float torqueStart = float(wanderProgress>PROGRESS_0 && wanderProgress<PROGRESS_3)*torqueArea;
+	float allStart = max(torqueStart, clamp((wanderProgress-(PROGRESS_4+0.05))*25, 0, 1));
+
+	baseColor.a = mix(baseColor.a, wanderingCloud, allStart);
 #endif // WANDERING	
 	float lenV = length(viewPos.xyz);
 	// cloud detail
@@ -98,12 +100,12 @@ void main()
 	color = 0.03 + diffuse;
 #ifdef WANDERING
 	// for start
-	vec3 MVU = normalize(modelVertex.xyz);
-	float lon = abs(atan(MVU.x, MVU.y))/M_PI;
-	float engineStart = smoothstep(0.0, 0.2, max(MVU.z-1+engineStartRatio.y,
-		clamp(2*engineStartRatio.x-lon,0,1)*clamp((0.35-abs(MVU.z))*4,0,1)));
+	float lon = abs(fract(texCoord_0.x-0.25)*2-1);
+	float engineStart = max(
+		smoothstep(0.0, 0.2, (texCoord_0.y-1)*2+engineStartRatio.y)*exp2(min(0,texCoord_0.y-0.67)*40),
+		smoothstep(0.0, 0.2, clamp(2*engineStartRatio.x-lon,0,1)*torqueArea)*exp2(-abs(texCoord_0.y-0.5)*25));
 
-	vec3 ambient = vec3(0.07,0.11,0.15)*(exp2(-abs(texCoord_0.y-0.5)*25)+exp2(min(0,texCoord_0.y-0.67)*50))*engineStart;
+	vec3 ambient = vec3(0.07,0.11,0.15)*engineStart;
 	color = 0.03 + ambient + 0.5*diffuse;
 	vec3 illumEngine = engineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
 	color += illumEngine;
@@ -118,7 +120,7 @@ void main()
 
 #ifdef EARTH
 #ifdef WANDERING
-	if(unit > 1e6)
+	if((wanderProgress > PROGRESS_4) && (unit > 1e6))
 	{
 		vec4 tailColor = texture(tailTex, gl_FragCoord.xy/screenSize.xy);
 		color = mix(color, tailColor.rgb, tailColor.a);

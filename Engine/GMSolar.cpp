@@ -3034,10 +3034,14 @@ void CGMSolar::_UpdatePlanetRotate(double dDeltaTime)
 		// 更新真近点角
 		itr.fTrueAnomaly += fDeltaTrueAnomaly;
 		// 地球模块内部需要更新旋转节点
-		if (m_pConfigData->bWanderingEarth && (3 == iCenterCelestialBody))
+		if (3 == iCenterCelestialBody)
 		{
-			// 由于itr.fObliquity中存放的是真实的偏转角，所以不能在流浪地球模式中传给地球，而是实时计算
-			m_pEarth->SetEarthRotate(itr.fSpin, fObliquity, itr.fTrueAnomaly);
+			// 由于itr.fObliquity中存放的是真实的偏转角，所以不能在流浪地球模式中传给地球，而是实时计算一个fObliquity
+			// 在普通模式下，地球的自转轴方向不会变
+			double fEarthTrueAnomaly = 0;
+			// 在流浪地球模式下，地球的自转轴方向实时变化
+			if (m_pConfigData->bWanderingEarth) fEarthTrueAnomaly = itr.fTrueAnomaly;
+			m_pEarth->SetEarthRotate(itr.fSpin, fObliquity, fEarthTrueAnomaly);
 		}
 
 		iCenterCelestialBody++;

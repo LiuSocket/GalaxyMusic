@@ -2,6 +2,12 @@
 
 #pragma import_defines(ATMOS, EARTH, WANDERING)
 
+const float PROGRESS_0 = 0.1;
+const float PROGRESS_1 = 0.15;
+const float PROGRESS_2 = 0.2;
+const float PROGRESS_3 = 0.25;
+const float PROGRESS_4 = 0.3;
+
 uniform vec3 viewUp;
 uniform vec3 viewLight;
 uniform float minDotUL;

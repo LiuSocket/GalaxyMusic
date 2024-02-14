@@ -4,11 +4,13 @@ uniform float cloudTop;
 uniform vec3 viewLight;
 uniform mat4 view2ECEFMatrix;
 
+out vec2 texCoord_0;
 out vec3 texCoord_1;
 out vec4 viewPos;
 
 void main()
 {
+	texCoord_0 = gl_MultiTexCoord0.xy;
 	texCoord_1 = gl_MultiTexCoord1.xyz;
 	vec3 viewNormal = normalize(gl_NormalMatrix*gl_Normal);
 	float dotNL = dot(viewNormal, viewLight);

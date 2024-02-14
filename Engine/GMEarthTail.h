@@ -86,7 +86,8 @@ namespace GM
 		void SetUniform(
 			osg::Uniform* pViewLight,
 			osg::Uniform* pEngineStartRatio,
-			osg::Uniform* pView2ECEF);
+			osg::Uniform* pView2ECEF,
+			osg::Uniform* pWanderProgress);
 
 	private:
 		/**
@@ -153,7 +154,8 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_mWorld2ECEFUniform;			//!< “2级世界空间”转 ECEF 的矩阵
 		osg::ref_ptr<osg::Uniform>						m_mView2ECEFUniform;			//!< view空间转ECEF的矩阵
 		osg::ref_ptr<osg::Uniform>						m_vViewLightUniform;			//!< view空间的光源方向
-		osg::ref_ptr<osg::Uniform>						m_fEngineStartRatioUniform;		//!< 发动机开启比例Uniform
+		osg::ref_ptr<osg::Uniform>						m_fWanderProgressUniform;		//!< 流浪地球计划进展Uniform
+		osg::ref_ptr<osg::Uniform>						m_vEngineStartRatioUniform;		//!< 开启比例，x=转向，y=推进
 	};
 
 }	// GM

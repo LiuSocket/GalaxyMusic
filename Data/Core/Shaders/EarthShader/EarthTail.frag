@@ -33,6 +33,12 @@ const float hash[256] = float[](
 	222,114, 67, 29, 24, 72,243,141,128,195, 78, 66,215, 61,156,180
 );
 
+const float PROGRESS_0 = 0.1;
+const float PROGRESS_1 = 0.15;
+const float PROGRESS_2 = 0.2;
+const float PROGRESS_3 = 0.25;
+const float PROGRESS_4 = 0.3;
+
 const int STEP_NUM = 64;
 const int LIGHT_SAMPLE = 4;
 const float LAST_SCLAE = 128;
@@ -44,6 +50,7 @@ uniform float unit;
 uniform float times;
 uniform float pixelLength;
 uniform float tailVisible;
+uniform float wanderProgress;
 uniform vec2 engineStartRatio;
 uniform vec2 shakeVec;
 uniform vec2 deltaShakeVec;
@@ -409,7 +416,7 @@ void main()
 	tailColor = mix(tailColor, tailC_2, weight.z);
 #endif // RAYS_3
 
-	tailAlpha = tailColor.a;
+	tailAlpha = (wanderProgress > PROGRESS_4) ? tailColor.a : 0.0;
 
 	vec3 posDiff = ((deltaViewProjMatrix*vec4(WCP+lenTail*WVD,1.0)).xyz)/max(1, lenTail);
 	// position different

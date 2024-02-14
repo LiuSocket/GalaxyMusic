@@ -88,6 +88,10 @@ bool CGMEarthTail::Update(double dDeltaTime)
 		else{}
 	}
 
+	float fWanderProgress = 0.0f;
+	m_fWanderProgressUniform->get(fWanderProgress);
+	m_pTailEnvelopeGeode2->setNodeMask(fWanderProgress > PROGRESS_4 ? ~0 : 0);
+
 	CGMVolumeBasic::Update(dDeltaTime);
 	return true;
 }
@@ -312,7 +316,7 @@ void CGMEarthTail::MakeEarthTail()
 	pSSTailEnvelope->addUniform(m_pCommonUniform->GetUnit());
 	pSSTailEnvelope->addUniform(m_pCommonUniform->GetTime());
 	pSSTailEnvelope->addUniform(m_vViewLightUniform);
-	pSSTailEnvelope->addUniform(m_fEngineStartRatioUniform);
+	pSSTailEnvelope->addUniform(m_vEngineStartRatioUniform);
 
 	osg::ref_ptr<osg::Texture2D> pNoise2DTex = new osg::Texture2D;
 	pNoise2DTex->setImage(osgDB::readImageFile(m_pConfigData->strCorePath + "Textures/Volume/noise2D.dds"));
@@ -343,7 +347,7 @@ void CGMEarthTail::ResizeScreen(const int width, const int height)
 
 bool CGMEarthTail::UpdateHierarchy(int iHieNew)
 {
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
+	if (m_bVisible && EGMRENDER_LOW != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
 	{
 		if (2 == iHieNew)
 		{
@@ -371,6 +375,29 @@ bool CGMEarthTail::UpdateHierarchy(int iHieNew)
 void CGMEarthTail::SetVisible(const bool bVisible)
 {
 	m_bVisible = bVisible;
+
+	if (3 != GM_ENGINE.GetCelestialIndex() || EGMRENDER_LOW == m_pConfigData->eRenderQuality) return;
+
+	if(m_bVisible)
+	{
+		// 显示节点
+		if (0 == m_rayMarchCamera->getNodeMask())
+		{
+			m_rayMarchCamera->setNodeMask(~0);
+			m_TAACamera->setNodeMask(~0);
+			m_pTailTransform2->setNodeMask(~0);
+		}
+	}
+	else
+	{
+		// 隐藏节点
+		if (0 != m_rayMarchCamera->getNodeMask())
+		{
+			m_rayMarchCamera->setNodeMask(0);
+			m_TAACamera->setNodeMask(0);
+			m_pTailTransform2->setNodeMask(0);
+		}
+	}
 }
 
 void CGMEarthTail::SetEarthTailRotate(const osg::Quat& qRotate)
@@ -385,11 +412,13 @@ void CGMEarthTail::SetEarthTailRotate(const osg::Quat& qRotate)
 void CGMEarthTail::SetUniform(
 	osg::Uniform* pViewLight,
 	osg::Uniform* pEngineStartRatio,
-	osg::Uniform* pView2ECEF)
+	osg::Uniform* pView2ECEF,
+	osg::Uniform* pWanderProgress)
 {
 	m_vViewLightUniform = pViewLight;
-	m_fEngineStartRatioUniform = pEngineStartRatio;
+	m_vEngineStartRatioUniform = pEngineStartRatio;
 	m_mView2ECEFUniform = pView2ECEF;
+	m_fWanderProgressUniform = pWanderProgress;
 }
 
 osg::Geometry* CGMEarthTail::_MakeTailBoxGeometry(const float fLength, const float fRadius) const
@@ -680,7 +709,8 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->addUniform(m_pCommonUniform->GetEyeUpDir());
 	pSS->addUniform(m_pCommonUniform->GetMainInvProjMatrix());
 	pSS->addUniform(m_pCommonUniform->GetDeltaVPMatrix());
-	pSS->addUniform(m_fEngineStartRatioUniform);
+	pSS->addUniform(m_vEngineStartRatioUniform);
+	pSS->addUniform(m_fWanderProgressUniform);
 
 	int iUnit = 0;
 	CGMKit::AddTexture(pSS, m_vectorMap_1, "lastVectorTex", iUnit++);

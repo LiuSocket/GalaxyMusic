@@ -28,23 +28,13 @@
 using namespace GM;
 
 /*************************************************************************
-constexpr
-*************************************************************************/
-
-constexpr float PROGRESS_0 = 0.1f; 		// 前太阳时代结束，开启刹车时代
-constexpr float PROGRESS_1 = 0.15f; 	// 刹车时代结束，开始调整地球姿态，旋转北极轴
-constexpr float PROGRESS_2 = 0.2f;		// 地球姿态调整中期
-constexpr float PROGRESS_3 = 0.25f;		// 地球姿态调整结束，北极与地球运行方向相反
-constexpr float PROGRESS_4 = 0.3f;		// 全球发动机并网成功，启航
-constexpr float PROGRESS_5 = 0.4f;		// 发动机全功率开启
-
-/*************************************************************************
 Structs
 *************************************************************************/
 // 行星发动机合力产生的加速度
 struct SEarthAcceleration
 {
-	SEarthAcceleration() :fAccelerationFront(0.0), fAccelerationRoll(0.0), qAccelerationTurn(osg::Quat()) {}
+	SEarthAcceleration() :fAccelerationFront(0.0), fAccelerationRoll(0.0),
+		qAccelerationTurn(osg::Quat(0, osg::Vec3d(1, 0, 0))) {}
 	SEarthAcceleration(const double fAFront, const double fARoll, const osg::Quat& qATurn) :
 		fAccelerationFront(fAFront), fAccelerationRoll(fARoll), qAccelerationTurn(qATurn) {}
 
@@ -245,18 +235,12 @@ namespace GM
 	class CEEControlVisitor : public osg::NodeVisitor
 	{
 	public:
-		CEEControlVisitor()
-			: NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN), _fUnit(1e10),
-			_sEarthAcceleration(SEarthAcceleration())
-		{
-			_ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
-			_ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
-		}
+		CEEControlVisitor(): NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN),
+			_fUnit(1e10),_sEarthAcceleration(SEarthAcceleration()){}
 
 		void SetUnit(const double fUnit)
 		{
-			_ellipsoid.setRadiusEquator(osg::WGS_84_RADIUS_EQUATOR / _fUnit);
-			_ellipsoid.setRadiusPolar(osg::WGS_84_RADIUS_POLAR / _fUnit);
+			_fUnit = fUnit;
 		}
 
 		SEarthAcceleration GetAcceleration() const
@@ -277,10 +261,15 @@ namespace GM
 		{
 			osg::Vec3 vLocalUp = vECEFPos;
 			vLocalUp.normalize();
-			osg::Vec3 vLocalEast = osg::Vec3(0, 0, 1) ^ vLocalUp;
-			vLocalEast.normalize();
-			osg::Vec3 vLocalNorth = vLocalUp ^ vLocalEast;
-			vLocalNorth.normalize();
+			osg::Vec3 vLocalEast = osg::Vec3(0, 1, 0);
+			osg::Vec3 vLocalNorth = osg::Vec3(0, 0, 1);
+			if (osg::Vec3(0, 0, 1) != vLocalUp && osg::Vec3(0, 0, -1) != vLocalUp)
+			{
+				vLocalEast = osg::Vec3(0, 0, 1) ^ vLocalUp;
+				vLocalEast.normalize();
+				vLocalNorth = vLocalUp ^ vLocalEast;
+				vLocalNorth.normalize();
+			}
 
 			osg::Vec3d vDirNorth = osg::Vec3d(0,0,0);
 			// 如果地球在加速前进，则发动机必有指向北极的分量
@@ -299,9 +288,23 @@ namespace GM
 			{
 				vDirRoll = vLocalEast;
 			}
-			else{}
+			else {}
 
 			osg::Vec3d vDirTurn = osg::Vec3d(0, 0, 0);
+			double fAngleAccel, fX, fY, fZ;
+			_sEarthAcceleration.qAccelerationTurn.getRotate(fAngleAccel, fX, fY, fZ);
+			// 如果地球在改变北极轴的方向，则发动机必有指向南北方向的分量
+			if (0 != fAngleAccel)
+			{
+				osg::Vec3d vTurnAxis = osg::Vec3d(fX, fY, fZ);
+				vTurnAxis.normalize();
+				if ((vLocalUp != vTurnAxis) && (vLocalUp != -vTurnAxis))
+				{
+					vDirTurn = vLocalUp ^ vTurnAxis;
+					vDirTurn *= (fAngleAccel > 0) ? 1.0 : -1.0;
+					vDirTurn.normalize();
+				}
+			}
 
 			// 发动机最低倾斜角度为45°
 			const double fPitch = osg::PI_4;
@@ -461,7 +464,6 @@ namespace GM
 			traverse(node);
 		}
 	private:
-		osg::EllipsoidModel _ellipsoid;
 		double				_fUnit;
 		SEarthAcceleration	_sEarthAcceleration;			//!< 行星发动机合力产生的加速度
 	};
@@ -533,15 +535,18 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 	float fWanderProgress = 0.0f;
 	m_fWanderProgressUniform->get(fWanderProgress);
 	// 是否需要显示行星发动机喷射流
-	unsigned int iJetMask = fWanderProgress > 0.1f ? ~0 : 0;
-	m_pEarthEngineStream->setNodeMask(iJetMask);
-	m_pEarthEnginePointNode_1->setNodeMask(iJetMask);
-	m_pEarthEnginePointNode_2->setNodeMask(iJetMask);
-	m_pEarthEngineJetNode_1->setNodeMask(iJetMask);
-	m_pEarthEngineJetNode_2->setNodeMask(iJetMask);
+	unsigned int iJetMask = fWanderProgress > PROGRESS_0 ? ~0 : 0;
+	if (m_pEarthEngineStream->getNodeMask() != iJetMask)
+	{
+		m_pEarthEngineStream->setNodeMask(iJetMask);
+		m_pEarthEnginePointNode_1->setNodeMask(iJetMask);
+		m_pEarthEnginePointNode_2->setNodeMask(iJetMask);
+		m_pEarthEngineJetNode_1->setNodeMask(iJetMask);
+		m_pEarthEngineJetNode_2->setNodeMask(iJetMask);
+	}
 
 	// 暂时根据流浪地球计划进度来设置行星发动机的开启或关闭，由此改变地球的加速度，后续可以让用户自由控制
-	SEarthAcceleration sEA;
+	SEarthAcceleration sEA = SEarthAcceleration();
 	float fTorqueStart = PROGRESS_4 + (PROGRESS_5 - PROGRESS_4) * 0.1f;// 转向发动机启动要稍微慢一些
 	float fTorqueRatio = 0.0f;// 转向发动机
 	float fPropulsionRatio = 0.0f;//  推进发动机
@@ -549,14 +554,12 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 	if (fWanderProgress < PROGRESS_0)
 	{	
 		// 建造发动机（前太阳时代）
-		sEA = SEarthAcceleration();
 	}
 	else if (fWanderProgress < PROGRESS_1)
 	{
 		// 刹车时代
 		sEA.fAccelerationFront = 0;
 		sEA.fAccelerationRoll = -0.1;
-		sEA.qAccelerationTurn = osg::Quat();
 
 		fTorqueRatio = 1;
 		fPropulsionRatio = 0;
@@ -589,7 +592,6 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 		// 启航
 		sEA.fAccelerationFront = 1.0;
 		sEA.fAccelerationRoll = 0.0;
-		sEA.qAccelerationTurn = osg::Quat();
 
 		fTorqueRatio = fmaxf((fWanderProgress - fTorqueStart) / (PROGRESS_5 - fTorqueStart), 0.0f);
 		fPropulsionRatio = fmaxf((fWanderProgress - PROGRESS_4) / (PROGRESS_5 - PROGRESS_4), 0.0f);
@@ -599,7 +601,6 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 		// 逃逸时代
 		sEA.fAccelerationFront = 1.0;
 		sEA.fAccelerationRoll = 0.0;
-		sEA.qAccelerationTurn = osg::Quat();
 
 		fTorqueRatio = fmaxf((fWanderProgress - fTorqueStart) / (PROGRESS_5 - fTorqueStart), 0.0f);
 		fPropulsionRatio = fmaxf((fWanderProgress - PROGRESS_4) / (PROGRESS_5 - PROGRESS_4), 0.0f);
