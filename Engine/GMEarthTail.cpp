@@ -59,8 +59,51 @@ bool CGMEarthTail::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, 
 /** @brief 更新 */
 bool CGMEarthTail::Update(double dDeltaTime)
 {
-	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return true;
 	if(!m_bVisible) return true;
+
+	if (2 == m_pKernelData->iHierarchy)
+	{
+		double fDistance = GM_ENGINE.GetHierarchyTargetDistance();
+		if (fDistance > 0.2)
+		{
+			// 隐藏节点
+			if (0 != m_pTailTransform2->getNodeMask())
+			{
+				m_pTailTransform2->setNodeMask(0);
+				m_pSpiralTransform2->setNodeMask(0);
+			}
+		}
+		else if(3 == GM_ENGINE.GetCelestialIndex())// 地球
+		{
+			// 显示节点
+			if (0 == m_pTailTransform2->getNodeMask())
+			{
+				m_pTailTransform2->setNodeMask(~0);
+				m_pSpiralTransform2->setNodeMask(~0);
+			}
+		}
+		else{}
+	}
+
+	float fWanderProgress = 0.0f;
+	m_fWanderProgressUniform->get(fWanderProgress);
+
+	// 设置尾迹包络节点的显隐
+	if((fWanderProgress >= PROGRESS_4) && (0 == m_pTailEnvelopeGeode2->getNodeMask()))
+		m_pTailEnvelopeGeode2->setNodeMask(~0);
+	else if ((fWanderProgress < PROGRESS_4) && (0 != m_pTailEnvelopeGeode2->getNodeMask()))
+		m_pTailEnvelopeGeode2->setNodeMask(0);
+	else{}
+
+	// 设置螺旋气体节点的显隐
+	if ((fWanderProgress >= PROGRESS_1) && (fWanderProgress <= PROGRESS_3) && (0 == m_pSpiralGeode2->getNodeMask()))
+		m_pSpiralGeode2->setNodeMask(~0);
+	else if (((fWanderProgress < PROGRESS_1) || (fWanderProgress > PROGRESS_3)) && (0 != m_pSpiralGeode2->getNodeMask()))
+		m_pSpiralGeode2->setNodeMask(0);
+	else {}
+	
+	//////////////////////////////////////////////////////////////////////////////////////////////
+	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return true;
 
 	if (2 == m_pKernelData->iHierarchy)
 	{
@@ -72,25 +115,19 @@ bool CGMEarthTail::Update(double dDeltaTime)
 			{
 				m_rayMarchCamera->setNodeMask(0);
 				m_TAACamera->setNodeMask(0);
-				m_pTailTransform2->setNodeMask(0);
 			}
 		}
-		else if(3 == GM_ENGINE.GetCelestialIndex())// 地球
+		else if (3 == GM_ENGINE.GetCelestialIndex())// 地球
 		{
 			// 显示节点
 			if (0 == m_rayMarchCamera->getNodeMask())
 			{
 				m_rayMarchCamera->setNodeMask(~0);
 				m_TAACamera->setNodeMask(~0);
-				m_pTailTransform2->setNodeMask(~0);
 			}
 		}
-		else{}
+		else {}
 	}
-
-	float fWanderProgress = 0.0f;
-	m_fWanderProgressUniform->get(fWanderProgress);
-	m_pTailEnvelopeGeode2->setNodeMask(fWanderProgress > PROGRESS_4 ? ~0 : 0);
 
 	CGMVolumeBasic::Update(dDeltaTime);
 	return true;
@@ -161,12 +198,104 @@ bool CGMEarthTail::Load()
 			strEarthShader + "TailEnvelope.frag",
 			"TailEnvelope");
 	}
+	if (m_pSpiralGeode2.valid())
+	{
+		CGMKit::LoadShader(m_pSpiralGeode2->getStateSet(),
+			strEarthShader + "TailEnvelope.vert",
+			strEarthShader + "TailEnvelope.frag",
+			"Spiral");
+	}
 
 	return true;
 }
 
 void CGMEarthTail::MakeEarthTail()
 {
+	double fUnit2 = m_pKernelData->fUnitArray->at(2);
+
+	osg::ref_ptr<osg::Texture2D> pNoise2DTex = new osg::Texture2D;
+	pNoise2DTex->setImage(osgDB::readImageFile(m_pConfigData->strCorePath + "Textures/Volume/noise2D.dds"));
+	pNoise2DTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	pNoise2DTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	pNoise2DTex->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+	pNoise2DTex->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+	pNoise2DTex->setSourceType(GL_UNSIGNED_BYTE);
+
+	// 创建气体螺旋相关的节点，北极轴旋转时，发动机喷出的气体会形成螺旋
+	// 因为气体螺旋不能跟着地球自转，所以必须单独一个变换节点
+	m_pSpiralTransform2 = new osg::PositionAttitudeTransform();
+	m_pSpiralTransform2->setNodeMask(0);
+
+	osg::ref_ptr<osg::StateSet> pSSSpiral = new osg::StateSet();
+	pSSSpiral->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+	pSSSpiral->setMode(GL_BLEND, osg::StateAttribute::ON);
+	pSSSpiral->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0, 1, false)); // no zbuffer
+	pSSSpiral->setAttributeAndModes(new osg::CullFace());
+	pSSSpiral->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
+	pSSSpiral->setRenderBinDetails(BIN_PLANET_TAIL, "DepthSortedBin");
+	pSSSpiral->setDefine("SPIRAL", osg::StateAttribute::ON);
+
+	pSSSpiral->addUniform(m_pCommonUniform->GetUnit());
+	pSSSpiral->addUniform(m_pCommonUniform->GetTime());
+	pSSSpiral->addUniform(m_vViewLightUniform);
+	pSSSpiral->addUniform(m_vEngineStartRatioUniform);
+	CGMKit::AddTexture(pSSSpiral, pNoise2DTex, "noise2DTex", 0);
+	CGMKit::LoadShader(pSSSpiral,
+		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.vert",
+		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.frag",
+		"Spiral");
+
+	m_pSpiralGeode2 = new osg::Geode;
+	m_pSpiralGeode2->setStateSet(pSSSpiral);
+	m_pSpiralGeode2->addDrawable(_MakeSpiralGeometry(osg::WGS_84_RADIUS_EQUATOR / fUnit2));
+
+	m_pSpiralTransform2->addChild(m_pSpiralGeode2);
+	GM_Root->addChild(m_pSpiralTransform2);
+
+	///////////////////////////////////////////////////////////////////////////////////////////
+	// 创建尾迹相关的节点，这里的尾迹不包括气体螺旋，因为气体螺旋不能跟着地球自转
+	m_pTailTransform2 = new osg::PositionAttitudeTransform();
+	m_pTailTransform2->setNodeMask(0);
+	GM_Root->addChild(m_pTailTransform2);
+
+	double fEarthTailRadius = 7.2e6; // 单位：米
+	double fEarthTailLength = 4e7; // 单位：米
+	double fRadiusHie2 = fEarthTailRadius / fUnit2;
+	double fLengthHie2 = fEarthTailLength / fUnit2;
+
+	// 创建尾迹包络面
+	osg::ref_ptr<osg::StateSet> pSSTailEnvelope = new osg::StateSet();
+	pSSTailEnvelope->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+	pSSTailEnvelope->setMode(GL_BLEND, osg::StateAttribute::ON);
+	pSSTailEnvelope->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0, 1, false)); // no zbuffer
+	pSSTailEnvelope->setAttributeAndModes(new osg::CullFace());
+	pSSTailEnvelope->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
+	pSSTailEnvelope->setRenderBinDetails(BIN_PLANET_TAIL, "DepthSortedBin");
+
+	pSSTailEnvelope->addUniform(m_pCommonUniform->GetUnit());
+	pSSTailEnvelope->addUniform(m_pCommonUniform->GetTime());
+	pSSTailEnvelope->addUniform(m_vViewLightUniform);
+	pSSTailEnvelope->addUniform(m_vEngineStartRatioUniform);
+	CGMKit::AddTexture(pSSTailEnvelope, pNoise2DTex, "noise2DTex", 0);
+	CGMKit::LoadShader(pSSTailEnvelope,
+		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.vert",
+		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.frag",
+		"TailEnvelope");
+
+	m_pTailEnvelopeGeode2 = new osg::Geode;
+	m_pTailEnvelopeGeode2->setStateSet(pSSTailEnvelope);
+	m_pTailTransform2->addChild(m_pTailEnvelopeGeode2);
+	m_pTailEnvelopeGeode2->addDrawable(_MakeTailEnvelopeGeometry(1.2e7 / fUnit2, fRadiusHie2));
+	m_pTailEnvelopeGeode2->addDrawable(_MakeTailCylinderGeometry(1.5e8 / fUnit2, 1.7e6 / fUnit2));
+	m_pTailEnvelopeGeode2->addDrawable(_MakeTailXGeometry(1.5e8 / fUnit2, 1.7e6 / fUnit2));
+
+	// 如果是低画质，就不创建体渲染模块
+	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return;
+
 	// create the ray marching texture
 	int iWidth = 960;
 	int iHeight = 540;
@@ -270,10 +399,6 @@ void CGMEarthTail::MakeEarthTail()
 	// Add texture to TAA board,and active TAA
 	ActiveTAA(m_rayMarchTex, m_vectorMap_0);
 
-	m_pTailTransform2 = new osg::PositionAttitudeTransform();
-	m_pTailTransform2->setNodeMask(0);
-	GM_Root->addChild(m_pTailTransform2);
-
 	// new stateSet for final EarthTail box
 	osg::ref_ptr<osg::StateSet> pSSEarthTail = new osg::StateSet();
 	pSSEarthTail->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
@@ -291,80 +416,48 @@ void CGMEarthTail::MakeEarthTail()
 		"EarthTailBox2");
 
 	// final sphere to show the TAA result
-	double fUnit2 = m_pKernelData->fUnitArray->at(2);
-	double fEarthTailRadius = 7.2e6; // 单位：米
-	double fEarthTailLength = 4e7; // 单位：米
-	double fRadiusHie2 = fEarthTailRadius / fUnit2;
-	double fLengthHie2 = fEarthTailLength / fUnit2;
-
 	m_pTailBoxGeode2 = new osg::Geode;
 	m_pTailTransform2->addChild(m_pTailBoxGeode2);
 	m_pTailBoxGeode2->addDrawable(_MakeTailBoxGeometry(fLengthHie2, fRadiusHie2));
 	m_pTailBoxGeode2->setStateSet(pSSEarthTail);
-
-	// 创建尾迹包络面
-	osg::ref_ptr<osg::StateSet> pSSTailEnvelope = new osg::StateSet();
-	pSSTailEnvelope->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSSTailEnvelope->setMode(GL_BLEND, osg::StateAttribute::ON);
-	pSSTailEnvelope->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0, 1, false)); // no zbuffer
-	pSSTailEnvelope->setAttributeAndModes(new osg::CullFace());
-	pSSTailEnvelope->setAttributeAndModes(new osg::BlendFunc(
-		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
-	), osg::StateAttribute::ON);
-	pSSTailEnvelope->setRenderBinDetails(BIN_PLANET_TAIL, "DepthSortedBin");
-
-	pSSTailEnvelope->addUniform(m_pCommonUniform->GetUnit());
-	pSSTailEnvelope->addUniform(m_pCommonUniform->GetTime());
-	pSSTailEnvelope->addUniform(m_vViewLightUniform);
-	pSSTailEnvelope->addUniform(m_vEngineStartRatioUniform);
-
-	osg::ref_ptr<osg::Texture2D> pNoise2DTex = new osg::Texture2D;
-	pNoise2DTex->setImage(osgDB::readImageFile(m_pConfigData->strCorePath + "Textures/Volume/noise2D.dds"));
-	pNoise2DTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	pNoise2DTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	pNoise2DTex->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-	pNoise2DTex->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-	pNoise2DTex->setSourceType(GL_UNSIGNED_BYTE);
-	CGMKit::AddTexture(pSSTailEnvelope, pNoise2DTex, "noise2DTex", 0);
-
-	CGMKit::LoadShader(pSSTailEnvelope,
-		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.vert",
-		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.frag",
-		"TailEnvelope");
-
-	m_pTailEnvelopeGeode2 = new osg::Geode;
-	m_pTailEnvelopeGeode2->setStateSet(pSSTailEnvelope);
-	m_pTailTransform2->addChild(m_pTailEnvelopeGeode2);
-	m_pTailEnvelopeGeode2->addDrawable(_MakeTailEnvelopeGeometry(1.2e7 / fUnit2, fRadiusHie2));
-	m_pTailEnvelopeGeode2->addDrawable(_MakeTailCylinderGeometry(1.5e8 / fUnit2, 1.7e6 / fUnit2));
-	m_pTailEnvelopeGeode2->addDrawable(_MakeTailXGeometry(1.5e8 / fUnit2, 1.7e6 / fUnit2));
-}
-
-void CGMEarthTail::ResizeScreen(const int width, const int height)
-{
-	CGMVolumeBasic::ResizeScreen(width, height);
 }
 
 bool CGMEarthTail::UpdateHierarchy(int iHieNew)
 {
-	if (m_bVisible && EGMRENDER_LOW != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
+	if (m_bVisible)
 	{
 		if (2 == iHieNew)
 		{
-			if (m_bVisible && 0 == m_rayMarchCamera->getNodeMask())
-			{
-				m_rayMarchCamera->setNodeMask(~0);
-				m_TAACamera->setNodeMask(~0);
+			if (0 == m_pTailTransform2->getNodeMask())
 				m_pTailTransform2->setNodeMask(~0);
-			}
+			if (0 == m_pSpiralTransform2->getNodeMask())
+				m_pSpiralTransform2->setNodeMask(~0);	
 		}
 		else
 		{
-			if (0 != m_rayMarchCamera->getNodeMask())
-			{
-				m_rayMarchCamera->setNodeMask(0);
-				m_TAACamera->setNodeMask(0);
+			if (0 != m_pTailTransform2->getNodeMask())
 				m_pTailTransform2->setNodeMask(0);
+			if (0 != m_pSpiralTransform2->getNodeMask())
+				m_pSpiralTransform2->setNodeMask(0);
+		}
+
+		if (EGMRENDER_LOW != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
+		{
+			if (2 == iHieNew)
+			{
+				if (0 == m_rayMarchCamera->getNodeMask())
+				{
+					m_rayMarchCamera->setNodeMask(~0);
+					m_TAACamera->setNodeMask(~0);
+				}
+			}
+			else
+			{
+				if (0 != m_rayMarchCamera->getNodeMask())
+				{
+					m_rayMarchCamera->setNodeMask(0);
+					m_TAACamera->setNodeMask(0);
+				}
 			}
 		}
 	}
@@ -376,16 +469,34 @@ void CGMEarthTail::SetVisible(const bool bVisible)
 {
 	m_bVisible = bVisible;
 
-	if (3 != GM_ENGINE.GetCelestialIndex() || EGMRENDER_LOW == m_pConfigData->eRenderQuality) return;
+	if (m_bVisible)
+	{
+		// 显示节点
+		if (0 == m_pTailTransform2->getNodeMask() && (3 == GM_ENGINE.GetCelestialIndex()))
+		{
+			m_pTailTransform2->setNodeMask(~0);
+			m_pSpiralTransform2->setNodeMask(~0);
+		}
+	}
+	else
+	{
+		// 隐藏节点
+		if (0 != m_pTailTransform2->getNodeMask())
+		{
+			m_pTailTransform2->setNodeMask(0);
+			m_pSpiralTransform2->setNodeMask(0);
+		}
+	}
+
+	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return;
 
 	if(m_bVisible)
 	{
 		// 显示节点
-		if (0 == m_rayMarchCamera->getNodeMask())
+		if (0 == m_rayMarchCamera->getNodeMask() && (3 == GM_ENGINE.GetCelestialIndex()))
 		{
 			m_rayMarchCamera->setNodeMask(~0);
 			m_TAACamera->setNodeMask(~0);
-			m_pTailTransform2->setNodeMask(~0);
 		}
 	}
 	else
@@ -395,16 +506,35 @@ void CGMEarthTail::SetVisible(const bool bVisible)
 		{
 			m_rayMarchCamera->setNodeMask(0);
 			m_TAACamera->setNodeMask(0);
-			m_pTailTransform2->setNodeMask(0);
 		}
 	}
 }
 
-void CGMEarthTail::SetEarthTailRotate(const osg::Quat& qRotate)
+void CGMEarthTail::SetEarthTailRotate(const double fSpin, const double fObliquity, const double fTrueAnomaly)
 {
-	if (!m_pTailTransform2.valid()) return;
+	osg::Quat qPlanetSpin = osg::Quat(fSpin, osg::Vec3d(0, 0, 1));
+	osg::Quat qPlanetInclination = osg::Quat(fObliquity, osg::Vec3d(1, 0, 0));
+	osg::Quat qPlanetTurn = osg::Quat(fTrueAnomaly, osg::Vec3d(0, 0, 1));
+	osg::Quat qRotate = qPlanetSpin * qPlanetInclination * qPlanetTurn;
 
-	m_pTailTransform2->asPositionAttitudeTransform()->setAttitude(qRotate);
+	if (m_pTailTransform2.valid())
+		m_pTailTransform2->asPositionAttitudeTransform()->setAttitude(qRotate);
+	if (m_pSpiralTransform2.valid())
+	{
+		float fWanderProgress = 0.0f;
+		m_fWanderProgressUniform->get(fWanderProgress);
+		if (fWanderProgress < PROGRESS_2)
+		{
+			m_pSpiralTransform2->asPositionAttitudeTransform()->setAttitude(qPlanetInclination*qPlanetTurn);
+		}
+		else
+		{
+			// 沿着北极轴转180°
+			osg::Quat qInverseSpin = osg::Quat(osg::PI, osg::Vec3d(0, 0, 1));
+			m_pSpiralTransform2->asPositionAttitudeTransform()->setAttitude(qInverseSpin*qPlanetInclination*qPlanetTurn);
+		}
+	}
+
 	osg::Matrixf mWorld2ECEFMatrix = osg::Matrixd::inverse(osg::Matrixd(qRotate));
 	m_mWorld2ECEFUniform->set(mWorld2ECEFMatrix);
 }
@@ -419,6 +549,71 @@ void CGMEarthTail::SetUniform(
 	m_vEngineStartRatioUniform = pEngineStartRatio;
 	m_mView2ECEFUniform = pView2ECEF;
 	m_fWanderProgressUniform = pWanderProgress;
+}
+
+osg::Geometry* CGMEarthTail::_MakeSpiralGeometry(const float fRadius) const
+{
+	osg::Geometry* geom = new osg::Geometry();
+	geom->setUseVertexBufferObjects(true);
+
+	constexpr int iLatSeg = 32;
+	constexpr int iLonSeg = 32;
+	constexpr int iHalfVertNum = (iLatSeg+1) * (iLonSeg+1);
+
+	osg::Vec3Array* verts = new osg::Vec3Array();
+	osg::Vec2Array* texCoords = new osg::Vec2Array();
+	osg::Vec3Array* normals = new osg::Vec3Array();
+	osg::DrawElementsUShort* el = new osg::DrawElementsUShort(GL_TRIANGLES);
+
+	verts->reserve(iHalfVertNum * 2);
+	texCoords->reserve(iHalfVertNum * 2);
+	normals->reserve(iHalfVertNum * 2);
+	el->reserve(iLatSeg * iLonSeg * 12);
+
+	for (int i = 0; i < 2; i++)
+	{
+		for (int y = 0; y <= iLatSeg; ++y)
+		{
+			double fU = double(y) / iLatSeg;
+			for (int x = 0; x <= iLonSeg; ++x)
+			{
+				double fV = double(x) / iLonSeg;
+				osg::Vec3 vPos = _GetSpiralSurfacePos(osg::Vec2(fU, fV), fRadius, i);
+				verts->push_back(vPos);
+				texCoords->push_back(osg::Vec2(5 * fU, fV));
+
+				osg::Vec3 vOut = vPos;
+				vOut.normalize();
+				// 微分
+				osg::Vec3 vPos_1 = _GetSpiralSurfacePos(osg::Vec2(fU + 1e-4, fV + 1e-4), fRadius, i);
+				osg::Vec3 vTang = vPos_1 - vPos;
+				vTang.normalize();
+				osg::Vec3 vBinormal = vTang ^ vOut;
+				vBinormal.normalize();
+				osg::Vec3 normal = vBinormal ^ vTang;
+				normal.normalize();
+				normals->push_back(normal);
+
+				if ((y < iLatSeg) && (x < iLonSeg))
+				{
+					el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x + 1);
+					el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x);
+					el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x);
+					el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x + 1);
+					el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x);
+					el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x + 1);
+				}
+			}
+		}
+	}
+
+	geom->setVertexArray(verts);
+	geom->setTexCoordArray(0, texCoords);
+	geom->setNormalArray(normals);
+	geom->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+	geom->addPrimitiveSet(el);
+
+	return geom;
 }
 
 osg::Geometry* CGMEarthTail::_MakeTailBoxGeometry(const float fLength, const float fRadius) const
@@ -529,7 +724,7 @@ osg::Geometry* CGMEarthTail::_MakeTailEnvelopeGeometry(const float fLength, cons
 			float s = (float)x / (float)iLonSegments;
 			osg::Vec3 vPos = _GetTailEnvelopePos(osg::Vec2(s, t), fLength, fRadius);
 			verts->push_back(vPos);
-			texCoords->push_back(osg::Vec2(s*13, t));
+			texCoords->push_back(osg::Vec2(s*10, t));
 
 			osg::Vec3 vOut = vPos;
 			vOut.normalize();
@@ -570,7 +765,7 @@ osg::Geometry* CGMEarthTail::_MakeTailCylinderGeometry(const float fLength, cons
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
 
-	float fStartLenRatio = 0.05;
+	float fStartLenRatio = 0.043;
 	int iLonSegments = 20;
 	float lonSegmentSize = osg::PI * 2 / (float)iLonSegments;
 
@@ -630,9 +825,9 @@ osg::Geometry* CGMEarthTail::_MakeTailXGeometry(const float fLength, const float
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
 
-	float fStartLenRatio = 0.05f;
-	int iSegments = 32;
-	int iDegreeSeg = 6;
+	float fStartLenRatio = 0.043f;
+	int iSegments = 64;
+	int iDegreeSeg = 12;
 
 	osg::Vec3Array* verts = new osg::Vec3Array();
 	osg::Vec2Array* texCoords = new osg::Vec2Array();
@@ -648,7 +843,7 @@ osg::Geometry* CGMEarthTail::_MakeTailXGeometry(const float fLength, const float
 	{
 		for (int x = 0; x < iDegreeSeg; ++x)
 		{
-			float fR = fRadius * (1 + 2 * std::exp2(- y * 30.0 / iSegments));
+			float fR = fRadius * (1 + 1.5 * std::exp2(- y * 25.0 / iSegments));
 			float fLon = (osg::PI * 2 * x) / iDegreeSeg;
 			float fX = fR * cos(fLon);
 			float fY = fR * sin(fLon);
@@ -657,8 +852,8 @@ osg::Geometry* CGMEarthTail::_MakeTailXGeometry(const float fLength, const float
 			verts->push_back(osg::Vec3(fX, fY, fZ));
 
 			float fCoordY = 4.0f + 2.0f * float(y) / iSegments;
-			texCoords->push_back(osg::Vec2(2 * float(x) / iDegreeSeg, fCoordY));
-			texCoords->push_back(osg::Vec2(2 * float(x + 1) / iDegreeSeg, fCoordY));
+			texCoords->push_back(osg::Vec2(4 * float(x) / iDegreeSeg, fCoordY));
+			texCoords->push_back(osg::Vec2(4 * float(x + 1) / iDegreeSeg, fCoordY));
 
 			osg::Vec3 normal = osg::Vec3(fY, -fX, 0);
 			normal.normalize();
@@ -722,6 +917,33 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	CGMKit::LoadShader(pSS, strPath + "EarthTail.vert", strPath + "EarthTail.frag", strShaderName);
 
 	return true;
+}
+
+osg::Vec3 CGMEarthTail::_GetSpiralSurfacePos(const osg::Vec2 fCoordUV, const float fRadius, const int i) const
+{
+	double fU = fCoordUV.x();
+	double fV = fCoordUV.y();
+	double fR = fRadius * (1 + 0.075 * log2(15.0 * fV + 1));
+	double fRX = fRadius * (1 - fV + 2 * exp2(-0.5 * fV) * (1 - exp2(-fV)));
+	double lon = osg::PI_2 * (fV - 1);
+	double lat = osg::PI * (fU - 0.5);
+	double sinLon = sin(lon);
+	double cosLon = cos(lon);
+	double sinLat = sin(lat);
+	double cosLat = cos(lat);
+	double fOffset = fV - 0.1;
+
+	double fX = fRX * sinLat;
+	double fY = fR * cosLat * sinLon + cosLon * fRadius * fOffset;
+	double fZ = fR * cosLat * cosLon - sinLon * fRadius * fOffset;
+	if (0 == i)
+	{
+		return osg::Vec3(fX, fY, fZ);
+	}
+	else
+	{
+		return osg::Vec3(fX, -fY, -fZ);
+	}
 }
 
 osg::Vec3 CGMEarthTail::_GetTailEnvelopePos(const osg::Vec2 fCoordUV, const float fLength, const float fRadius) const

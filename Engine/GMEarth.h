@@ -94,7 +94,7 @@ namespace GM
 		* @brief 设置地球在第2空间层级下的旋转
 		* @param fSpin： 自转，单位：弧度
 		* @param fObliquity： 自转轴倾角，单位：弧度
-		* * @param fTrueAnomaly： 自转轴偏航角，单位：弧度
+		* @param fTrueAnomaly： 自转轴偏航角，单位：弧度
 		*/
 		void SetEarthRotate(const double fSpin, const double fObliquity, const double fTrueAnomaly);
 		/**

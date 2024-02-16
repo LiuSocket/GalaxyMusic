@@ -87,6 +87,12 @@ namespace GM
 	public:
 		/** @brief 构造 */
 		CGMVolumeBasic();
+		/**
+		* @brief 修改屏幕尺寸时,子类调用此函数
+		* @param width: 屏幕宽度
+		* @param height: 屏幕高度
+		*/
+		void ResizeScreen(const int width, const int height);
 
 		/**
 		* 设置渲染质量
@@ -137,12 +143,6 @@ namespace GM
 		* @return osg::Texture* 返回纹理指针
 		*/
 		osg::Texture* _CreateTexture2D(const std::string& fileName, const int iChannelNum);
-		/**
-		* @brief 修改屏幕尺寸时,子类调用此函数
-		* @param width: 屏幕宽度
-		* @param height: 屏幕高度
-		*/
-		void ResizeScreen(const int width, const int height);
 
 		/**
 		* @brief 生成体积云需要的柏拉图实体（介于12面体和20面体之间的实体）

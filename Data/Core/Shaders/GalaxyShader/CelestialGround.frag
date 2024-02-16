@@ -67,9 +67,15 @@ void main()
 	vec3 illumCity = illum.rgb*darkness;
 	float rockMask = 1 - baseColor.a;
 
+	vec3 DEMCoord = texCoord_1;
+	DEMCoord.xy = (DEMCoord.xy - 0.5)*celestialCoordScale.w + 0.5;
+	float elev = DEM(texture(DEMTex, DEMCoord).r);
+	vertAlt = elev/unit;
+
 	vec3 viewHalf = normalize(viewLight - viewDir);
 	float dotNH = max(dot(viewVertUp, viewHalf), 0);
-	vec3 specualr = mix(vec3(1.0,0.5,0.0),vec3(0.6,0.4,0.3),max(0,dotVUL))*pow(dotNH, 100)*sqrt(diffuse);
+	vec3 specualrColor = mix(vec3(1.0,0.4,0.0),vec3(0.6,0.4,0.3),sqrt(max(0,dotVUL)))*sqrt(diffuse);
+
 #ifdef WANDERING
 	float seaLevelAddProgress = clamp(wanderProgress/PROGRESS_0, 0, 1);
 	vec3 wanderingBaseCoord = baseCoord;
@@ -86,10 +92,6 @@ void main()
 		smoothstep(0.0, 0.2, clamp(2*engineStartRatio.x-lon,0,1)*torqueArea)*exp2(-abs(texCoord_0.y-0.5)*25));
 	vec3 ambient = vec3(0.07,0.11,0.15)*engineStart;
 
-	vec3 DEMCoord = texCoord_1;
-	DEMCoord.xy = (DEMCoord.xy - 0.5)*celestialCoordScale.w + 0.5;
-	float elev = DEM(texture(DEMTex, DEMCoord).r);
-	vertAlt = elev/unit;
 	float latCoord = texCoord_0.y*2-1;
 	float seaLevel = SeaLevel(latCoord, seaLevelAddProgress);
 	float elev2Sea = elev-seaLevel;
@@ -101,16 +103,17 @@ void main()
 	color = mix(vec3(0.0,0.1,0.0), baseColor.rgb, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));
 	color *= 0.02 + ambient + 0.5*diffuse;
 
+	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-elev2Sea*0.015, 0)))*clamp(-elev2Sea*0.01, 0, 1);
 	vec3 oceanColor = mix(vec3(0.06,0.13,0.2), vec3(0.2,0.3,0.3), seaLevelAddProgress*exp2(min(0, elev2Sea)*0.01));
-	oceanColor = oceanColor*(ambient + 0.5*diffuse) + clamp(-elev2Sea*0.01, 0, 1)*specualr;
+	oceanColor = oceanColor*(ambient + 0.5*diffuse) + specualr;
 #else // not WANDERING
+	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-elev*0.015, 0)));
 	vec3 oceanColor = vec3(0.08,0.1,0.12)*diffuse + specualr;
 #endif // WANDERING	or not
 	color = mix(oceanColor, color, rockMask);
 #endif // EARTH
 
 #ifdef ATMOS
-	vertAlt = groundTop*0.01;
 	// radius at the vertex point
 	float Rv = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1));
 	color += AtmosColor(max(0, vertAlt), viewPos.xyz, viewDir, viewVertUp, Rv);

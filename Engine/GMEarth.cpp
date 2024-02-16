@@ -385,7 +385,7 @@ void CGMEarth::SetEarthRotate(const double fSpin, const double fObliquity, const
 	if (m_pConfigData->bWanderingEarth)
 	{
 		m_pEarthEngine->SetEarthSpin(fSpin);
-		m_pEarthTail->SetEarthTailRotate(qRotate);
+		m_pEarthTail->SetEarthTailRotate(fSpin, fObliquity, fTrueAnomaly);
 	}
 }
 
@@ -969,8 +969,7 @@ bool CGMEarth::_CreateWanderingEarth()
 
 	if ((m_pConfigData->bWanderingEarth))
 	{
-		if(EGMRENDER_LOW != m_pConfigData->eRenderQuality)
-			m_pEarthTail->MakeEarthTail();
+		m_pEarthTail->MakeEarthTail();
 
 		m_pEarthEngine->SetTex(m_pEarthTail->GetTAATex(), m_pInscatteringTex);
 		m_pEarthEngine->CreateEngine();

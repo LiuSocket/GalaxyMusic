@@ -56,12 +56,6 @@ namespace GM
 		* @brief 创建流浪地球尾迹
 		*/
 		void MakeEarthTail();
-		/**
-		* @brief 修改屏幕尺寸时调用此函数
-		* @param width: 屏幕宽度
-		* @param height: 屏幕高度
-		*/
-		void ResizeScreen(const int width, const int height);
 
 		/**
 		* @brief 由于空间层级变化而更新场景
@@ -77,10 +71,12 @@ namespace GM
 		void SetVisible(const bool bVisible);
 
 		/**
-		*  @brief 设置流浪地球的尾迹在第2空间层级下的旋转
-		* @param qRotate 旋转四元数
+		* @brief 设置流浪地球的尾迹在第2空间层级下的旋转
+		* @param fSpin： 自转，单位：弧度
+		* @param fObliquity： 自转轴倾角，单位：弧度
+		* @param fTrueAnomaly： 自转轴偏航角，单位：弧度
 		*/
-		void SetEarthTailRotate(const osg::Quat& qRotate);
+		void SetEarthTailRotate(const double fSpin, const double fObliquity, const double fTrueAnomaly);
 
 		/* @brief 传递Uniform */
 		void SetUniform(
@@ -90,6 +86,13 @@ namespace GM
 			osg::Uniform* pWanderProgress);
 
 	private:
+		/**
+		* @brief 北极轴旋转时，发动机喷出的气体形成的螺旋
+		* @param fRadius			地球半径
+		* @return Geometry			返回创建的几何体指针
+		*/
+		osg::Geometry* _MakeSpiralGeometry(const float fRadius) const;
+
 		/**
 		* @brief 创建地球尾迹长方体
 		* @param fLength			地球尾迹长度
@@ -128,8 +131,16 @@ namespace GM
 		bool _InitEarthTailStateSet(osg::StateSet* pSS, const std::string strShaderName);
 
 		/**
+		* @brief 获取螺旋气体表面坐标
+		* @param fCoordUV			螺旋气体表面UV坐标，范围[0.0,1.0]
+		* @param fRadius			地球半径
+		* @param i					螺旋气体是轴对称图形，i=0/1分别代表螺旋的两半
+		* @return osg::Vec3			表面顶点的模型空间的位置
+		*/
+		osg::Vec3 _GetSpiralSurfacePos(const osg::Vec2 fCoordUV, const float fRadius, const int i) const;
+		/**
 		* @brief 获取尾迹包络的表面坐标
-		* @param fCoordV			沿着尾迹方向的坐标，范围[0.0,1.0]
+		* @param fCoordUV			沿着尾迹方向的坐标，范围[0.0,1.0]
 		* @param fLength			尾迹长度
 		* @param fRadius			大气头部半径
 		* @return osg::Vec3			表面顶点的模型空间的位置
@@ -141,8 +152,11 @@ namespace GM
 		std::string										m_strEarthShaderPath;			//!< Earth shader 路径
 		std::string										m_strGalaxyShaderPath;			//!< 星系着色器路径
 
+		osg::ref_ptr<osg::Transform>					m_pSpiralTransform2;			//!< 第2层级气体螺旋的变换节点
 		osg::ref_ptr<osg::Transform>					m_pTailTransform2;				//!< 第2层级流浪地球尾迹的变换节点
-		osg::ref_ptr<osg::Geode>						m_pTailBoxGeode2;				//!< 第2层级流浪地球尾迹的几何节点
+
+		osg::ref_ptr<osg::Geode>						m_pSpiralGeode2;				//!< 第2层级气体螺旋的几何节点
+		osg::ref_ptr<osg::Geode>						m_pTailBoxGeode2;				//!< 第2层级尾迹画布的几何节点
 		osg::ref_ptr<osg::Geode>						m_pTailEnvelopeGeode2;			//!< 第2层级尾迹包络的几何节点
 
 		osg::ref_ptr<osg::StateSet>						m_pSsTailDecFace;				//!< 流浪地球尾迹12面体面状态集

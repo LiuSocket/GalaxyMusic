@@ -24,10 +24,9 @@ void main()
 	float vertAlt = max(0, gl_TexCoord[0].z);
 
 	float illumAlt = clamp(vertAlt*unit*1e-4,0,1);
-	vec3 illum = vec3(1.0,0.2,0.1)*(pow(illumAlt,4)*engineIntensity);
 	vec3 streamLight = vec3(0.0,0.4,0.6)*(illumAlt*engineIntensity);
 	vec4 baseColor = texture(baseColorTex, gl_TexCoord[0].xy);
-	color = vec4(max(illum+streamLight,vec3(diffuse))*baseColor.rgb, baseColor.a);
+	color = vec4(max(streamLight,vec3(diffuse))*baseColor.rgb, baseColor.a);
 	color.a -= clamp(1-(maxDistance-lenV)/(0.9*maxDistance), 0, 1);
 	// building progress
 	color.a *= step(0, wanderProgress*10-vertAlt*unit*1e-4);

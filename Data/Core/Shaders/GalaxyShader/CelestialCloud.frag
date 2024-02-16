@@ -39,7 +39,7 @@ void main()
 	celestialCoordScale = coordScale_Earth;
 #else // not EARTH
 	celestialCoordScale = coordScale;
-#endif // EARTH
+#endif // EARTH or not
 
 	vec3 cloudCoord = texCoord_1;
 	cloudCoord.xy = (cloudCoord.xy - 0.5)*celestialCoordScale.y + 0.5;

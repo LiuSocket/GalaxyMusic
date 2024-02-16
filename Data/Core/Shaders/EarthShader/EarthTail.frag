@@ -43,7 +43,7 @@ const int STEP_NUM = 64;
 const int LIGHT_SAMPLE = 4;
 const float LAST_SCLAE = 128;
 const float RANGE_MAX = 3;
-const float M_PI = 3.141592657;
+const float M_PI = 3.141592654;
 const float ALPHA_MAX = 0.99;
 
 uniform float unit;
@@ -72,7 +72,7 @@ uniform sampler2D blueNoiseTex;
 uniform sampler3D noiseShapeTex;
 uniform sampler3D noiseErosionTex;
 
-float STEP_LENGTH = 2e4/unit;
+float STEP_LENGTH = 1e4/unit;
 float EARTH_RADIUS = 6.36e6/unit;
 float ATMOS_RADIUS = 7.2e6/unit;
 float TAIL_RADIUS = 1.7e6/unit;
@@ -84,12 +84,6 @@ float LIGHT_LEN[LIGHT_SAMPLE] = float[](5e4/unit, 1e4/unit, 1e6/unit, 1e7/unit);
 
 in vec3 weight;
 in vec3 localVertDir;
-
-// length of point to line
-float Len_Point2Line(vec3 point, vec3 lineDir)
-{	
-	return length(point-dot(point, lineDir)*lineDir);
-}
 
 // (length min,length max)
 // dstEarth means the normalized distance to Earth core, [0,1]
@@ -287,7 +281,7 @@ void Tail(commonParam cP, inout vec4 tailColor, inout float lenTail)
 				// all color
 				vec3 chrome = ambient + diffuse; 
 
-				float tailA = 1 - exp2(-atmosDens * (0.5+0.4*exp2(min(0,1-ratioR))));
+				float tailA = 1 - exp2(-atmosDens * (0.25+0.2*exp2(min(0,1-ratioR))));
 				tailC += vec4(chrome*tailA, tailA)*(1-tailC.a);			
 			}
 
@@ -332,7 +326,7 @@ void main()
 	float forwardScattering = (1-gForward*gForward)/(4*M_PI*pow(1+gForward*gForward-2*gForward*dotVL,1.5));
 	float scattering = 0.5 + forwardScattering;
 
-	float noiseD = texture(blueNoiseTex, gl_FragCoord.xy*screenSize.z/(abs(fract(times*20)-0.5)*10+64)).r;
+	float noiseD = texture(blueNoiseTex, gl_FragCoord.xy*screenSize.z/(abs(fract(times*10)-0.5)*10+64)).r;
 	// bounding shape
 	float dstEarth = 0;
 	vec2 lenMinMax = LenMinMax(modelEyePos, modelPixDir, dstEarth);
