@@ -33,9 +33,6 @@ using namespace GM;
 constexpr
 *************************************************************************/
 
-constexpr double EARTH_EQUATOR = 6378137.0; 		// 地球赤道半径
-constexpr double EARTH_POLAR = 6356752.0; 			// 地球两极半径
-
 /*************************************************************************
 Class
 *************************************************************************/
@@ -372,20 +369,20 @@ void CGMEarth::SetVisible(const bool bVisible)
 	}
 }
 
-void CGMEarth::SetEarthRotate(const double fSpin, const double fObliquity, const double fTrueAnomaly)
+void CGMEarth::SetEarthRotate(const double fSpin, const double fObliquity, const double fNorthYaw)
 {
 	m_fCurrentObliquity = fObliquity;
 
 	osg::Quat qPlanetSpin = osg::Quat(fSpin, osg::Vec3d(0, 0, 1));
 	osg::Quat qPlanetInclination = osg::Quat(fObliquity, osg::Vec3d(1, 0, 0));
-	osg::Quat qPlanetTurn = osg::Quat(fTrueAnomaly, osg::Vec3d(0, 0, 1));
-	osg::Quat qRotate = qPlanetSpin * qPlanetInclination * qPlanetTurn;
+	osg::Quat qPlanetNorthYaw = osg::Quat(fNorthYaw, osg::Vec3d(0, 0, 1));
+	osg::Quat qRotate = qPlanetSpin * qPlanetInclination * qPlanetNorthYaw;
 	m_pShadow_2_Transform->asPositionAttitudeTransform()->setAttitude(qRotate);
 
 	if (m_pConfigData->bWanderingEarth)
 	{
 		m_pEarthEngine->SetEarthSpin(fSpin);
-		m_pEarthTail->SetEarthTailRotate(fSpin, fObliquity, fTrueAnomaly);
+		m_pEarthTail->SetEarthTailRotate(fSpin, fObliquity, fNorthYaw);
 	}
 }
 
@@ -495,7 +492,9 @@ bool CGMEarth::_CreateGlobalCloudShadow()
 		if (!pShadowEarthGeom.valid()) return false;
 
 		double fUnit = m_pKernelData->fUnitArray->at(i);
-		m_pCelestialScaleVisitor->SetRadius((EARTH_EQUATOR + m_fCloudTop) / fUnit, (EARTH_POLAR + m_fCloudTop) / fUnit);
+		m_pCelestialScaleVisitor->SetRadius(
+			(osg::WGS_84_RADIUS_EQUATOR + m_fCloudTop) / fUnit,
+			(osg::WGS_84_RADIUS_POLAR + m_fCloudTop) / fUnit);
 		pShadowEarthGeom->accept(*m_pCelestialScaleVisitor);	// 改变大小
 		osg::ref_ptr<osg::Geode> pShadowEarth = new osg::Geode();
 		m_mShadowEarthGeode[i] = pShadowEarth;
@@ -561,7 +560,7 @@ bool CGMEarth::_CreateEarth_1()
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	unsigned int iOnOverride = osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE;
 	double fUnit1 = m_pKernelData->fUnitArray->at(1);
-	m_pCelestialScaleVisitor->SetRadius(EARTH_EQUATOR / fUnit1, EARTH_POLAR / fUnit1);
+	m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit1, osg::WGS_84_RADIUS_POLAR / fUnit1);
 	// 改变大小
 	m_pEarthGeom_1->accept(*m_pCelestialScaleVisitor);
 

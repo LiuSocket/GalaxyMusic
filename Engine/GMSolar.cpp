@@ -2996,33 +2996,55 @@ void CGMSolar::_UpdatePlanetRotate(double dDeltaTime)
 		//流浪地球模式，逐渐停止自传
 		if (m_pConfigData->bWanderingEarth && (3 == iCenterCelestialBody))
 		{
-			constexpr double fProgress_0 = 0.1;
-			constexpr double fProgress_1 = 0.15;
-			constexpr double fProgress_2 = 0.25;
+			fDeltaSpin *= 1 - osg::clampBetween((m_fWanderingEarthProgress - PROGRESS_0) / (PROGRESS_1 - PROGRESS_0), 0.0f, 1.0f);
 
-			fDeltaSpin *= 1 - osg::clampBetween((m_fWanderingEarthProgress - fProgress_0) / (fProgress_1 - fProgress_0), 0.0, 1.0);
-			if (m_fWanderingEarthProgress > fProgress_1)
+			// 停止自转后，地球北极轴方向实时变化，方便日后加速逃逸
+			if (m_fWanderingEarthProgress > PROGRESS_1)
 			{
 				fObliquity = m_pEarth->GetCurrentObliquity();
-				if (m_fWanderingEarthProgress < fProgress_2)
+				if (m_fWanderingEarthProgress < PROGRESS_3)
 				{
 					double fT = GM_ENGINE.GetAudioDuration() * 1e-3 * 0.1;
 					double fS = osg::PI_2 - itr.fObliquity;
 					// 角加速度
 					double fRotateAccel = 4 * fS / (fT * fT);
 					// 先加速后减速
-					if (m_fWanderingEarthProgress > 0.5*(fProgress_1 + fProgress_2)) fRotateAccel *= -1;
+					if (m_fWanderingEarthProgress > 0.5*(PROGRESS_1 + PROGRESS_3)) fRotateAccel *= -1;
 
 					double fNorthRotateSpeed = m_pEarth->GetNorthRotateSpeed() + fRotateAccel * dDeltaTime;
-					m_pEarth->SetNorthRotateSpeed(fNorthRotateSpeed);
 					// 偏转角
-					fObliquity = min(osg::PI_2, fObliquity + dDeltaTime * fNorthRotateSpeed);
+					double fMoreNorthRotateSpeed = fObliquity + dDeltaTime * fNorthRotateSpeed - osg::PI_2;
+					if (0 < fMoreNorthRotateSpeed)
+					{
+						fNorthRotateSpeed -= fMoreNorthRotateSpeed / dDeltaTime;
+						fObliquity = osg::PI_2;
+					}
+					else
+					{
+						fObliquity += dDeltaTime * fNorthRotateSpeed;
+					}
+					m_pEarth->SetNorthRotateSpeed(fNorthRotateSpeed);
 				}
 				else
 				{
 					m_pEarth->SetNorthRotateSpeed(0);
 					fObliquity = osg::PI_2;
 				}
+
+				// 更新北极轴偏航角
+				double fDeltaNorthYaw = 0.5*(itr.fTrueAnomaly - itr.fNorthYaw);
+				double fDeltaYawMax = dDeltaTime * 0.05;
+				// 防止偏航过快
+				if (fDeltaNorthYaw > fDeltaYawMax)
+				{
+					fDeltaNorthYaw = fDeltaYawMax;
+				}
+				else if (fDeltaNorthYaw < -fDeltaYawMax)
+				{
+					fDeltaNorthYaw = -fDeltaYawMax;
+				}
+				else{}
+				itr.fNorthYaw += fDeltaNorthYaw;
 			}
 			else
 			{
@@ -3033,16 +3055,11 @@ void CGMSolar::_UpdatePlanetRotate(double dDeltaTime)
 		itr.fSpin += fDeltaSpin;
 		// 更新真近点角
 		itr.fTrueAnomaly += fDeltaTrueAnomaly;
+
 		// 地球模块内部需要更新旋转节点
+		// 由于itr.fObliquity中存放的是真实的偏转角，所以不能在流浪地球模式中传给地球，而是实时计算一个fObliquity
 		if (3 == iCenterCelestialBody)
-		{
-			// 由于itr.fObliquity中存放的是真实的偏转角，所以不能在流浪地球模式中传给地球，而是实时计算一个fObliquity
-			// 在普通模式下，地球的自转轴方向不会变
-			double fEarthTrueAnomaly = 0;
-			// 在流浪地球模式下，地球的自转轴方向实时变化
-			if (m_pConfigData->bWanderingEarth) fEarthTrueAnomaly = itr.fTrueAnomaly;
-			m_pEarth->SetEarthRotate(itr.fSpin, fObliquity, fEarthTrueAnomaly);
-		}
+			m_pEarth->SetEarthRotate(itr.fSpin, fObliquity, itr.fNorthYaw);
 
 		iCenterCelestialBody++;
 	}
@@ -3066,11 +3083,5 @@ osg::Quat CGMSolar::_GetPlanetInclination() const
 
 osg::Quat CGMSolar::_GetPlanetTurn() const
 {
-	double fPlanetTheta = 0.0;
-	if (m_pConfigData->bWanderingEarth && (3 == m_iCenterCelestialBody))
-	{
-		// 流浪地球的真近点角
-		fPlanetTheta = m_sCelestialBodyVector.at(3).fTrueAnomaly;
-	}
-	return osg::Quat(fPlanetTheta, osg::Vec3d(0, 0, 1));
+	return osg::Quat(m_sCelestialBodyVector.at(m_iCenterCelestialBody).fNorthYaw, osg::Vec3d(0, 0, 1));
 }

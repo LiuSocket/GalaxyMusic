@@ -41,7 +41,8 @@ namespace GM
 		SGMCelestialBody()
 			: fOrbitalRadius(1e11), fOrbitalPeriod(1.0), fTrueAnomaly(0.0),
 			fEquatorRadius(0.01), fPolarRadius(0.01), fObliquity(0.0), fSpinPeriod(1.0),
-			fSpin(0.0), fGroundTop(1000.0f), fCloudTop(8e3f), eAtmosHeight(EGMAH_0),
+			fSpin(0.0), fNorthYaw(0.0),
+			fGroundTop(1000.0f), fCloudTop(8e3f), eAtmosHeight(EGMAH_0),
 			vAtmosColor(osg::Vec4f(1, 1, 1, 1)),
 			fRingMinRadius(0), fRingMaxRadius(0)
 		{}
@@ -52,7 +53,8 @@ namespace GM
 			double ringMinRadius = 0, double ringMaxRadius = 0)
 			: fOrbitalRadius(orbitalRadius), fOrbitalPeriod(period), fTrueAnomaly(startTrueAnomaly),
 			fEquatorRadius(equatorRadius), fPolarRadius(polarRadius), fObliquity(obliquity), fSpinPeriod(spinPeriod),
-			fSpin(0.0), fGroundTop(groundTop), fCloudTop(cloudTop), eAtmosHeight(atmosH), vAtmosColor(atmosColor),
+			fSpin(0.0), fNorthYaw(0.0),
+			fGroundTop(groundTop), fCloudTop(cloudTop), eAtmosHeight(atmosH), vAtmosColor(atmosColor),
 			fRingMinRadius(ringMinRadius), fRingMaxRadius(ringMaxRadius)	
 		{}
 
@@ -63,7 +65,8 @@ namespace GM
 		double fPolarRadius;			// 天体两级半径，单位：米
 		double fObliquity;				// 天体的自转轴平面与黄道面夹角（有向），单位：弧度
 		double fSpinPeriod;				// 天体的自转周期，单位：秒
-		double fSpin;					// 天体当前帧的自转角度，单位：弧度
+		double fSpin;					// 天体当前帧自转角度，单位：弧度
+		double fNorthYaw;				// 天体当前帧北极轴偏航角，单位：弧度（针对流浪地球，其他天体没意义）
 		float fGroundTop;				// 地面最高山顶的海拔高，单位：米
 		float fCloudTop;				// 岩石行星的云顶海拔高，单位：米
 		EGMAtmosHeight eAtmosHeight;	// 天体的大气厚度，单位：千米

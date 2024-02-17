@@ -63,12 +63,11 @@ void main()
 	const float v1 = 4;
 	const float v2 = 6;
 
-	float fade_0 = clamp(v*30, 0, 1)*clamp((v0-v)*6, 0, 1)
-		*(1-exp2(min(0, v - v0*(engineStartRatio.x - 0.5))*10));
-	float fade_1 = clamp((v-v0)*20, 0, 1)*clamp(v1-v, 0, 1)
-		*(1-exp2(min(0, v - mix(v0, v1, clamp(0.15*(engineStartRatio.y - 1), 0, 1)))*20));
-	float fade_2 = clamp((v-v1)*50, 0, 1)*clamp(v2-v, 0.0, 0.5)
-		*(1-exp2(min(0, v - mix(v1, v2, clamp(0.15*(engineStartRatio.y - 1), 0, 1)))*30));
+	float torqueGrow = (1+0.5*noiseD1)*(engineStartRatio.x - 0.5);
+	float tailGrow = clamp((0.1+0.05*noiseD1)*(engineStartRatio.y - 1), 0, 1);
+	float fade_0 = clamp(v*30, 0, 1)*clamp((v0-v)*6, 0, 1)*(1-exp2(min(0, v - v0*torqueGrow)*10));
+	float fade_1 = clamp((v-v0)*20, 0, 1)*clamp(v1-v, 0, 1)*(1-exp2(min(0, v - mix(v0, v1, tailGrow))*20));
+	float fade_2 = clamp((v-v1)*50, 0, 1)*clamp(v2-v, 0.0, 0.5)*(1-exp2(min(0, v - mix(v1, v2, tailGrow))*30));
 
 	float tailCordX = fract(gl_TexCoord[0].x*3);
 	float edgeFade = 4*tailCordX*(1-tailCordX)*(1-dotNC*dotNC);

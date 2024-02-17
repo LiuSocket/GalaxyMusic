@@ -74,9 +74,9 @@ namespace GM
 		* @brief 设置流浪地球的尾迹在第2空间层级下的旋转
 		* @param fSpin： 自转，单位：弧度
 		* @param fObliquity： 自转轴倾角，单位：弧度
-		* @param fTrueAnomaly： 自转轴偏航角，单位：弧度
+		* @param fNorthYaw： 自转轴偏航角，单位：弧度
 		*/
-		void SetEarthTailRotate(const double fSpin, const double fObliquity, const double fTrueAnomaly);
+		void SetEarthTailRotate(const double fSpin, const double fObliquity, const double fNorthYaw);
 
 		/* @brief 传递Uniform */
 		void SetUniform(

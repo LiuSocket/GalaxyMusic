@@ -510,11 +510,11 @@ void CGMEarthTail::SetVisible(const bool bVisible)
 	}
 }
 
-void CGMEarthTail::SetEarthTailRotate(const double fSpin, const double fObliquity, const double fTrueAnomaly)
+void CGMEarthTail::SetEarthTailRotate(const double fSpin, const double fObliquity, const double fNorthYaw)
 {
 	osg::Quat qPlanetSpin = osg::Quat(fSpin, osg::Vec3d(0, 0, 1));
 	osg::Quat qPlanetInclination = osg::Quat(fObliquity, osg::Vec3d(1, 0, 0));
-	osg::Quat qPlanetTurn = osg::Quat(fTrueAnomaly, osg::Vec3d(0, 0, 1));
+	osg::Quat qPlanetTurn = osg::Quat(fNorthYaw, osg::Vec3d(0, 0, 1));
 	osg::Quat qRotate = qPlanetSpin * qPlanetInclination * qPlanetTurn;
 
 	if (m_pTailTransform2.valid())
