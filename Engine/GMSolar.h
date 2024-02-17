@@ -63,10 +63,10 @@ namespace GM
 		double fTrueAnomaly;			// 真近点角，单位：弧度
 		double fEquatorRadius;			// 天体赤道半径，单位：米
 		double fPolarRadius;			// 天体两级半径，单位：米
-		double fObliquity;				// 天体的自转轴平面与黄道面夹角（有向），单位：弧度
+		double fObliquity;				// 天体的自转轴平面与黄道面夹角（有向），单位：弧度[0, PI)
 		double fSpinPeriod;				// 天体的自转周期，单位：秒
 		double fSpin;					// 天体当前帧自转角度，单位：弧度
-		double fNorthYaw;				// 天体当前帧北极轴偏航角，单位：弧度（针对流浪地球，其他天体没意义）
+		double fNorthYaw;				// 天体当前帧北极轴偏航角，单位：弧度[0, PI*2)（针对流浪地球，其他天体没意义）
 		float fGroundTop;				// 地面最高山顶的海拔高，单位：米
 		float fCloudTop;				// 岩石行星的云顶海拔高，单位：米
 		EGMAtmosHeight eAtmosHeight;	// 天体的大气厚度，单位：千米
@@ -272,11 +272,11 @@ namespace GM
 		osg::Geometry* _CreateSquareGeometry(const float fWidth, const bool bCorner = false);
 
 		/**
-		* @brief 创建光环的某一块切片
-		* @param iID					环的每个切片ID号，0,1,2,3,4,5
+		* @brief 创建光环的某一块切片，由于半透明排序的问题，必须要把环分成前后两个
+		* @param bFront					是否是前面的环
 		* @return Geometry				返回创建的几何体指针
 		*/
-		osg::Geometry* _MakeRingGeometry(unsigned int iID);
+		osg::Geometry* _MakeRingGeometry(const bool bFront);
 
 		/**
 		* @brief 修改光环半径

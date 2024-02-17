@@ -450,7 +450,7 @@ bool CGMSolar::UpdateLater(double dDeltaTime)
 
 	// 第二层级空间下，所有行星的北极轴所在平面的法向量
 	// 为方便计算，假设所有天体的北极轴都与这个轴垂直
-	osg::Vec3d vPlanetAxisNorm(1.0, 0.0, 0.0);
+	osg::Vec3d vPlanetAxisNorm(1, 0, 0);
 
 	if (2 >= iHie)
 	{
@@ -2268,8 +2268,8 @@ bool CGMSolar::_CreatePlanetSystem_2()
 	////////////////////////////////////
 	// 行星光环，切成2等分以避免半透明问题
 	m_pRingGeode_2 = new osg::Geode();
-	osg::ref_ptr <osg::Geometry> pRingGeoBack = _MakeRingGeometry(0);
-	osg::ref_ptr <osg::Geometry> pRingGeoFront = _MakeRingGeometry(1);
+	osg::ref_ptr <osg::Geometry> pRingGeoBack = _MakeRingGeometry(false);
+	osg::ref_ptr <osg::Geometry> pRingGeoFront = _MakeRingGeometry(true);
 	m_pRingGeode_2->addDrawable(pRingGeoBack);
 	m_pRingGeode_2->addDrawable(pRingGeoFront);
 	m_pRing_2_Transform->addChild(m_pRingGeode_2);
@@ -2408,25 +2408,22 @@ osg::Geometry* CGMSolar::_CreateSquareGeometry(const float fWidth, const bool bC
 	return pGeometry.release();
 }
 
-osg::Geometry* CGMSolar::_MakeRingGeometry(unsigned int iID)
+osg::Geometry* CGMSolar::_MakeRingGeometry(const bool bFront)
 {
-	if (iID >= 2) return nullptr;
-
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
 
-	double fDegreeEach = 180;
 	double fRadiusMin = 0.01;
 	double fRadiusMax = 0.02;
-	float fLonStart = iID * fDegreeEach; // degrees
-	double lonSegmentSize = fDegreeEach / double(RING_SEGMENT); // degrees
+	float fLonStart = (bFront ? 1.0f : 0.0f ) * osg::PI;
+	double lonSegmentSize = osg::PI / double(RING_SEGMENT);
 
 	osg::ref_ptr<osg::Vec3Array> verts = new osg::Vec3Array();
-	verts->reserve(RING_SEGMENT);
+	verts->reserve((RING_SEGMENT+1)*2);
 	m_ringVertVector.push_back(verts);
 
 	osg::Vec2Array* texCoords = new osg::Vec2Array();
-	texCoords->reserve(RING_SEGMENT);
+	texCoords->reserve((RING_SEGMENT + 1) * 2);
 	geom->setTexCoordArray(0, texCoords);
 
 	osg::DrawElementsUShort* el = new osg::DrawElementsUShort(GL_TRIANGLES);
@@ -2437,11 +2434,10 @@ osg::Geometry* CGMSolar::_MakeRingGeometry(unsigned int iID)
 		double fR = y ? fRadiusMax : fRadiusMin;
 		for (int x = 0; x <= RING_SEGMENT; ++x)
 		{
-			double lonDegree = fLonStart + lonSegmentSize * (double)x;// 角度
-			double lonRadians = osg::DegreesToRadians(lonDegree);// 弧度
-			verts->push_back(osg::Vec3(fR*cos(lonRadians),fR*sin(lonRadians),0));
+			double lon = fLonStart + lonSegmentSize * (double)x;
+			verts->push_back(osg::Vec3(fR*cos(lon),fR*sin(lon),0));
 
-			texCoords->push_back(osg::Vec2(y, lonDegree / 360.0));
+			texCoords->push_back(osg::Vec2(y, lon / (osg::PI*2)));
 
 			if ((y < 1) && (x < RING_SEGMENT))
 			{
@@ -3032,19 +3028,42 @@ void CGMSolar::_UpdatePlanetRotate(double dDeltaTime)
 				}
 
 				// 更新北极轴偏航角
-				double fDeltaNorthYaw = 0.5*(itr.fTrueAnomaly - itr.fNorthYaw);
 				double fDeltaYawMax = dDeltaTime * 0.05;
-				// 防止偏航过快
-				if (fDeltaNorthYaw > fDeltaYawMax)
+				double fDeltaNorthYaw = itr.fTrueAnomaly - itr.fNorthYaw;
+				// 保证夹角小于180
+				if (fDeltaNorthYaw > osg::PI)
 				{
-					fDeltaNorthYaw = fDeltaYawMax;
+					fDeltaNorthYaw -= osg::PI * 2;
 				}
-				else if (fDeltaNorthYaw < -fDeltaYawMax)
+				else if (fDeltaNorthYaw < -osg::PI)
 				{
-					fDeltaNorthYaw = -fDeltaYawMax;
+					fDeltaNorthYaw += osg::PI * 2;
 				}
 				else{}
-				itr.fNorthYaw += fDeltaNorthYaw;
+
+				double fAddNorthYaw = 0.5 * fDeltaNorthYaw;
+				// 防止偏航过快
+				if (fAddNorthYaw > fDeltaYawMax)
+				{
+					fAddNorthYaw = fDeltaYawMax;
+				}
+				else if (fAddNorthYaw < -fDeltaYawMax)
+				{
+					fAddNorthYaw = -fDeltaYawMax;
+				}
+				else{}
+				itr.fNorthYaw += fAddNorthYaw;
+
+				// 偏航角[0, PI*2)
+				if (itr.fNorthYaw > osg::PI * 2)
+				{
+					itr.fNorthYaw -= osg::PI * 2;
+				}
+				else if (itr.fNorthYaw < 0)
+				{
+					itr.fNorthYaw += osg::PI * 2;
+				}
+				else{}
 			}
 			else
 			{

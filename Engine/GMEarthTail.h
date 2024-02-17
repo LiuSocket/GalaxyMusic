@@ -121,6 +121,12 @@ namespace GM
 		* @return Geometry			返回创建的几何体指针
 		*/
 		osg::Geometry* _MakeTailXGeometry(const float fLength, const float fRadius) const;
+		/**
+		* @brief 刹车时代，发动机喷出的气体形成的地球环
+		* @param fRadius			地球半径
+		* @return Geometry			返回创建的几何体指针
+		*/
+		osg::Geometry* _MakeEarthRingGeometry(const float fRadius) const;
 
 		/**
 		* @brief 初始化流浪地球尾迹状态集
@@ -155,6 +161,7 @@ namespace GM
 		osg::ref_ptr<osg::Transform>					m_pSpiralTransform2;			//!< 第2层级气体螺旋的变换节点
 		osg::ref_ptr<osg::Transform>					m_pTailTransform2;				//!< 第2层级流浪地球尾迹的变换节点
 
+		osg::ref_ptr<osg::Geode>						m_pEarthRingGeode2;				//!< 第2层级地球环的几何节点
 		osg::ref_ptr<osg::Geode>						m_pSpiralGeode2;				//!< 第2层级气体螺旋的几何节点
 		osg::ref_ptr<osg::Geode>						m_pTailBoxGeode2;				//!< 第2层级尾迹画布的几何节点
 		osg::ref_ptr<osg::Geode>						m_pTailEnvelopeGeode2;			//!< 第2层级尾迹包络的几何节点

@@ -101,6 +101,13 @@ bool CGMEarthTail::Update(double dDeltaTime)
 	else if (((fWanderProgress < PROGRESS_1) || (fWanderProgress > PROGRESS_3)) && (0 != m_pSpiralGeode2->getNodeMask()))
 		m_pSpiralGeode2->setNodeMask(0);
 	else {}
+
+	// 设置地球环的显隐
+	if ((fWanderProgress >= PROGRESS_0) && (fWanderProgress <= PROGRESS_1) && (0 == m_pEarthRingGeode2->getNodeMask()))
+		m_pEarthRingGeode2->setNodeMask(~0);
+	else if (((fWanderProgress < PROGRESS_0) || (fWanderProgress > PROGRESS_1)) && (0 != m_pEarthRingGeode2->getNodeMask()))
+		m_pEarthRingGeode2->setNodeMask(0);
+	else {}
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return true;
@@ -205,6 +212,13 @@ bool CGMEarthTail::Load()
 			strEarthShader + "TailEnvelope.frag",
 			"Spiral");
 	}
+	if (m_pEarthRingGeode2.valid())
+	{
+		CGMKit::LoadShader(m_pEarthRingGeode2->getStateSet(),
+			strEarthShader + "EarthRing.vert",
+			strEarthShader + "EarthRing.frag",
+			"EarthRing");
+	}
 
 	return true;
 }
@@ -288,10 +302,37 @@ void CGMEarthTail::MakeEarthTail()
 
 	m_pTailEnvelopeGeode2 = new osg::Geode;
 	m_pTailEnvelopeGeode2->setStateSet(pSSTailEnvelope);
-	m_pTailTransform2->addChild(m_pTailEnvelopeGeode2);
 	m_pTailEnvelopeGeode2->addDrawable(_MakeTailEnvelopeGeometry(1.2e7 / fUnit2, fRadiusHie2));
 	m_pTailEnvelopeGeode2->addDrawable(_MakeTailCylinderGeometry(1.5e8 / fUnit2, 1.7e6 / fUnit2));
 	m_pTailEnvelopeGeode2->addDrawable(_MakeTailXGeometry(1.5e8 / fUnit2, 1.7e6 / fUnit2));
+	m_pTailTransform2->addChild(m_pTailEnvelopeGeode2);
+
+	// 创建地球环相关的节点。刹车时代，发动机喷出的气体会形成地球的气体环
+	osg::ref_ptr<osg::StateSet> pSSEarthRing = new osg::StateSet();
+	pSSEarthRing->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+	pSSEarthRing->setMode(GL_BLEND, osg::StateAttribute::ON);
+	pSSEarthRing->setAttributeAndModes(new osg::Depth(osg::Depth::LESS, 0, 1, false)); // no zbuffer
+	pSSEarthRing->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
+	pSSEarthRing->setRenderBinDetails(BIN_PLANET_TAIL, "DepthSortedBin");
+
+	pSSEarthRing->addUniform(m_pCommonUniform->GetUnit());
+	pSSEarthRing->addUniform(m_pCommonUniform->GetTime());
+	pSSEarthRing->addUniform(m_vViewLightUniform);
+	pSSEarthRing->addUniform(m_vEngineStartRatioUniform);
+	CGMKit::AddTexture(pSSEarthRing, pNoise2DTex, "noise2DTex", 0);
+
+	CGMKit::LoadShader(pSSEarthRing,
+		m_pConfigData->strCorePath + m_strEarthShaderPath + "EarthRing.vert",
+		m_pConfigData->strCorePath + m_strEarthShaderPath + "EarthRing.frag",
+		"EarthRing");
+
+	m_pEarthRingGeode2 = new osg::Geode;
+	m_pEarthRingGeode2->setStateSet(pSSEarthRing);
+	m_pEarthRingGeode2->addDrawable(_MakeEarthRingGeometry(osg::WGS_84_RADIUS_EQUATOR / fUnit2));
+	m_pTailTransform2->addChild(m_pEarthRingGeode2);
+	GM_Root->addChild(m_pTailTransform2);
 
 	// 如果是低画质，就不创建体渲染模块
 	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return;
@@ -431,7 +472,7 @@ bool CGMEarthTail::UpdateHierarchy(int iHieNew)
 			if (0 == m_pTailTransform2->getNodeMask())
 				m_pTailTransform2->setNodeMask(~0);
 			if (0 == m_pSpiralTransform2->getNodeMask())
-				m_pSpiralTransform2->setNodeMask(~0);	
+				m_pSpiralTransform2->setNodeMask(~0);
 		}
 		else
 		{
@@ -549,6 +590,54 @@ void CGMEarthTail::SetUniform(
 	m_vEngineStartRatioUniform = pEngineStartRatio;
 	m_mView2ECEFUniform = pView2ECEF;
 	m_fWanderProgressUniform = pWanderProgress;
+}
+
+osg::Geometry* CGMEarthTail::_MakeEarthRingGeometry(const float fRadius) const
+{
+	osg::Geometry* geom = new osg::Geometry();
+	geom->setUseVertexBufferObjects(true);
+
+	const int iRingSeg = 128;
+	double lonSegmentSize = osg::PI*2 / iRingSeg; // 弧度
+
+	osg::Vec3Array* verts = new osg::Vec3Array();
+	osg::Vec2Array* texCoords = new osg::Vec2Array();
+	osg::DrawElementsUShort* el = new osg::DrawElementsUShort(GL_TRIANGLES);
+
+	verts->reserve((iRingSeg+1)*2);
+	texCoords->reserve((iRingSeg+1)*2);
+	el->reserve(iRingSeg * 6);
+
+	for (int y = 0; y < 2; ++y)
+	{
+		double fR = (y + 1) * fRadius;
+		for (int x = 0; x <= iRingSeg; ++x)
+		{
+			double lon = lonSegmentSize * (double)x;
+			verts->push_back(osg::Vec3(fR * cos(lon), fR * sin(lon), 0));
+
+			texCoords->push_back(osg::Vec2(y, lon / (osg::PI*2)));
+
+			if ((y < 1) && (x < iRingSeg))
+			{
+				int x_plus_1 = x + 1;
+				int y_plus_1 = y + 1;
+
+				el->push_back(y * (iRingSeg + 1) + x);
+				el->push_back(y_plus_1 * (iRingSeg + 1) + x);
+				el->push_back(y * (iRingSeg + 1) + x_plus_1);
+				el->push_back(y * (iRingSeg + 1) + x_plus_1);
+				el->push_back(y_plus_1 * (iRingSeg + 1) + x);
+				el->push_back(y_plus_1 * (iRingSeg + 1) + x_plus_1);
+			}
+		}
+	}
+
+	geom->setVertexArray(verts);
+	geom->setTexCoordArray(0, texCoords);
+	geom->addPrimitiveSet(el);
+
+	return geom;
 }
 
 osg::Geometry* CGMEarthTail::_MakeSpiralGeometry(const float fRadius) const
