@@ -126,7 +126,7 @@ namespace GM
 		* @param fRadius			地球半径
 		* @return Geometry			返回创建的几何体指针
 		*/
-		osg::Geometry* _MakeEarthRingGeometry(const float fRadius) const;
+		osg::Geometry* _MakeEarthRingGeometry(const float fRadius);
 
 		/**
 		* @brief 初始化流浪地球尾迹状态集

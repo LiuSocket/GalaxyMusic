@@ -592,47 +592,73 @@ void CGMEarthTail::SetUniform(
 	m_fWanderProgressUniform = pWanderProgress;
 }
 
-osg::Geometry* CGMEarthTail::_MakeEarthRingGeometry(const float fRadius) const
+osg::Geometry* CGMEarthTail::_MakeEarthRingGeometry(const float fRadius)
 {
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
 
-	const int iRingSeg = 128;
-	double lonSegmentSize = osg::PI*2 / iRingSeg; // 弧度
+	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
+	constexpr int iUSeg = 128;
+	constexpr int iVSeg = 16;
+	constexpr int iW = 3;
+	constexpr int iVertNumPerLayer = (iUSeg + 1) * (iVSeg + 1);
 
-	osg::Vec3Array* verts = new osg::Vec3Array();
-	osg::Vec2Array* texCoords = new osg::Vec2Array();
-	osg::DrawElementsUShort* el = new osg::DrawElementsUShort(GL_TRIANGLES);
-
-	verts->reserve((iRingSeg+1)*2);
-	texCoords->reserve((iRingSeg+1)*2);
-	el->reserve(iRingSeg * 6);
-
-	for (int y = 0; y < 2; ++y)
+	osg::ref_ptr<osg::DoubleArray> randomEdgeArray = new osg::DoubleArray();
+	randomEdgeArray->reserve((iVSeg+1) * iW);
+	for (int z = 0; z < iW; ++z)
 	{
-		double fR = (y + 1) * fRadius;
-		for (int x = 0; x <= iRingSeg; ++x)
+		for (int y = 0; y <= iVSeg; ++y)
 		{
-			double lon = lonSegmentSize * (double)x;
-			verts->push_back(osg::Vec3(fR * cos(lon), fR * sin(lon), 0));
-
-			texCoords->push_back(osg::Vec2(y, lon / (osg::PI*2)));
-
-			if ((y < 1) && (x < iRingSeg))
-			{
-				int x_plus_1 = x + 1;
-				int y_plus_1 = y + 1;
-
-				el->push_back(y * (iRingSeg + 1) + x);
-				el->push_back(y_plus_1 * (iRingSeg + 1) + x);
-				el->push_back(y * (iRingSeg + 1) + x_plus_1);
-				el->push_back(y * (iRingSeg + 1) + x_plus_1);
-				el->push_back(y_plus_1 * (iRingSeg + 1) + x);
-				el->push_back(y_plus_1 * (iRingSeg + 1) + x_plus_1);
-			}
+			double fRandom = iPseudoNoise(m_iRandom) * 1e-4; // 0.0000-1.0000
+			randomEdgeArray->push_back(fRandom);//用于最后一圈与第一圈无缝衔接
 		}
 	}
 
+	osg::Vec3Array* verts = new osg::Vec3Array();
+	osg::Vec3Array* texCoords = new osg::Vec3Array();
+	osg::DrawElementsUShort* el = new osg::DrawElementsUShort(GL_TRIANGLES);
+
+	verts->reserve(iVertNumPerLayer * iW);
+	texCoords->reserve(iVertNumPerLayer * iW);
+	el->reserve(iUSeg * iVSeg * 6 * iW);
+
+	for (int z = 0; z < iW; ++z)
+	{
+		double fZ = fRadius * 0.13 * (double(z) / (iW - 1) - 0.5);
+		for (int y = 0; y <= iVSeg; ++y)
+		{
+			double fV = double(y) / iVSeg;
+			double fR = fRadius * (fV + 1);
+			for (int x = 0; x <= iUSeg; ++x)
+			{
+				double fU = double(x) / iUSeg;
+				double lon = fU * osg::PI * 2;
+				double fRandom = 0;
+				if(0 == x || iUSeg == x)
+					fRandom = randomEdgeArray->at(z * (iVSeg+1) + y);
+				else
+					fRandom = iPseudoNoise(m_iRandom) * 1e-4; // 0.0000-1.0000
+
+				verts->push_back(osg::Vec3(fR * cos(lon), fR * sin(lon),
+					fZ * exp2(-fV * fV * 8) + fRadius * 0.008 * (fRandom-0.5)));
+
+				texCoords->push_back(osg::Vec3(fU, fV, z));
+
+				if ((x < iUSeg) && (y < iVSeg))
+				{
+					int x_plus_1 = x + 1;
+					int y_plus_1 = y + 1;
+
+					el->push_back(iVertNumPerLayer * z + y * (iUSeg + 1) + x);
+					el->push_back(iVertNumPerLayer * z + y_plus_1 * (iUSeg + 1) + x);
+					el->push_back(iVertNumPerLayer * z + y * (iUSeg + 1) + x_plus_1);
+					el->push_back(iVertNumPerLayer * z + y * (iUSeg + 1) + x_plus_1);
+					el->push_back(iVertNumPerLayer * z + y_plus_1 * (iUSeg + 1) + x);
+					el->push_back(iVertNumPerLayer * z + y_plus_1 * (iUSeg + 1) + x_plus_1);
+				}
+			}
+		}
+	}
 	geom->setVertexArray(verts);
 	geom->setTexCoordArray(0, texCoords);
 	geom->addPrimitiveSet(el);

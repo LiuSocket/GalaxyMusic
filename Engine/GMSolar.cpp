@@ -2419,15 +2419,14 @@ osg::Geometry* CGMSolar::_MakeRingGeometry(const bool bFront)
 	double lonSegmentSize = osg::PI / double(RING_SEGMENT);
 
 	osg::ref_ptr<osg::Vec3Array> verts = new osg::Vec3Array();
-	verts->reserve((RING_SEGMENT+1)*2);
-	m_ringVertVector.push_back(verts);
-
 	osg::Vec2Array* texCoords = new osg::Vec2Array();
-	texCoords->reserve((RING_SEGMENT + 1) * 2);
-	geom->setTexCoordArray(0, texCoords);
-
 	osg::DrawElementsUShort* el = new osg::DrawElementsUShort(GL_TRIANGLES);
+
+	verts->reserve((RING_SEGMENT + 1) * 2);
+	texCoords->reserve((RING_SEGMENT + 1) * 2);
 	el->reserve(RING_SEGMENT * 6);
+
+	m_ringVertVector.push_back(verts);
 
 	for (int y = 0; y < 2; ++y)
 	{
@@ -2455,6 +2454,7 @@ osg::Geometry* CGMSolar::_MakeRingGeometry(const bool bFront)
 	}
 
 	geom->setVertexArray(verts);
+	geom->setTexCoordArray(0, texCoords);
 	geom->addPrimitiveSet(el);
 
 	return geom;
