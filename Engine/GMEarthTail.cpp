@@ -624,11 +624,11 @@ osg::Geometry* CGMEarthTail::_MakeEarthRingGeometry(const float fRadius)
 
 	for (int z = 0; z < iW; ++z)
 	{
-		double fZ = fRadius * 0.13 * (double(z) / (iW - 1) - 0.5);
+		double fZ = fRadius * 0.14 * (double(z) / (iW - 1) - 0.5);
 		for (int y = 0; y <= iVSeg; ++y)
 		{
 			double fV = double(y) / iVSeg;
-			double fR = fRadius * (fV + 1);
+			double fR = fRadius * (1.5*fV + 1);
 			for (int x = 0; x <= iUSeg; ++x)
 			{
 				double fU = double(x) / iUSeg;
@@ -640,7 +640,7 @@ osg::Geometry* CGMEarthTail::_MakeEarthRingGeometry(const float fRadius)
 					fRandom = iPseudoNoise(m_iRandom) * 1e-4; // 0.0000-1.0000
 
 				verts->push_back(osg::Vec3(fR * cos(lon), fR * sin(lon),
-					fZ * exp2(-fV * fV * 8) + fRadius * 0.008 * (fRandom-0.5)));
+					fZ * exp2(-fV * 5) + fRadius * 0.007 * (fRandom-0.5)));
 
 				texCoords->push_back(osg::Vec3(fU, fV, z));
 

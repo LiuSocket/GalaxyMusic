@@ -179,6 +179,29 @@ QDoubleSpinBox::down-arrow:disabled,QDoubleSpinBox::down-arrow:off{ /* off state
    image: url(:/Resources/SpinDown_Disable.png);
 }
 
+QSlider::groove:horizontal{
+	border:0px;
+	border-radius:2px;
+	height:4px;
+	background:rgba(255,255,255,50);
+	margin:0px;
+}
+QSlider::sub-page:horizontal{
+	background:rgba(221,0,27,255);
+	border:0px;
+	border-radius:2px;
+}
+QSlider::handle:horizontal {
+    width: 22px;
+	margin: -9px -9px;
+	border-style: none;
+	background:transparent;
+	background-image: url(:/Resources/slider_handle.png);
+}
+QSlider::handle:horizontal:hover{
+	background-image: url(:/Resources/slider_handle_hover.png);
+}
+
 #titleWidget {
 	background: #101010;
 }
@@ -304,27 +327,19 @@ QDoubleSpinBox::down-arrow:disabled,QDoubleSpinBox::down-arrow:off{ /* off state
 
 /* 时间滑轨 */
 #timeSlider::groove:horizontal{
-	border:0px;
-	border-radius:2px;
 	width:400px;
-	height:4px;
-	background:rgba(255,255,255,50);
-	margin:0px;
 }
-#timeSlider::sub-page:horizontal{
-	background:rgba(221,0,27,255);
-	border:0px;
-	border-radius:2px;
-}
-#timeSlider::handle:horizontal {
-    width: 22px;
-	margin: -9px -9px;
-	border-style: none;
+
+/* 流浪地球控件 */
+#GMWanderingEarthWidget{
 	background:transparent;
-	background-image: url(:/Resources/slider_handle.png);
 }
-#timeSlider::handle:horizontal:hover {
-	background-image: url(:/Resources/slider_handle_hover.png);
+#WEBackLab{
+	background:transparent;
+	background-image: url(:/Resources/volumeLab.png);
+}
+#WEProgressSlider::groove:horizontal{
+	width:1000px;
 }
 
 /* 音量控件背景 */

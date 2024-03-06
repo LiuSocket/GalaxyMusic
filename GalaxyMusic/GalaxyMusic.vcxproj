@@ -160,6 +160,7 @@
     <ClCompile Include="UI\GMTextScroller.cpp" />
     <ClCompile Include="UI\GMUIManager.cpp" />
     <ClCompile Include="UI\GMVolumeWidget.cpp" />
+    <ClCompile Include="UI\GMWanderingEarthWidget.cpp" />
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="GMGalaxyMusic.qrc" />
@@ -172,6 +173,7 @@
     <QtUic Include="UI\GMListWidget.ui" />
     <QtUic Include="UI\GMVolumeWidget.ui" />
     <QtUic Include="UI\GMMainWindow.ui" />
+    <QtUic Include="UI\GMWanderingEarthWidget.ui" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="UI\GMMainWindow.h" />
@@ -202,17 +204,18 @@
     <ClInclude Include="..\Engine\GMPrerequisites.h" />
     <ClInclude Include="..\Engine\GMSolar.h" />
     <ClInclude Include="..\Engine\GMStructs.h" />
-    <QtMoc Include="..\Engine\GMViewWidget.h" />
     <ClInclude Include="..\Engine\GMTerrain.h" />
+	<ClInclude Include="..\Engine\GMVolumeBasic.h" />
+    <ClInclude Include="..\Engine\GMXml.h" />
     <ClInclude Include="resource.h" />
+    <QtMoc Include="..\Engine\GMViewWidget.h" />
     <QtMoc Include="UI\GMColorLabel.h" />
     <QtMoc Include="UI\GMAudioWidget.h" />
     <QtMoc Include="UI\GMListWidget.h" />
     <QtMoc Include="UI\GMSlider.h" />
     <QtMoc Include="UI\GMTextScroller.h" />
     <QtMoc Include="UI\GMVolumeWidget.h" />
-    <ClInclude Include="..\Engine\GMVolumeBasic.h" />
-    <ClInclude Include="..\Engine\GMXml.h" />
+	<QtMoc Include="UI\GMWanderingEarthWidget.h" />
     <QtMoc Include="GMSystemManager.h" />
   </ItemGroup>
   <ItemGroup>

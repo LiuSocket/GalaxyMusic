@@ -1,6 +1,7 @@
 #include "GMMainWindow.h"
 #include "GMVolumeWidget.h"
 #include "GMListWidget.h"
+#include "GMWanderingEarthWidget.h"
 #include "UI/GMUIManager.h"
 #include "../Engine/GMEngine.h"
 #include <QKeyEvent>
@@ -46,6 +47,13 @@ CGMMainWindow::CGMMainWindow(QWidget *parent)
 	m_pListWidget->raise();
 	m_pListWidget->hide();
 
+	m_pWanderingEarthWidget = new CGMWanderingEarthWidget(this);
+	m_pWanderingEarthWidget->Init();
+	m_pWanderingEarthWidget->raise();
+	m_pWanderingEarthWidget->move(100, 100);
+	m_pWanderingEarthWidget->show();
+	//m_pWanderingEarthWidget->hide();
+
 	// ¼ÓÔØQSS
 	QFile qssFile(":/Resources/MainWindow.qss");
 	if (qssFile.open(QFile::ReadOnly))
@@ -54,6 +62,7 @@ CGMMainWindow::CGMMainWindow(QWidget *parent)
 		setStyleSheet(style);
 		m_pVolumeWidget->setStyleSheet(style);
 		m_pListWidget->setStyleSheet(style);
+		m_pWanderingEarthWidget->setStyleSheet(style);
 		qssFile.close();
 	}
 }

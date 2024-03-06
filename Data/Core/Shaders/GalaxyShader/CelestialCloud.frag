@@ -106,7 +106,7 @@ void main()
 		smoothstep(0.0, 0.2, clamp(2*engineStartRatio.x-lon,0,1)*torqueArea)*exp2(-abs(texCoord_0.y-0.5)*25));
 
 	vec3 ambient = vec3(0.07,0.11,0.15)*engineStart;
-	color = 0.03 + ambient + 0.5*diffuse;
+	color = 0.03 + ambient + diffuse;
 	vec3 illumEngine = engineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
 	color += illumEngine;
 #endif // WANDERING

@@ -8,6 +8,7 @@ Class
 *************************************************************************/
 class CGMVolumeWidget;
 class CGMListWidget;
+class CGMWanderingEarthWidget;
 class CGMViewWidget;
 
 class CGMMainWindow : public QMainWindow
@@ -141,6 +142,7 @@ private:
 	Ui::GMMainWindow					ui;
 	CGMVolumeWidget*					m_pVolumeWidget;
 	CGMListWidget*						m_pListWidget;
+	CGMWanderingEarthWidget*			m_pWanderingEarthWidget;
 	CGMViewWidget*						m_pSceneWidget;
 
 	bool								m_bInit;

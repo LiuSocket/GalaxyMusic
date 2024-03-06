@@ -41,7 +41,7 @@ void main()
 	float dotVUL = dot(normalize(viewModelVertPos), viewLight);
 
 	// shadow
-	float shadowEdge = dotVUL + 0.7*sqrt(UV.y) - 0.3;
+	float shadowEdge = dotVUL + 0.85*sqrt(UV.y) - 0.3;
 	vec3 shadow = smoothstep(vec3(-0.55,-0.52,-0.5), vec3(0.2,0.24,0.28), vec3(shadowEdge));
 
 	const float gForward = 0.98;
