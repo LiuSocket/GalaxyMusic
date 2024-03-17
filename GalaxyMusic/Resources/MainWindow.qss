@@ -336,7 +336,7 @@ QSlider::handle:horizontal:hover{
 }
 #WEBackLab{
 	background:transparent;
-	background-image: url(:/Resources/volumeLab.png);
+	background-image: url(:/Resources/WELab.png);
 }
 #WEProgressSlider::groove:horizontal{
 	width:1000px;

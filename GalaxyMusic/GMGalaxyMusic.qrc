@@ -40,5 +40,6 @@
         <file>Resources/SpinUp_Disable.png</file>
         <file>Resources/SpinUp_Hover.png</file>
         <file>Resources/Empty.qss</file>
+        <file>Resources/WELab.png</file>
     </qresource>
 </RCC>

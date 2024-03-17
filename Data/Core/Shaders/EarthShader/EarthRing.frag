@@ -4,7 +4,6 @@ const float M_PI = 3.141592657;
 
 uniform float unit;
 uniform float times;
-uniform vec2 engineStartRatio;
 uniform vec3 viewLight;
 uniform sampler2D noise2DTex;
 
@@ -31,7 +30,7 @@ void main()
 	float noiseD1 = texture(noise2DTex, coord1).r;
 
 	vec2 coord = UV;
-	coord.y *= 2.91*coord.y;
+	coord.y *= 10*coord.y*(1-0.8*coord.y);
 	coord -= vec2(times*(0.05+0.02*abs(gl_TexCoord[0].z-0.9)), 0.1*noiseD1);
 	float noiseD = texture(noise2DTex, fract(coord)).r;
 

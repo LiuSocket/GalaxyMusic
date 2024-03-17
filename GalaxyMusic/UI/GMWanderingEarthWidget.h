@@ -13,6 +13,11 @@ public:
 
 	/** @brief 初始化 */
 	bool Init();
+	/** @brief 更新 */
+	void Update();
+
+public slots:
+	void _slotSetProgress(int iProgress);
 
 private:
 	Ui::GMWanderingEarthWidget ui;

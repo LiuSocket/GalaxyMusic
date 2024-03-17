@@ -1218,12 +1218,6 @@ SGMVector3 CGMGalaxy::UpdateCelestialBody(const SGMVector3& vTargetHiePos)
 	return m_pSolarSystem->UpdateCelestialBody(vTargetHiePos);
 }
 
-void CGMGalaxy::RefreshNearStarWorldPos()
-{
-	// 这两个值不一定相同：正在切换歌曲时，这两个值不同
-	m_vNearStarWorld4Pos = m_vPlayingStarWorld4Pos;
-}
-
 osg::Quat CGMGalaxy::GetNearStarRotate() const
 {
 	return m_pSolarSystem->GetSolarRotate();
@@ -1232,6 +1226,11 @@ osg::Quat CGMGalaxy::GetNearStarRotate() const
 void CGMGalaxy::SetWanderingEarthProgress(const float fProgress)
 {
 	m_pSolarSystem->SetWanderingEarthProgress(fProgress);
+}
+
+float CGMGalaxy::GetWanderingEarthProgress() const
+{
+	return m_pSolarSystem->GetWanderingEarthProgress();
 }
 
 void CGMGalaxy::_InitBackground()

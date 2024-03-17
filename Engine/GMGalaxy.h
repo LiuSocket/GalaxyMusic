@@ -277,7 +277,11 @@ namespace GM
 		/**
 		* @brief 刷新最近的恒星在银河系坐标系（4级空间的世界坐标系）的位置
 		*/
-		void RefreshNearStarWorldPos();
+		inline void RefreshNearStarWorldPos()
+		{
+			// 这两个值不一定相同：正在切换歌曲时，这两个值不同
+			m_vNearStarWorld4Pos = m_vPlayingStarWorld4Pos;
+		}
 		/**
 		* @brief 获取最近的恒星在银河系坐标系（4级空间的世界坐标系）的位置
 		* @return osg::Vec3d:		最近的恒星在银河系坐标系（4级空间的世界坐标系）的位置
@@ -297,83 +301,62 @@ namespace GM
 		* @param fProgress 进展百分比，[0.0, 1.0]
 		*/
 		void SetWanderingEarthProgress(const float fProgress);
+		/**
+		* @brief 获取“流浪地球计化”的进展
+		* @return float 进展百分比，[0.0, 1.0]
+		*/
+		float GetWanderingEarthProgress() const;
 
 	private:
-		/**
-		* _InitBackground
-		* 初始化背景相关节点
-		* @author LiuTao
-		* @since 2022.08.07
-		* @return void:
-		*/
+		/** @brief 初始化背景相关节点 */
 		void _InitBackground();
 
-		/** _CreateStarCube
-		* 创建PointSprite恒星盒，用于0123级空间
-		* 在一个正方体中创建点模式恒星
+		/**
+		* @brief 创建PointSprite恒星盒，用于0123级空间，在一个正方体中创建点模式恒星
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateStarCube();
 
 		/**
-		* _CreateHandle
-		* 创建用于移动恒星的圆盘状的把手
-		* @author LiuTao
-		* @since 2022.01.23
+		* @brief 创建用于移动恒星的圆盘状的把手
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateHandle();
 
 		/**
-		* _CreateAudioPoints
 		* 创建音频星点
-		* @author LiuTao
-		* @since 2020.12.05
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateAudioPoints();
 
 		/**
-		* _CreateGalaxyPoints
 		* 创建PointSprite星系
-		* @author LiuTao
-		* @since 2020.12.05
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateGalaxyPoints();
 
 		/**
-		* _CreateStarCube_4
 		* 创建PointSprite恒星盒，用于4级空间
 		* 在一个正方体中创建星星，然后根据相机位置平移每颗星星
-		* @author LiuTao
-		* @since 2021.10.01
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateStarCube_4();
 
 		/**
-		* _CreateGalaxyPointsN_4
 		* 创建N倍密度的PointSprite星系，用于4级空间
 		* 例如：输入2倍密度，星星的范围直径就缩小到星系的1/2,但高度范围不变
-		* @author LiuTao
-		* @since 2021.09.26
 		* @param iDens：		星星的密度倍数，只处理2、4、8、16倍数
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateGalaxyPointsN_4(int iDens);
 
 		/**
-		* _CreateGalaxyPlane_4
 		* 创建平面星系，用于4级空间
-		* @author LiuTao
-		* @since 2020.12.05
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateGalaxyPlane_4();
 
 		/**
-		* _CreateGalaxies_4
 		* 创建PointSprite星系群，用于4级空间,和第5级空间的最小星系群无缝衔接
 		* 完美融合，实现乾坤大挪移
 		* 在一个球面上创建星系群，球面中心始终在相机位置
@@ -383,14 +366,12 @@ namespace GM
 		bool _CreateGalaxies_4();
 
 		/**
-		* _CreateGalaxyPlane_5
 		* 创建平面星系，用于5级空间
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateGalaxyPlane_5();
 
 		/**
-		* _CreateGalaxies_5
 		* 创建PointSprite星系群，用于5级空间
 		* 在一个正方体中创建星系群，然后根据相机位置平移每个星系
 		* @return bool:			成功true，失败false
@@ -398,14 +379,12 @@ namespace GM
 		bool _CreateGalaxies_5();
 
 		/**
-		* _CreateSupercluster
 		* 创建超星系团
 		* 在一个正方体中创建超星系团
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateSupercluster();
 		/**
-		* _CreateUltracluster
 		* 创建究极星系团（瞎编的名称）
 		* 在一个正方体中创建究极星系团
 		* @return bool:			成功true，失败false
@@ -413,60 +392,44 @@ namespace GM
 		bool _CreateUltracluster();
 
 		/**
-		* _CreateMyWorld
 		* 创建我的世界
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateMyWorld();
 
-		/** _CreateBackgroundGalaxy
+		/**
 		* 创建背景银河系环形结构
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateBackgroundGalaxy();
 
 		/**
-		* _CreateCosmosBox
 		* 创建背景宇宙盒，用于背景
-		* @author LiuTao
-		* @since 2021.08.22
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateCosmosBox();
 
 		/**
-		* _DetachAudioPoints
 		* 将输入的音频星点分离
-		* @author LiuTao
-		* @since 2021.07.11
 		* @return bool:				成功true，失败false
 		*/
 		bool _DetachAudioPoints();
 
 		/**
-		* _AttachAudioPoints
 		* 合并当前编辑的音频星点
-		* @author LiuTao
-		* @since 2021.07.11
 		* @return bool:				成功true，失败false
 		*/
 		bool _AttachAudioPoints();
 
 		/**
-		* _UpdatePlayingStarInformation
 		* @brief 根据输入的音频空间坐标，更新当前播放的音频星信息
-		* @author LiuTao
-		* @since 2022.02.16
 		* @param sAudioCoord:		音频空间坐标
 		* @return bool:				成功true，如果不合法，则返回false
 		*/
 		bool _UpdatePlayingStarInformation(const SGMAudioCoord& sAudioCoord);
 
 		/**
-		* _CreateAudioGeometry
 		* 读取数据并创建音频星几何体
-		* @author LiuTao
-		* @since 2021.07.11
 		* @param audioMap：			完整的音频数据map
 		* @param iDiscardUID:		因为激活而需要被剔除的音频星UID，默认0表示没有剔除的音频
 		* @return Geometry*:		创建的几何体节点指针，未成功则返回nullptr
@@ -476,10 +439,7 @@ namespace GM
 			const unsigned int iDiscardUID = 0);
 
 		/**
-		* _CreateConeGeometry
 		* 创建圆锥体
-		* @author LiuTao
-		* @since 2021.07.18
 		* @param void：				无
 		* @return Geometry*:		创建的几何体节点指针，未成功则返回nullptr
 		*/

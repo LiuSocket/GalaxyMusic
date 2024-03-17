@@ -33,6 +33,7 @@ CGMMainWindow::CGMMainWindow(QWidget *parent)
 
 	connect(ui.timeSlider, SIGNAL(valueChanged(int)), this, SLOT(_slotSetAudioTime(int)));
 
+	connect(ui.managerBtn, SIGNAL(clicked()), this, SLOT(_slotManager()));
 	connect(ui.volumeBtn, SIGNAL(clicked()), this, SLOT(_slotSetMute()));
 	connect(ui.listBtn, SIGNAL(clicked()), this, SLOT(_slotListVisible()));
 	connect(ui.fullScreenBtn, SIGNAL(clicked()), this, SLOT(_slotFullScreen()));
@@ -50,9 +51,7 @@ CGMMainWindow::CGMMainWindow(QWidget *parent)
 	m_pWanderingEarthWidget = new CGMWanderingEarthWidget(this);
 	m_pWanderingEarthWidget->Init();
 	m_pWanderingEarthWidget->raise();
-	m_pWanderingEarthWidget->move(100, 100);
-	m_pWanderingEarthWidget->show();
-	//m_pWanderingEarthWidget->hide();
+	m_pWanderingEarthWidget->hide();
 
 	// 加载QSS
 	QFile qssFile(":/Resources/MainWindow.qss");
@@ -99,6 +98,8 @@ void CGMMainWindow::Update()
 	{
 		m_pVolumeWidget->SetVolume(GM_ENGINE.GetVolume() * 100);
 	}
+
+	m_pWanderingEarthWidget->Update();
 }
 
 void CGMMainWindow::SetFullScreen(const bool bFull)
@@ -121,6 +122,8 @@ void CGMMainWindow::SetFullScreen(const bool bFull)
 
 			ui.listBtn->setChecked(false);
 			m_pListWidget->hide();
+
+			m_pWanderingEarthWidget->hide();
 		}
 		else
 		{
@@ -138,6 +141,9 @@ void CGMMainWindow::SetFullScreen(const bool bFull)
 			ui.titleEdgeLab->show();
 			ui.toolWidget->show();
 			ui.toolEdgeLab->show();
+
+			if(ui.managerBtn->isChecked())
+				m_pWanderingEarthWidget->show();
 		}
 	}
 }
@@ -200,7 +206,7 @@ void CGMMainWindow::UpdateAudioInfo()
 	}
 	// 获取当前音频播放位置，单位：ms
 	int iCurrentTime = GM_ENGINE.GetAudioCurrentTime();
-	float fTimeRatio = 100 * float(iCurrentTime) / float(m_iAudioDuration);
+	float fTimeRatio = 400 * float(iCurrentTime) / float(m_iAudioDuration);
 	// 避免循环修改时间
 	int iTimeLast = ui.timeSlider->value();
 	if(abs(fTimeRatio - iTimeLast) > 0.5f)
@@ -276,6 +282,10 @@ void CGMMainWindow::_slotMaximum()
 	{
 		_SetPlayingListGeometry();
 	}
+	if (m_pWanderingEarthWidget->isVisible())
+	{
+		_SetManagerPos();
+	}
 }
 
 void CGMMainWindow::_slotClose()
@@ -287,11 +297,24 @@ void CGMMainWindow::_slotClose()
 void CGMMainWindow::_slotSetAudioTime(int iTimeRatio)
 {
 	// 当前音频播放的时刻
-	int iAudioCurrentTime = float(iTimeRatio)*0.01*m_iAudioDuration;
+	int iAudioCurrentTime = float(iTimeRatio)*0.0025*m_iAudioDuration;
 	int iAudioCurrentPreciseTime = GM_ENGINE.GetAudioCurrentTime();
 	if (std::abs(iAudioCurrentPreciseTime - iAudioCurrentTime) > 1000)
 	{
 		GM_ENGINE.SetAudioCurrentTime(iAudioCurrentTime);
+	}
+}
+
+void CGMMainWindow::_slotManager()
+{
+	if (ui.managerBtn->isChecked())
+	{
+		_SetManagerPos();
+		m_pWanderingEarthWidget->show();
+	}
+	else
+	{
+		m_pWanderingEarthWidget->hide();
 	}
 }
 
@@ -396,6 +419,10 @@ void CGMMainWindow::mouseDoubleClickEvent(QMouseEvent *event)
 		{
 			_SetPlayingListGeometry();
 		}
+		if (m_pWanderingEarthWidget->isVisible())
+		{
+			_SetManagerPos();
+		}
 	}
 	QWidget::mouseDoubleClickEvent(event);
 }
@@ -449,6 +476,9 @@ void CGMMainWindow::mouseMoveEvent(QMouseEvent* event)
 			move(x() + movePoint.x(), y() + movePoint.y());
 
 			m_pListWidget->move(m_pListWidget->pos().x() + movePoint.x(), m_pListWidget->pos().y() + movePoint.y());
+			m_pWanderingEarthWidget->move(
+				m_pWanderingEarthWidget->pos().x() + movePoint.x(),
+				m_pWanderingEarthWidget->pos().y() + movePoint.y());
 		}
 		else // 最大化状态
 		{
@@ -462,6 +492,10 @@ void CGMMainWindow::mouseMoveEvent(QMouseEvent* event)
 			if (m_pListWidget->isVisible())
 			{
 				_SetPlayingListGeometry();
+			}
+			if (m_pWanderingEarthWidget->isVisible())
+			{
+				_SetManagerPos();
 			}
 		}
 	}
@@ -524,4 +558,11 @@ void CGMMainWindow::_SetPlayingListGeometry()
 	int iHeight = ui.toolEdgeLab->y() - ui.titleEdgeLab->pos().y() - ui.titleEdgeLab->height();
 
 	m_pListWidget->setGeometry(iX, iY, iWidth, iHeight);
+}
+
+void CGMMainWindow::_SetManagerPos()
+{
+	int iX = pos().x() + width() * 0.5 - m_pWanderingEarthWidget->width() * 0.5;
+	int iY = pos().y() + ui.toolEdgeLab->pos().y() - 60;
+	m_pWanderingEarthWidget->move(iX, iY);
 }

@@ -547,7 +547,7 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 
 	// 暂时根据流浪地球计划进度来设置行星发动机的开启或关闭，由此改变地球的加速度，后续可以让用户自由控制
 	SEarthAcceleration sEA = SEarthAcceleration();
-	float fTorqueStart = PROGRESS_4 + (PROGRESS_5 - PROGRESS_4) * 0.1f;// 转向发动机启动要稍微慢一些
+	float fTorqueStart = CGMKit::Mix(PROGRESS_4, PROGRESS_5, 0.1f);// 转向发动机启动要稍微慢一些
 	float fTorqueRatio = 0.0f;// 转向发动机
 	float fPropulsionRatio = 0.0f;//  推进发动机
 

@@ -33,11 +33,11 @@ const float hash[256] = float[](
 	222,114, 67, 29, 24, 72,243,141,128,195, 78, 66,215, 61,156,180
 );
 
-const float PROGRESS_0 = 0.1;
-const float PROGRESS_1 = 0.15;
-const float PROGRESS_2 = 0.2;
-const float PROGRESS_3 = 0.25;
-const float PROGRESS_4 = 0.3;
+const float PROGRESS_0 = 0.005;
+const float PROGRESS_1 = 0.02;
+const float PROGRESS_2 = 0.04;
+const float PROGRESS_3 = 0.06;
+const float PROGRESS_4 = 0.062;
 
 const int STEP_NUM = 64;
 const int LIGHT_SAMPLE = 4;

@@ -197,7 +197,18 @@ namespace GM
 		* @brief 设置“流浪地球计化”的进展
 		* @param fProgress 进展百分比，[0.0, 1.0]
 		*/
-		void SetWanderingEarthProgress(const float fProgress);
+		inline void SetWanderingEarthProgress(const float fProgress)
+		{
+			m_fWanderingEarthProgress = osg::clampBetween(fProgress, 0.0f, 1.0f);
+		}
+		/**
+		* @brief 获取“流浪地球计化”的进展
+		* @return float 进展百分比，[0.0, 1.0]
+		*/
+		inline float GetWanderingEarthProgress() const
+		{
+			return m_fWanderingEarthProgress;
+		}
 
 		/**
 		* @brief 由于空间层级变化而更新场景

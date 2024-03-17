@@ -408,6 +408,12 @@ namespace GM
 		*/
 		void SetWanderingEarthProgress(const float fProgress);
 
+		/**
+		* @brief 获取“流浪地球计化”的进展
+		* @return float 进展百分比，[0.0, 1.0]
+		*/
+		float GetWanderingEarthProgress() const;
+
 	private:
 		/**
 		* @brief 加载配置

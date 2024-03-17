@@ -19,12 +19,12 @@ namespace GM
 	/*************************************************************************
 	constexpr
 	*************************************************************************/
-	constexpr float PROGRESS_0 = 0.1f; 		// 前太阳时代结束，开启刹车时代
-	constexpr float PROGRESS_1 = 0.15f; 	// 刹车时代结束，开始调整地球姿态，旋转北极轴
-	constexpr float PROGRESS_2 = 0.2f;		// 地球姿态调整中期
-	constexpr float PROGRESS_3 = 0.25f;		// 地球姿态调整结束，北极与地球运行方向相反
-	constexpr float PROGRESS_4 = 0.3f;		// 全球发动机并网成功，启航
-	constexpr float PROGRESS_5 = 0.4f;		// 发动机全功率开启
+	constexpr float PROGRESS_0 = 0.005f; 		// 前太阳时代结束，开启刹车时代
+	constexpr float PROGRESS_1 = 0.02f; 		// 刹车时代结束，开始调整地球姿态，旋转北极轴
+	constexpr float PROGRESS_2 = 0.04f;			// 地球姿态调整中期
+	constexpr float PROGRESS_3 = 0.06f;			// 地球姿态调整结束，北极与地球运行方向相反
+	constexpr float PROGRESS_4 = 0.062f;		// 全球发动机并网成功，启航
+	constexpr float PROGRESS_5 = 0.1f;			// 发动机全功率开启
 
 	/*************************************************************************
 	 Macro Defines

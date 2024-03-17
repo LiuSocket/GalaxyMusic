@@ -48,32 +48,20 @@ public:
 
 public slots:
 
-	/**
-	* @brief 上一首
-	*/
+	/** @brief 上一首 */
 	void _slotLast();
 
-	/**
-	* @brief 播放/暂停
-	*/
+	/** @brief 播放/暂停 */
 	void _slotPlayOrPause();
 
-	/**
-	* @brief 下一首
-	*/
+	/** @brief 下一首 */
 	void _slotNext();
 
-	/**
-	* @brief 最小化/还原
-	*/
+	/** @brief 最小化/还原 */
 	void _slotMinimum();
-	/**
-	* @brief 最大化/还原
-	*/
+	/** @brief 最大化/还原 */
 	void _slotMaximum();
-	/**
-	* @brief 关闭
-	*/
+	/** @brief 关闭 */
 	void _slotClose();
 
 	/** 
@@ -82,9 +70,9 @@ public slots:
 	*/
 	void _slotSetAudioTime(int iTimeRatio);
 
-	/**
-	* @brief 正常/静音
-	*/
+	/** @brief 每个星球的管理界面，不同星球，弹出的界面会不同 */
+	void _slotManager();
+	/** @brief 开启声音/静音 */
 	void _slotSetMute();
 	/**
 	* @brief 设置音量
@@ -130,13 +118,10 @@ private:
 	*/
 	void _Million2MinutesSeconds(const int ms, int& minutes, int& seconds);
 
-	/**
-	* _SetPlayingListGeometry
-	* @brief 设置播放列表的位置、尺寸
-	* @param void
-	* @return void
-	*/
+	/** @brief 设置播放列表的位置、尺寸 */
 	void _SetPlayingListGeometry();
+	/** @brief 设置管理面板的位置 */
+	void _SetManagerPos();
 
 private:
 	Ui::GMMainWindow					ui;
