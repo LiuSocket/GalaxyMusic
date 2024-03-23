@@ -89,9 +89,10 @@ namespace GM
 		/**
 		* @brief 北极轴旋转时，发动机喷出的气体形成的螺旋
 		* @param fRadius			地球半径
+		* @param bPositive			气体是否用于正向加速地球旋转
 		* @return Geometry			返回创建的几何体指针
 		*/
-		osg::Geometry* _MakeSpiralGeometry(const float fRadius) const;
+		osg::Geometry* _MakeSpiralGeometry(const float fRadius, const bool bPositive) const;
 
 		/**
 		* @brief 创建地球尾迹长方体
@@ -141,9 +142,10 @@ namespace GM
 		* @param fCoordUV			螺旋气体表面UV坐标，范围[0.0,1.0]
 		* @param fRadius			地球半径
 		* @param i					螺旋气体是轴对称图形，i=0/1分别代表螺旋的两半
+		* @param bPositive			气体是否用于正向加速地球旋转
 		* @return osg::Vec3			表面顶点的模型空间的位置
 		*/
-		osg::Vec3 _GetSpiralSurfacePos(const osg::Vec2 fCoordUV, const float fRadius, const int i) const;
+		osg::Vec3 _GetSpiralSurfacePos(const osg::Vec2 fCoordUV, const float fRadius, const int i, const bool bPositive) const;
 		/**
 		* @brief 获取尾迹包络的表面坐标
 		* @param fCoordUV			沿着尾迹方向的坐标，范围[0.0,1.0]
@@ -162,7 +164,8 @@ namespace GM
 		osg::ref_ptr<osg::Transform>					m_pTailTransform2;				//!< 第2层级流浪地球尾迹的变换节点
 
 		osg::ref_ptr<osg::Geode>						m_pEarthRingGeode2;				//!< 第2层级地球环的几何节点
-		osg::ref_ptr<osg::Geode>						m_pSpiralGeode2;				//!< 第2层级气体螺旋的几何节点
+		osg::ref_ptr<osg::Geode>						m_pSpiralPositiveGeode2;		//!< 第2层级正向螺旋的几何节点
+		osg::ref_ptr<osg::Geode>						m_pSpiralNegativeGeode2;		//!< 第2层级反向螺旋的几何节点
 		osg::ref_ptr<osg::Geode>						m_pTailBoxGeode2;				//!< 第2层级尾迹画布的几何节点
 		osg::ref_ptr<osg::Geode>						m_pTailEnvelopeGeode2;			//!< 第2层级尾迹包络的几何节点
 

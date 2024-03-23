@@ -34,10 +34,10 @@ const float hash[256] = float[](
 );
 
 const float PROGRESS_0 = 0.005;
-const float PROGRESS_1 = 0.02;
-const float PROGRESS_2 = 0.04;
-const float PROGRESS_3 = 0.06;
-const float PROGRESS_4 = 0.062;
+const float PROGRESS_1 = 0.020;
+const float PROGRESS_2 = 0.050;
+const float PROGRESS_3 = 0.080;
+const float PROGRESS_4 = 0.084;
 
 const int STEP_NUM = 64;
 const int LIGHT_SAMPLE = 4;
@@ -163,7 +163,7 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 
 	vec3 erosionUVW = modelStepPos/ATMOS_RADIUS;
 	erosionUVW *= vec3(1, 1, 0.413);		
-	erosionUVW.z -= times*0.002;
+	erosionUVW.z -= times*0.004;
 
 	vec3 offsetUVW = texture3D(noiseErosionTex, fract(erosionUVW)).bgr;
 	vec3 shapeUVW = modelStepPos/ATMOS_RADIUS;

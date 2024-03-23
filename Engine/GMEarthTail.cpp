@@ -96,16 +96,21 @@ bool CGMEarthTail::Update(double dDeltaTime)
 	else{}
 
 	// 设置螺旋气体节点的显隐
-	if ((fWanderProgress >= PROGRESS_1) && (fWanderProgress <= PROGRESS_3) && (0 == m_pSpiralGeode2->getNodeMask()))
-		m_pSpiralGeode2->setNodeMask(~0);
-	else if (((fWanderProgress < PROGRESS_1) || (fWanderProgress > PROGRESS_3)) && (0 != m_pSpiralGeode2->getNodeMask()))
-		m_pSpiralGeode2->setNodeMask(0);
+	if ((fWanderProgress >= PROGRESS_1) && (fWanderProgress <= PROGRESS_2_1) && (0 == m_pSpiralPositiveGeode2->getNodeMask()))
+		m_pSpiralPositiveGeode2->setNodeMask(~0);
+	else if (((fWanderProgress < PROGRESS_1) || (fWanderProgress > PROGRESS_2_1)) && (0 != m_pSpiralPositiveGeode2->getNodeMask()))
+		m_pSpiralPositiveGeode2->setNodeMask(0);
+	else {}
+	if ((fWanderProgress >= PROGRESS_2) && (fWanderProgress <= PROGRESS_3_1) && (0 == m_pSpiralNegativeGeode2->getNodeMask()))
+		m_pSpiralNegativeGeode2->setNodeMask(~0);
+	else if (((fWanderProgress < PROGRESS_2) || (fWanderProgress > PROGRESS_3_1)) && (0 != m_pSpiralNegativeGeode2->getNodeMask()))
+		m_pSpiralNegativeGeode2->setNodeMask(0);
 	else {}
 
-	// 设置地球环的显隐
-	if ((fWanderProgress >= PROGRESS_0) && (fWanderProgress <= PROGRESS_1) && (0 == m_pEarthRingGeode2->getNodeMask()))
+	// 设置刹车时代的“地球环”的显隐
+	if ((fWanderProgress >= PROGRESS_0) && (fWanderProgress <= PROGRESS_1_1) && (0 == m_pEarthRingGeode2->getNodeMask()))
 		m_pEarthRingGeode2->setNodeMask(~0);
-	else if (((fWanderProgress < PROGRESS_0) || (fWanderProgress > PROGRESS_1)) && (0 != m_pEarthRingGeode2->getNodeMask()))
+	else if (((fWanderProgress < PROGRESS_0) || (fWanderProgress > PROGRESS_1_1)) && (0 != m_pEarthRingGeode2->getNodeMask()))
 		m_pEarthRingGeode2->setNodeMask(0);
 	else {}
 	
@@ -205,12 +210,19 @@ bool CGMEarthTail::Load()
 			strEarthShader + "TailEnvelope.frag",
 			"TailEnvelope");
 	}
-	if (m_pSpiralGeode2.valid())
+	if (m_pSpiralPositiveGeode2.valid())
 	{
-		CGMKit::LoadShader(m_pSpiralGeode2->getStateSet(),
+		CGMKit::LoadShader(m_pSpiralPositiveGeode2->getStateSet(),
 			strEarthShader + "TailEnvelope.vert",
 			strEarthShader + "TailEnvelope.frag",
-			"Spiral");
+			"SpiralPositive");
+	}
+	if (m_pSpiralNegativeGeode2.valid())
+	{
+		CGMKit::LoadShader(m_pSpiralNegativeGeode2->getStateSet(),
+			strEarthShader + "TailEnvelope.vert",
+			strEarthShader + "TailEnvelope.frag",
+			"SpiralNegative");
 	}
 	if (m_pEarthRingGeode2.valid())
 	{
@@ -261,11 +273,16 @@ void CGMEarthTail::MakeEarthTail()
 		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.frag",
 		"Spiral");
 
-	m_pSpiralGeode2 = new osg::Geode;
-	m_pSpiralGeode2->setStateSet(pSSSpiral);
-	m_pSpiralGeode2->addDrawable(_MakeSpiralGeometry(osg::WGS_84_RADIUS_EQUATOR / fUnit2));
+	m_pSpiralPositiveGeode2 = new osg::Geode;
+	m_pSpiralPositiveGeode2->setStateSet(pSSSpiral);
+	m_pSpiralPositiveGeode2->addDrawable(_MakeSpiralGeometry(osg::WGS_84_RADIUS_EQUATOR / fUnit2, true));
+	m_pSpiralTransform2->addChild(m_pSpiralPositiveGeode2);
 
-	m_pSpiralTransform2->addChild(m_pSpiralGeode2);
+	m_pSpiralNegativeGeode2 = new osg::Geode;
+	m_pSpiralNegativeGeode2->setStateSet(pSSSpiral);
+	m_pSpiralNegativeGeode2->addDrawable(_MakeSpiralGeometry(osg::WGS_84_RADIUS_EQUATOR / fUnit2, false));
+	m_pSpiralTransform2->addChild(m_pSpiralNegativeGeode2);
+
 	GM_Root->addChild(m_pSpiralTransform2);
 
 	///////////////////////////////////////////////////////////////////////////////////////////
@@ -564,16 +581,7 @@ void CGMEarthTail::SetEarthTailRotate(const double fSpin, const double fObliquit
 	{
 		float fWanderProgress = 0.0f;
 		m_fWanderProgressUniform->get(fWanderProgress);
-		if (fWanderProgress < PROGRESS_2)
-		{
-			m_pSpiralTransform2->asPositionAttitudeTransform()->setAttitude(qPlanetInclination*qPlanetTurn);
-		}
-		else
-		{
-			// 沿着北极轴转180°
-			osg::Quat qInverseSpin = osg::Quat(osg::PI, osg::Vec3d(0, 0, 1));
-			m_pSpiralTransform2->asPositionAttitudeTransform()->setAttitude(qInverseSpin*qPlanetInclination*qPlanetTurn);
-		}
+		m_pSpiralTransform2->asPositionAttitudeTransform()->setAttitude(qPlanetInclination*qPlanetTurn);
 	}
 
 	osg::Matrixf mWorld2ECEFMatrix = osg::Matrixd::inverse(osg::Matrixd(qRotate));
@@ -666,7 +674,7 @@ osg::Geometry* CGMEarthTail::_MakeEarthRingGeometry(const float fRadius)
 	return geom;
 }
 
-osg::Geometry* CGMEarthTail::_MakeSpiralGeometry(const float fRadius) const
+osg::Geometry* CGMEarthTail::_MakeSpiralGeometry(const float fRadius, const bool bPositive) const
 {
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
@@ -693,14 +701,14 @@ osg::Geometry* CGMEarthTail::_MakeSpiralGeometry(const float fRadius) const
 			for (int x = 0; x <= iLonSeg; ++x)
 			{
 				double fV = double(x) / iLonSeg;
-				osg::Vec3 vPos = _GetSpiralSurfacePos(osg::Vec2(fU, fV), fRadius, i);
+				osg::Vec3 vPos = _GetSpiralSurfacePos(osg::Vec2(fU, fV), fRadius, i, bPositive);
 				verts->push_back(vPos);
 				texCoords->push_back(osg::Vec2(5 * fU, fV));
 
 				osg::Vec3 vOut = vPos;
 				vOut.normalize();
 				// 微分
-				osg::Vec3 vPos_1 = _GetSpiralSurfacePos(osg::Vec2(fU + 1e-4, fV + 1e-4), fRadius, i);
+				osg::Vec3 vPos_1 = _GetSpiralSurfacePos(osg::Vec2(fU + 1e-4, fV + 1e-4), fRadius, i, bPositive);
 				osg::Vec3 vTang = vPos_1 - vPos;
 				vTang.normalize();
 				osg::Vec3 vBinormal = vTang ^ vOut;
@@ -711,12 +719,24 @@ osg::Geometry* CGMEarthTail::_MakeSpiralGeometry(const float fRadius) const
 
 				if ((y < iLatSeg) && (x < iLonSeg))
 				{
-					el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x + 1);
-					el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x);
-					el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x);
-					el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x + 1);
-					el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x);
-					el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x + 1);
+					if (bPositive)
+					{
+						el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x + 1);
+						el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x);
+						el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x);
+						el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x + 1);
+						el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x);
+						el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x + 1);
+					}
+					else
+					{
+						el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x + 1);
+						el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x);
+						el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x);
+						el->push_back(iHalfVertNum * i + y * (iLonSeg + 1) + x + 1);
+						el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x + 1);
+						el->push_back(iHalfVertNum * i + (y + 1) * (iLonSeg + 1) + x);
+					}
 				}
 			}
 		}
@@ -1034,7 +1054,8 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	return true;
 }
 
-osg::Vec3 CGMEarthTail::_GetSpiralSurfacePos(const osg::Vec2 fCoordUV, const float fRadius, const int i) const
+osg::Vec3 CGMEarthTail::_GetSpiralSurfacePos(
+	const osg::Vec2 fCoordUV, const float fRadius, const int i, const bool bPositive) const
 {
 	double fU = fCoordUV.x();
 	double fV = fCoordUV.y();
@@ -1053,11 +1074,17 @@ osg::Vec3 CGMEarthTail::_GetSpiralSurfacePos(const osg::Vec2 fCoordUV, const flo
 	double fZ = fR * cosLat * cosLon - sinLon * fRadius * fOffset;
 	if (0 == i)
 	{
-		return osg::Vec3(fX, fY, fZ);
+		if(bPositive)
+			return osg::Vec3(fX, fY, fZ);
+		else
+			return osg::Vec3(fX, -fY, fZ);
 	}
 	else
 	{
-		return osg::Vec3(fX, -fY, -fZ);
+		if (bPositive)
+			return osg::Vec3(fX, -fY, -fZ);
+		else
+			return osg::Vec3(fX, fY, -fZ);
 	}
 }
 

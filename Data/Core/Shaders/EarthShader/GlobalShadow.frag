@@ -3,10 +3,10 @@
 
 #ifdef WANDERING
 const float PROGRESS_0 = 0.005;
-const float PROGRESS_1 = 0.02;
-const float PROGRESS_2 = 0.04;
-const float PROGRESS_3 = 0.06;
-const float PROGRESS_4 = 0.062;
+const float PROGRESS_1 = 0.020;
+const float PROGRESS_2 = 0.050;
+const float PROGRESS_3 = 0.080;
+const float PROGRESS_4 = 0.084;
 uniform float wanderProgress;
 #endif // WANDERING	
 
@@ -33,7 +33,7 @@ void main()
 
 	float torqueArea = clamp((0.3-abs(texCoord_0.y*2-1))*4,0,1); torqueArea *= torqueArea;
 	float torqueStart = float(wanderProgress>PROGRESS_0 && wanderProgress<PROGRESS_3)*torqueArea;
-	float allStart = max(torqueStart, clamp((wanderProgress-(PROGRESS_4+0.05))*25, 0, 1));
+	float allStart = max(torqueStart, clamp((wanderProgress-(PROGRESS_4+0.02))*50, 0, 1));
 
 	cloudAlpha = mix(cloudAlpha, wanderingCloudAlpha, allStart);
 #endif // WANDERING	

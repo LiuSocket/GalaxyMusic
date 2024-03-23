@@ -35,8 +35,8 @@ void main()
 	float dotVUL = dot(normalize(viewModelVertPos), viewLight);
 	float dotNC = dot(viewNorm, normalize(cross(viewModelTailDir, viewDir)));
 
-	float noiseD1 = texture(noise2DTex, gl_TexCoord[0].xy*vec2(0.5, 0.7) - times*0.005).r;
-	vec2 coord = gl_TexCoord[0].xy - vec2(0.1*noiseD1, times*0.006);
+	float noiseD1 = texture(noise2DTex, gl_TexCoord[0].xy*vec2(0.5, 0.7) - times*0.01).r;
+	vec2 coord = gl_TexCoord[0].xy - vec2(0.1*noiseD1, times*0.012);
 	float noiseD = texture(noise2DTex, fract(coord)).r;
 
 	const float gForward = 0.98;

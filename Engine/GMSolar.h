@@ -60,13 +60,13 @@ namespace GM
 
 		double fOrbitalRadius;			// 公转轨道半径，单位：米
 		double fOrbitalPeriod;			// 公转周期，单位：s
-		double fTrueAnomaly;			// 真近点角，单位：弧度
+		double fTrueAnomaly;			// 真近点角，单位：弧度[0, 2*PI)
 		double fEquatorRadius;			// 天体赤道半径，单位：米
 		double fPolarRadius;			// 天体两级半径，单位：米
 		double fObliquity;				// 天体的自转轴平面与黄道面夹角（有向），单位：弧度[0, PI)
 		double fSpinPeriod;				// 天体的自转周期，单位：秒
 		double fSpin;					// 天体当前帧自转角度，单位：弧度
-		double fNorthYaw;				// 天体当前帧北极轴偏航角，单位：弧度[0, PI*2)（针对流浪地球，其他天体没意义）
+		double fNorthYaw;				// 天体当前帧北极轴偏航角，单位：弧度[0, 2*PI)（针对流浪地球，其他天体没意义）
 		float fGroundTop;				// 地面最高山顶的海拔高，单位：米
 		float fCloudTop;				// 岩石行星的云顶海拔高，单位：米
 		EGMAtmosHeight eAtmosHeight;	// 天体的大气厚度，单位：千米
