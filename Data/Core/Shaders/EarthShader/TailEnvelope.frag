@@ -2,9 +2,15 @@
 #pragma import_defines(SPIRAL)
 
 const float M_PI = 3.141592657;
+const float PROGRESS_1 = 0.020;
+const float PROGRESS_2 = 0.050;
+const float PROGRESS_2_1 = 0.053;
+const float PROGRESS_3 = 0.080;
+const float PROGRESS_3_1 = 0.083;
 
 uniform float unit;
 uniform float times;
+uniform float wanderProgress;
 uniform vec2 engineStartRatio;
 uniform vec3 viewLight;
 uniform sampler2D noise2DTex;
@@ -35,8 +41,14 @@ void main()
 	float dotVUL = dot(normalize(viewModelVertPos), viewLight);
 	float dotNC = dot(viewNorm, normalize(cross(viewModelTailDir, viewDir)));
 
-	float noiseD1 = texture(noise2DTex, gl_TexCoord[0].xy*vec2(0.5, 0.7) - times*0.01).r;
-	vec2 coord = gl_TexCoord[0].xy - vec2(0.1*noiseD1, times*0.012);
+#ifdef SPIRAL
+	const vec2 speed = vec2(0.02,0.023);
+#else // not SPIRAL
+	const vec2 speed = vec2(0.01,0.012);
+#endif // SPIRAL or not
+
+	float noiseD1 = texture(noise2DTex, gl_TexCoord[0].xy*vec2(0.5, 0.7) - times*speed.x).r;
+	vec2 coord = gl_TexCoord[0].xy - vec2(0.1*noiseD1, times*speed.y);
 	float noiseD = texture(noise2DTex, fract(coord)).r;
 
 	const float gForward = 0.98;
@@ -49,15 +61,29 @@ void main()
 
 	float v = gl_TexCoord[0].y;
 #ifdef SPIRAL
-	float fade = clamp(v*30, 0, 1)*clamp(1-v, 0, 1);
-	float alpha = (1-noiseD)*fade;
+	float fade_0 = clamp(v*30, 0, 1)*clamp(1-v, 0, 1);
+	float fade_1 = clamp((v-1)*30, 0, 1)*clamp(2-v, 0, 1);
+	float alpha = (1-noiseD)*(fade_0 + fade_1);
 
 	float tailCordX = fract(gl_TexCoord[0].x*0.2);
 	float edgeFade = min(1, 8*tailCordX*(1-tailCordX)*abs(dotNV));
 	alpha*= edgeFade;
 
+	// accelerate progress
+	float spiralAcceGrowTime = clamp((wanderProgress-PROGRESS_1)*2/(PROGRESS_2-PROGRESS_1), 0, 1);
+	float spiralAcceFallTime = clamp((wanderProgress-PROGRESS_2_1)*0.2/(PROGRESS_2-PROGRESS_2_1), 0, 1);
+	float spiralAcceGrowSpace = clamp((1.2*spiralAcceGrowTime-v)*5, 0, 1);
+	float spiralAcceFallSpace = clamp((v-0.5+1.5*spiralAcceFallTime)*2, 0, 1);
+	// decelerate progress
+	float spiralDeceGrowTime = clamp((wanderProgress-PROGRESS_2)*2/(PROGRESS_3-PROGRESS_2), 0, 1);
+	float spiralDeceFallTime = clamp((wanderProgress-PROGRESS_3_1)*0.2/(PROGRESS_3-PROGRESS_3_1), 0, 1);
+	float spiralDeceGrowSpace = clamp((1.2*spiralDeceGrowTime-(v-1))*5, 0, 1);
+	float spiralDeceFallSpace = clamp((v-1.5+1.5*spiralDeceFallTime)*2, 0, 1);
+	// acce / dece
+	alpha *= mix(spiralAcceGrowSpace*spiralAcceFallSpace, spiralDeceGrowSpace*spiralDeceFallSpace, float(v>1));
+
 	// ambient color
-	vec3 ambient = vec3(0.2, 0.35, 0.5)*exp2(-v*20);
+	vec3 ambient = vec3(0.2, 0.35, 0.5)*exp2(-max(0, v-float(v>1))*20);
 #else // not SPIRAL
 	const float v0 = 1;
 	const float v1 = 4;

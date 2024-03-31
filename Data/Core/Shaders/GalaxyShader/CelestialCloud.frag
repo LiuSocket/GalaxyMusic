@@ -120,7 +120,7 @@ void main()
 
 #ifdef EARTH
 #ifdef WANDERING
-	if((wanderProgress > PROGRESS_4) && (unit > 1e6))
+	if((wanderProgress > PROGRESS_0) && (unit > 1e6))
 	{
 		vec4 tailColor = texture(tailTex, gl_FragCoord.xy/screenSize.xy);
 		color = mix(color, tailColor.rgb, tailColor.a);

@@ -32,10 +32,12 @@ CGMEarthTail Methods
 CGMEarthTail::CGMEarthTail(): CGMVolumeBasic(),
 	m_strCoreGalaxyTexPath("Textures/Galaxy/"),
 	m_strEarthShaderPath("Shaders/EarthShader/"), m_strGalaxyShaderPath("Shaders/GalaxyShader/"),
-	m_bVisible(false),
+	m_bVisible(false), m_iWanderPeriod(0),
 	m_fTailVisibleUniform(new osg::Uniform("tailVisible", 1.0f)),
-	m_mWorld2ECEFUniform(new osg::Uniform("world2ECEFMatrix", osg::Matrixf()))
+	m_mWorld2SpiralUniform(new osg::Uniform("world2SpiralMatrix", osg::Matrixf())),
+	m_mView2SpiralUniform(new osg::Uniform("view2SpiralMatrix", osg::Matrixf()))
 {
+	m_pEarthTailBoxVisitor = new CEarthTailBoxVisitor();
 }
 
 /** @brief 析构 */
@@ -116,6 +118,32 @@ bool CGMEarthTail::Update(double dDeltaTime)
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return true;
+
+	if (fWanderProgress < PROGRESS_0)
+	{
+		// 建造发动机（前太阳时代）
+		_SetWanderPeriod(0);
+	}
+	else if (fWanderProgress < PROGRESS_1)
+	{
+		// 刹车时代
+		_SetWanderPeriod(1);
+	}
+	else if (fWanderProgress < PROGRESS_2)
+	{
+		// 重新加速自转，调转地球北极方向
+		_SetWanderPeriod(2);
+	}
+	else if (fWanderProgress < PROGRESS_3)
+	{
+		// 自转减慢到0，让地球北极方向与地球前进方向相反
+		_SetWanderPeriod(3);
+	}
+	else
+	{
+		// 逃逸时代
+		_SetWanderPeriod(4);
+	}
 
 	if (2 == m_pKernelData->iHierarchy)
 	{
@@ -265,6 +293,7 @@ void CGMEarthTail::MakeEarthTail()
 
 	pSSSpiral->addUniform(m_pCommonUniform->GetUnit());
 	pSSSpiral->addUniform(m_pCommonUniform->GetTime());
+	pSSSpiral->addUniform(m_fWanderProgressUniform);
 	pSSSpiral->addUniform(m_vViewLightUniform);
 	pSSSpiral->addUniform(m_vEngineStartRatioUniform);
 	CGMKit::AddTexture(pSSSpiral, pNoise2DTex, "noise2DTex", 0);
@@ -291,10 +320,8 @@ void CGMEarthTail::MakeEarthTail()
 	m_pTailTransform2->setNodeMask(0);
 	GM_Root->addChild(m_pTailTransform2);
 
-	double fEarthTailRadius = 7.2e6; // 单位：米
-	double fEarthTailLength = 4e7; // 单位：米
-	double fRadiusHie2 = fEarthTailRadius / fUnit2;
-	double fLengthHie2 = fEarthTailLength / fUnit2;
+	double fRadiusHie2 = EARTH_TAIL_RADIUS / fUnit2;
+	double fLengthHie2 = EARTH_TAIL_LENGTH / fUnit2;
 
 	// 创建尾迹包络面
 	osg::ref_ptr<osg::StateSet> pSSTailEnvelope = new osg::StateSet();
@@ -309,6 +336,7 @@ void CGMEarthTail::MakeEarthTail()
 
 	pSSTailEnvelope->addUniform(m_pCommonUniform->GetUnit());
 	pSSTailEnvelope->addUniform(m_pCommonUniform->GetTime());
+	pSSTailEnvelope->addUniform(m_fWanderProgressUniform);
 	pSSTailEnvelope->addUniform(m_vViewLightUniform);
 	pSSTailEnvelope->addUniform(m_vEngineStartRatioUniform);
 	CGMKit::AddTexture(pSSTailEnvelope, pNoise2DTex, "noise2DTex", 0);
@@ -336,6 +364,7 @@ void CGMEarthTail::MakeEarthTail()
 
 	pSSEarthRing->addUniform(m_pCommonUniform->GetUnit());
 	pSSEarthRing->addUniform(m_pCommonUniform->GetTime());
+	pSSEarthRing->addUniform(m_fWanderProgressUniform);
 	pSSEarthRing->addUniform(m_vViewLightUniform);
 	pSSEarthRing->addUniform(m_vEngineStartRatioUniform);
 	CGMKit::AddTexture(pSSEarthRing, pNoise2DTex, "noise2DTex", 0);
@@ -574,28 +603,32 @@ void CGMEarthTail::SetEarthTailRotate(const double fSpin, const double fObliquit
 	osg::Quat qPlanetInclination = osg::Quat(fObliquity, osg::Vec3d(1, 0, 0));
 	osg::Quat qPlanetTurn = osg::Quat(fNorthYaw, osg::Vec3d(0, 0, 1));
 	osg::Quat qRotate = qPlanetSpin * qPlanetInclination * qPlanetTurn;
+	osg::Quat qSpiralRotate = qPlanetInclination * qPlanetTurn;
 
 	if (m_pTailTransform2.valid())
 		m_pTailTransform2->asPositionAttitudeTransform()->setAttitude(qRotate);
 	if (m_pSpiralTransform2.valid())
-	{
-		float fWanderProgress = 0.0f;
-		m_fWanderProgressUniform->get(fWanderProgress);
-		m_pSpiralTransform2->asPositionAttitudeTransform()->setAttitude(qPlanetInclination*qPlanetTurn);
-	}
+		m_pSpiralTransform2->asPositionAttitudeTransform()->setAttitude(qSpiralRotate);
 
-	osg::Matrixf mWorld2ECEFMatrix = osg::Matrixd::inverse(osg::Matrixd(qRotate));
-	m_mWorld2ECEFUniform->set(mWorld2ECEFMatrix);
+	// 流浪地球计划的转向时代，尾迹方向不和地球自转绑定
+	osg::Matrixd mWorld2SpiralMatrix = osg::Matrixd::inverse(osg::Matrixd(qSpiralRotate));
+	m_mWorld2SpiralUniform->set(osg::Matrixf(mWorld2SpiralMatrix));
+
+	osg::Matrixd mView2SpiralMatrix = mWorld2SpiralMatrix;
+	mView2SpiralMatrix.preMult(osg::Matrixd::inverse(GM_View->getCamera()->getViewMatrix()));
+	m_mView2SpiralUniform->set(osg::Matrixf(mView2SpiralMatrix));
 }
 
 void CGMEarthTail::SetUniform(
 	osg::Uniform* pViewLight,
 	osg::Uniform* pEngineStartRatio,
+	osg::Uniform* pWorld2ECEF,
 	osg::Uniform* pView2ECEF,
 	osg::Uniform* pWanderProgress)
 {
 	m_vViewLightUniform = pViewLight;
 	m_vEngineStartRatioUniform = pEngineStartRatio;
+	m_mWorld2ECEFUniform = pWorld2ECEF;
 	m_mView2ECEFUniform = pView2ECEF;
 	m_fWanderProgressUniform = pWanderProgress;
 }
@@ -703,7 +736,7 @@ osg::Geometry* CGMEarthTail::_MakeSpiralGeometry(const float fRadius, const bool
 				double fV = double(x) / iLonSeg;
 				osg::Vec3 vPos = _GetSpiralSurfacePos(osg::Vec2(fU, fV), fRadius, i, bPositive);
 				verts->push_back(vPos);
-				texCoords->push_back(osg::Vec2(5 * fU, fV));
+				texCoords->push_back(osg::Vec2(5 * fU, fV + 1 - float(bPositive)));
 
 				osg::Vec3 vOut = vPos;
 				vOut.normalize();
@@ -1030,6 +1063,8 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->addUniform(m_vDeltaShakeUniform);
 	pSS->addUniform(m_mWorld2ECEFUniform);
 	pSS->addUniform(m_mView2ECEFUniform);
+	pSS->addUniform(m_mWorld2SpiralUniform);
+	pSS->addUniform(m_mView2SpiralUniform);
 	pSS->addUniform(m_vViewLightUniform);
 	pSS->addUniform(m_pCommonUniform->GetUnit());
 	pSS->addUniform(m_pCommonUniform->GetTime());
@@ -1099,4 +1134,55 @@ osg::Vec3 CGMEarthTail::_GetTailEnvelopePos(const osg::Vec2 fCoordUV, const floa
 	float fY = fR * sinLon;
 	float fZ = fLength * fCoordUV.y() - 0.1 * fRadius;
 	return osg::Vec3(fX, fY, fZ);
+}
+
+void CGMEarthTail::_SetWanderPeriod(const int iWanderPeriod)
+{
+	if (iWanderPeriod == m_iWanderPeriod) return;
+
+	m_iWanderPeriod = iWanderPeriod;
+	if (1 == iWanderPeriod)
+	{
+		m_pSsTailDecFace->setDefine("BRAKE_TIME", osg::StateAttribute::ON);
+		m_pSsTailDecEdge->setDefine("BRAKE_TIME", osg::StateAttribute::ON);
+		m_pSsTailDecVert->setDefine("BRAKE_TIME", osg::StateAttribute::ON);
+	}
+	else
+	{
+		m_pSsTailDecFace->setDefine("BRAKE_TIME", osg::StateAttribute::OFF);
+		m_pSsTailDecEdge->setDefine("BRAKE_TIME", osg::StateAttribute::OFF);
+		m_pSsTailDecVert->setDefine("BRAKE_TIME", osg::StateAttribute::OFF);
+	}
+
+	if (2 == iWanderPeriod)
+	{
+		m_pSsTailDecFace->setDefine("TORQUE_TIME_0", osg::StateAttribute::ON);
+		m_pSsTailDecEdge->setDefine("TORQUE_TIME_0", osg::StateAttribute::ON);
+		m_pSsTailDecVert->setDefine("TORQUE_TIME_0", osg::StateAttribute::ON);
+	}
+	else
+	{
+		m_pSsTailDecFace->setDefine("TORQUE_TIME_0", osg::StateAttribute::OFF);
+		m_pSsTailDecEdge->setDefine("TORQUE_TIME_0", osg::StateAttribute::OFF);
+		m_pSsTailDecVert->setDefine("TORQUE_TIME_0", osg::StateAttribute::OFF);
+	}
+
+	if (3 == iWanderPeriod)
+	{
+		m_pSsTailDecFace->setDefine("TORQUE_TIME_1", osg::StateAttribute::ON);
+		m_pSsTailDecEdge->setDefine("TORQUE_TIME_1", osg::StateAttribute::ON);
+		m_pSsTailDecVert->setDefine("TORQUE_TIME_1", osg::StateAttribute::ON);
+	}
+	else
+	{
+		m_pSsTailDecFace->setDefine("TORQUE_TIME_1", osg::StateAttribute::OFF);
+		m_pSsTailDecEdge->setDefine("TORQUE_TIME_1", osg::StateAttribute::OFF);
+		m_pSsTailDecVert->setDefine("TORQUE_TIME_1", osg::StateAttribute::OFF);
+	}
+
+	m_pEarthTailBoxVisitor->SetPeriod(iWanderPeriod);
+	if (m_pTailBoxGeode2.valid())
+	{
+		m_pTailBoxGeode2->accept(*m_pEarthTailBoxVisitor);
+	}
 }

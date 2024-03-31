@@ -561,7 +561,11 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 		sEA.fAccelerationFront = 0;
 		sEA.fAccelerationRoll = -0.1;
 
-		fTorqueRatio = 1;
+		float fTorqueFullStart = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.2f);// 转向发动机全部启动
+		float fTorqueFullEnd = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.8f);// 转向发动机开始关闭
+		fTorqueRatio = osg::clampBetween((fWanderProgress - PROGRESS_0) / (fTorqueFullStart - PROGRESS_0), 0.0f, 1.0f)
+			* osg::clampBetween((fWanderProgress - PROGRESS_1) / (fTorqueFullEnd - PROGRESS_1), 0.0f, 1.0f);
+
 		fPropulsionRatio = 0;
 	}
 	else if (fWanderProgress < PROGRESS_3)
@@ -574,13 +578,22 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 		{
 			// 重新加速自转，调转地球北极方向
 			sEA.qAccelerationTurn = osg::Quat(0.1, vTurnAxis);
+
+			float fTorqueFullStart = CGMKit::Mix(PROGRESS_1, PROGRESS_2, 0.2f);// 转向发动机全部启动
+			float fTorqueFullEnd = CGMKit::Mix(PROGRESS_1, PROGRESS_2, 0.8f);// 转向发动机开始关闭
+			fTorqueRatio = osg::clampBetween((fWanderProgress - PROGRESS_1) / (fTorqueFullStart - PROGRESS_1), 0.0f, 1.0f)
+				* osg::clampBetween((fWanderProgress - PROGRESS_2) / (fTorqueFullEnd - PROGRESS_2), 0.0f, 1.0f);
 		}
 		else// 自转减慢到0，让地球北极方向与地球前进方向相反
 		{
 			sEA.qAccelerationTurn = osg::Quat(-0.1, vTurnAxis);
+
+			float fTorqueFullStart = CGMKit::Mix(PROGRESS_2, PROGRESS_3, 0.2f);// 转向发动机全部启动
+			float fTorqueFullEnd = CGMKit::Mix(PROGRESS_2, PROGRESS_3, 0.8f);// 转向发动机开始关闭
+			fTorqueRatio = osg::clampBetween((fWanderProgress - PROGRESS_2) / (fTorqueFullStart - PROGRESS_2), 0.0f, 1.0f)
+				* osg::clampBetween((fWanderProgress - PROGRESS_3) / (fTorqueFullEnd - PROGRESS_3), 0.0f, 1.0f);
 		}
 
-		fTorqueRatio = 1;
 		fPropulsionRatio = 0;
 	}
 	else if (fWanderProgress < PROGRESS_4)

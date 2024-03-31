@@ -20,6 +20,12 @@ namespace GM
 	*************************************************************************/
 
 	/*************************************************************************
+	constexpr
+	*************************************************************************/
+	constexpr double EARTH_TAIL_RADIUS = 7.2e6;		// 尾迹半径，单位：米
+	constexpr double EARTH_TAIL_LENGTH = 4e7;		// 尾迹长度（从地球球心开始算起），单位：米
+
+	/*************************************************************************
 	Enums
 	*************************************************************************/
 
@@ -30,6 +36,103 @@ namespace GM
 	/*************************************************************************
 	Class
 	*************************************************************************/
+
+	/*
+	** 地球尾迹画布盒的访问器
+	*/
+	class CEarthTailBoxVisitor : public osg::NodeVisitor
+	{
+	public:
+		CEarthTailBoxVisitor() : NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN),
+			_fUnit(1e10), _iPeriod(0) {}
+
+		void SetUnit(const double fUnit)
+		{
+			_fUnit = fUnit;
+		}
+
+		/**
+		* @brief 设置流浪地球计划的阶段
+		* @param iWanderPeriod
+		* 0 = 前太阳时代
+		* 1 = 刹车时代
+		* 2 = 加速转向时代
+		* 3 = 减速转向时代
+		* 4 = 逃逸时代
+		*/
+		void SetPeriod(const int iPeriod)
+		{
+			_iPeriod = iPeriod;
+		}
+
+		void apply(osg::Node& node) { traverse(node); }
+		void apply(osg::Geode& node)
+		{
+			osg::Geometry* geom = dynamic_cast<osg::Geometry*>(node.getDrawable(0));
+			if (!geom) return;
+
+			osg::ref_ptr<osg::Vec3Array> pVert = dynamic_cast<osg::Vec3Array*>(geom->getVertexArray());
+			if (!pVert.valid()) return;
+
+			switch (_iPeriod)
+			{
+			case 1:
+			{
+				float fR = 1.2e7 / _fUnit;
+				float fZ = 6.4e6 / _fUnit;
+
+				pVert->at(0) = osg::Vec3(-fR, -fR, -fZ); // 0
+				pVert->at(1) = osg::Vec3(fR, -fR, -fZ); // 1
+				pVert->at(2) = osg::Vec3(fR, fR, -fZ); // 2
+				pVert->at(3) = osg::Vec3(-fR, fR, -fZ); // 3
+				pVert->at(4) = osg::Vec3(-fR, -fR, fZ); // 4
+				pVert->at(5) = osg::Vec3(fR, -fR, fZ); // 5
+				pVert->at(6) = osg::Vec3(fR, fR, fZ); // 6
+				pVert->at(7) = osg::Vec3(-fR, fR, fZ); // 7
+			}
+			break;
+			case 2:
+			case 3:
+			{
+				float fR = 1e7 / _fUnit;
+
+				pVert->at(0) = osg::Vec3(-fR, -fR, -fR); // 0
+				pVert->at(1) = osg::Vec3(fR, -fR, -fR); // 1
+				pVert->at(2) = osg::Vec3(fR, fR, -fR); // 2
+				pVert->at(3) = osg::Vec3(-fR, fR, -fR); // 3
+				pVert->at(4) = osg::Vec3(-fR, -fR, fR); // 4
+				pVert->at(5) = osg::Vec3(fR, -fR, fR); // 5
+				pVert->at(6) = osg::Vec3(fR, fR, fR); // 6
+				pVert->at(7) = osg::Vec3(-fR, fR, fR); // 7
+			}
+			break;
+			case 4:
+			{
+				float fR = EARTH_TAIL_RADIUS / _fUnit;
+				float fL = EARTH_TAIL_LENGTH / _fUnit;
+
+				pVert->at(0) = osg::Vec3(-fR, -fR, -fR); // 0
+				pVert->at(1) = osg::Vec3(fR, -fR, -fR); // 1
+				pVert->at(2) = osg::Vec3(fR, fR, -fR); // 2
+				pVert->at(3) = osg::Vec3(-fR, fR, -fR); // 3
+				pVert->at(4) = osg::Vec3(-fR, -fR, fL); // 4
+				pVert->at(5) = osg::Vec3(fR, -fR, fL); // 5
+				pVert->at(6) = osg::Vec3(fR, fR, fL); // 6
+				pVert->at(7) = osg::Vec3(-fR, fR, fL); // 7
+			}
+			break;
+			default:
+				break;
+			}
+
+			pVert->dirty();
+
+			traverse(node);
+		}
+	private:
+		double				_fUnit;
+		int					_iPeriod; // 流浪地球计划所处阶段
+	};
 
 	/*!
 	*  @class CGMEarthTail
@@ -82,6 +185,7 @@ namespace GM
 		void SetUniform(
 			osg::Uniform* pViewLight,
 			osg::Uniform* pEngineStartRatio,
+			osg::Uniform* pWorld2ECEF,
 			osg::Uniform* pView2ECEF,
 			osg::Uniform* pWanderProgress);
 
@@ -154,6 +258,18 @@ namespace GM
 		* @return osg::Vec3			表面顶点的模型空间的位置
 		*/
 		osg::Vec3 _GetTailEnvelopePos(const osg::Vec2 fCoordUV, const float fLength, const float fRadius) const;
+
+		/**
+		* @brief 设置流浪地球计划的阶段
+		* @param iWanderPeriod
+		* 0 = 前太阳时代
+		* 1 = 刹车时代
+		* 2 = 加速转向时代
+		* 3 = 减速转向时代
+		* 4 = 逃逸时代
+		*/
+		void _SetWanderPeriod(const int iWanderPeriod);
+
 	// 变量
 	private:
 		std::string										m_strCoreGalaxyTexPath;			//!< 星系核心贴图路径
@@ -174,12 +290,17 @@ namespace GM
 		osg::ref_ptr<osg::StateSet>						m_pSsTailDecVert;				//!< 流浪地球尾迹12面体点状态集
 
 		bool											m_bVisible;						//!< 流浪地球尾迹是否可见
+		int												m_iWanderPeriod;				//!< 流浪地球计划，当前所处的阶段
 		osg::ref_ptr<osg::Uniform>						m_fTailVisibleUniform;			//!< 流浪地球尾迹可见度的Uniform
 		osg::ref_ptr<osg::Uniform>						m_mWorld2ECEFUniform;			//!< “2级世界空间”转 ECEF 的矩阵
 		osg::ref_ptr<osg::Uniform>						m_mView2ECEFUniform;			//!< view空间转ECEF的矩阵
+		osg::ref_ptr<osg::Uniform>						m_mWorld2SpiralUniform;			//!< “2级世界空间”转“螺旋尾迹空间”矩阵
+		osg::ref_ptr<osg::Uniform>						m_mView2SpiralUniform;			//!< view空间转“螺旋尾迹空间”矩阵
 		osg::ref_ptr<osg::Uniform>						m_vViewLightUniform;			//!< view空间的光源方向
 		osg::ref_ptr<osg::Uniform>						m_fWanderProgressUniform;		//!< 流浪地球计划进展Uniform
 		osg::ref_ptr<osg::Uniform>						m_vEngineStartRatioUniform;		//!< 开启比例，x=转向，y=推进
+
+		osg::ref_ptr<CEarthTailBoxVisitor>				m_pEarthTailBoxVisitor;			//!< 地球尾迹的画布盒的访问器
 	};
 
 }	// GM

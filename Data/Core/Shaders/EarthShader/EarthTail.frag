@@ -1,5 +1,6 @@
 #version 400 compatibility
 
+#pragma import_defines(BRAKE_TIME, TORQUE_TIME_0, TORQUE_TIME_1)
 #pragma import_defines(RAYS_2, RAYS_3)
 
 struct commonParam {
@@ -66,6 +67,8 @@ uniform mat4 osg_ViewMatrixInverse;
 // world up is "y", earth tail direction is near "z", 
 uniform mat4 world2ECEFMatrix;
 uniform mat4 view2ECEFMatrix;
+uniform mat4 world2SpiralMatrix;
+uniform mat4 view2SpiralMatrix;
 
 uniform sampler2D lastVectorTex;
 uniform sampler2D blueNoiseTex;
@@ -85,6 +88,99 @@ float LIGHT_LEN[LIGHT_SAMPLE] = float[](5e4/unit, 1e4/unit, 1e6/unit, 1e7/unit);
 in vec3 weight;
 in vec3 localVertDir;
 
+vec2 SphereLenMinMax(float sphereR, vec3 modelSpherePos, vec3 modelEyePos, vec3 modelPixDir, out float dstTail)
+{
+	float dotSD = dot(modelSpherePos-modelEyePos, modelPixDir);
+	vec3 tailPointM = modelEyePos + dotSD*modelPixDir;
+	dstTail = distance(modelSpherePos, tailPointM)/sphereR;
+	float lenTailH = sphereR*sqrt(max(0,1-dstTail*dstTail));
+	vec2 lenTailMinMax = dotSD + vec2(-lenTailH, lenTailH);
+	return mix(lenTailMinMax, vec2(1e9,0.0), float(1 < dstTail));
+}
+
+vec2 SphereLenMinMax(float sphereR, vec3 modelSpherePos, vec3 modelEyePos, vec3 modelPixDir)
+{
+	float dstTail = 0;
+	return SphereLenMinMax(sphereR, modelSpherePos, modelEyePos, modelPixDir, dstTail);
+}
+
+#ifdef BRAKE_TIME
+// (length min,length max)
+// dstEarth means the normalized distance to Earth core, [0,1]
+vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
+{
+	// cull by earth
+	float dotED = dot(-modelEyePos, modelPixDir);
+	vec3 modelCorePointM = modelEyePos + dotED*modelPixDir;
+	dstEarth = length(modelCorePointM)/EARTH_RADIUS;
+	float lenEarthH = EARTH_RADIUS*sqrt(max(0,1-dstEarth*dstEarth));
+	vec2 lenMinMax = vec2(0, 1e9);
+
+	// tail sphere
+	float radiusI = EARTH_RADIUS * 15;
+	for(int i = 0 ; i < 2 ; i ++)
+	{
+		vec3 spherePosI = vec3(0.0, 0.0, (float(i)*2-1)*EARTH_RADIUS*14.9);
+		vec2 lenTailMinMax = SphereLenMinMax(radiusI, spherePosI, modelEyePos, modelPixDir);
+
+		lenMinMax.x = max(lenMinMax.x, lenTailMinMax.x);
+		lenMinMax.y = min(lenMinMax.y, lenTailMinMax.y);
+	}
+
+	lenMinMax.y = min(lenMinMax.y, dotED - lenEarthH + 1e9*float(dstEarth>1));
+	return lenMinMax;
+}
+
+float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
+{
+	float ratioZ = modelStepPos.z / ATMOS_RADIUS;
+	float ratioXY = length(modelStepPos.xy) / ATMOS_RADIUS;
+	float ratioR = length(modelStepPos) / ATMOS_RADIUS;
+	float texDens = 0.1;
+	return texDens;
+}
+
+#elif (defined(TORQUE_TIME_0) || defined(TORQUE_TIME_1))
+// (length min,length max)
+// dstEarth means the normalized distance to Earth core, [0,1]
+vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
+{
+	// cull by earth
+	float dotED = dot(-modelEyePos, modelPixDir);
+	vec3 modelCorePointM = modelEyePos + dotED*modelPixDir;
+	dstEarth = length(modelCorePointM)/EARTH_RADIUS;
+	float lenEarthH = EARTH_RADIUS*sqrt(max(0,1-dstEarth*dstEarth));
+	vec2 lenMinMax = vec2(1e9, 0.0);
+
+	// tail sphere
+	float radiusI = EARTH_RADIUS*1.03;
+	for(int i = 0 ; i < 2 ; i ++)
+	{
+		vec3 spherePosI = (float(i)*2-1)*EARTH_RADIUS*vec3(0.0, -0.1, 0.3);
+#ifdef TORQUE_TIME_1
+		spherePosI.z *= -1;
+#endif // TORQUE_TIME_0
+		vec2 lenTailMinMax = SphereLenMinMax(radiusI, spherePosI, modelEyePos, modelPixDir);
+
+		lenMinMax.x = min(lenMinMax.x, lenTailMinMax.x);
+		lenMinMax.y = max(lenMinMax.y, lenTailMinMax.y);
+	}
+
+	lenMinMax.y = min(lenMinMax.y, dotED - lenEarthH + 1e9*float(dstEarth>1));
+	return lenMinMax;
+}
+
+float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
+{
+	float ratioZ = modelStepPos.z / ATMOS_RADIUS;
+	float ratioXY = length(modelStepPos.xy) / ATMOS_RADIUS;
+	float ratioR = length(modelStepPos) / ATMOS_RADIUS;
+	float texDens = 0.1;
+	return texDens;
+}
+
+#else // !BRAKE_TIME && !TORQUE_TIME_*
+
 // (length min,length max)
 // dstEarth means the normalized distance to Earth core, [0,1]
 vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
@@ -102,15 +198,11 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 	{
 		float f = float(i);
 		float radiusScale = 0.45 + 0.55*exp2(-f*0.8);
-		float radiusNow = ATMOS_RADIUS * radiusScale;
-		vec3 tailSpherePos = vec3(0.0, 0.0, EARTH_RADIUS*(0.17 - 0.1*step(0.5,f) + 0.9*f*radiusScale));
-		float dotSD = dot(tailSpherePos-modelEyePos, modelPixDir);
-		vec3 tailPointM = modelEyePos + dotSD*modelPixDir;
+		float radiusI = ATMOS_RADIUS * radiusScale;
+		vec3 spherePosI = vec3(0.0, 0.0, EARTH_RADIUS*(0.17 - 0.1*float(0.5<f) + 0.9*f*radiusScale));
 
-		float dstTail = distance(tailSpherePos, tailPointM)/radiusNow;
-		float lenTailH = radiusNow*sqrt(max(0,1-dstTail*dstTail));
-		vec2 lenTailMinMax = dotSD + vec2(-lenTailH, lenTailH);
-		lenTailMinMax = mix(lenTailMinMax, vec2(1e9,0), step(1, dstTail));
+		float dstTail = 0;
+		vec2 lenTailMinMax = SphereLenMinMax(radiusI, spherePosI, modelEyePos, modelPixDir, dstTail);
 
 		lenMinMax.x = min(lenMinMax.x, lenTailMinMax.x);
 		lenMinMax.y = max(lenMinMax.y, lenTailMinMax.y);
@@ -199,6 +291,8 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 	texDens *= mix(1, fadeR, clamp((ratioR-EARTH_ATMOS_RATIO)*3, 0, 1));
 	return texDens;
 }
+
+#endif // BRAKE_TIME || TORQUE_TIME_* || not
 
 float Dens2Bright(float dens)
 {
@@ -309,12 +403,22 @@ void main()
 	localDir = normalize(localNear + localShake);
 	vec3 WVD = localDir;
 	vec3 WCP = osg_ViewMatrixInverse[3].xyz;
+
+#if (defined(TORQUE_TIME_0) || defined(TORQUE_TIME_1))
+	// eye position in model space
+	vec3 modelEyePos = (world2SpiralMatrix*vec4(WCP,1)).xyz;
+	// pixel direction in model space
+	vec3 modelPixDir = (world2SpiralMatrix*vec4(WVD,0)).xyz;
+	// sun direction in model space
+	vec3 modelSunDir = (view2SpiralMatrix*vec4(viewLight,0)).xyz;
+#else // !TORQUE_TIME_*
 	// eye position in model space
 	vec3 modelEyePos = (world2ECEFMatrix*vec4(WCP,1)).xyz;
 	// pixel direction in model space
 	vec3 modelPixDir = (world2ECEFMatrix*vec4(WVD,0)).xyz;
 	// sun direction in model space
 	vec3 modelSunDir = (view2ECEFMatrix*vec4(viewLight,0)).xyz;
+#endif // TORQUE_TIME_* or not
 
 	vec2 rayMarchScreenSize = screenSize.xy*screenSize.z;
 	vec2 projCoord = gl_FragCoord.xy/rayMarchScreenSize;
@@ -410,7 +514,7 @@ void main()
 	tailColor = mix(tailColor, tailC_2, weight.z);
 #endif // RAYS_3
 
-	tailAlpha = (wanderProgress > PROGRESS_4) ? tailColor.a : 0.0;
+	tailAlpha = (wanderProgress > PROGRESS_0) ? tailColor.a : 0.0;
 
 	vec3 posDiff = ((deltaViewProjMatrix*vec4(WCP+lenTail*WVD,1.0)).xyz)/max(1, lenTail);
 	// position different
@@ -418,5 +522,7 @@ void main()
 
 	// color and alpha
 	gl_FragData[1] = vec4(tailColor.rgb, tailAlpha);
-	//gl_FragData[1] = vec4(fract(lenMinMax.x*100),tailAlpha,0,1);
+
+	//gl_FragData[1] = vec4(fract(max(0, lenMinMax.y-lenMinMax.x)*1e4),tailAlpha,0.1,1.0);
+	//gl_FragData[1] = vec4(fract(lenMinMax.x*1e4),tailAlpha,0.1,1.0);
 }

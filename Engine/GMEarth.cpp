@@ -283,6 +283,7 @@ void CGMEarth::SetUniform(
 	osg::Uniform* pAtmosHeight,
 	osg::Uniform* pMinDotUL,
 	osg::Uniform* pEyeAltitude,
+	osg::Uniform* pWorld2ECEF,
 	osg::Uniform* pView2ECEF)
 {
 	m_vPlanetRadiusUniform = pPlanetRadius;
@@ -292,6 +293,7 @@ void CGMEarth::SetUniform(
 	m_fAtmosHeightUniform = pAtmosHeight;
 	m_fMinDotULUniform = pMinDotUL;
 	m_fEyeAltitudeUniform = pEyeAltitude;
+	m_mWorld2ECEFUniform = pWorld2ECEF;
 	m_mView2ECEFUniform = pView2ECEF;
 
 	if (m_pConfigData->bWanderingEarth)
@@ -299,6 +301,7 @@ void CGMEarth::SetUniform(
 		m_pEarthTail->SetUniform(
 			pViewLight,
 			m_pEarthEngine->GetEngineStartRatioUniform(),
+			pWorld2ECEF,
 			pView2ECEF,
 			m_fWanderProgressUniform);
 		m_pEarthEngine->SetUniform(

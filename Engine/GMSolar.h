@@ -456,6 +456,7 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_fMinDotULUniform;				//!< 有光区域的最小DotUL值(-1,0)
 		osg::ref_ptr<osg::Uniform>						m_fEyeAltitudeUniform;			//!< 眼点海拔Uniform
 		osg::ref_ptr<osg::Uniform>						m_mAtmosColorTransUniform;		//!< 大气颜色转换矩阵
+		osg::ref_ptr<osg::Uniform>						m_mWorld2ECEFUniform;			//!< “2级世界空间”转 ECEF 的矩阵
 		osg::ref_ptr<osg::Uniform>						m_mView2ECEFUniform;			//!< view空间转ECEF的矩阵
 		osg::ref_ptr<osg::Uniform>						m_fStepTimeUniform;				//!< 仿真步长的真实时间，单位：秒
 		osg::ref_ptr<osg::Uniform>						m_vJupiterPosUniform;			//!< 木星在太阳系下的坐标，单位：米

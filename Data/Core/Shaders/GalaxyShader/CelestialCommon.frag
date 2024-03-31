@@ -16,7 +16,7 @@ uniform float minDotUL;
 uniform sampler2D tailTex;
 uniform vec2 engineStartRatio;
 uniform float wanderProgress;
-#endif // WANDERING	
+#endif // WANDERING
 
 vec3 ToneMapping(vec3 color)
 {

@@ -2,8 +2,13 @@
 
 const float M_PI = 3.141592657;
 
+const float PROGRESS_0 = 0.005;
+const float PROGRESS_1 = 0.020;
+const float PROGRESS_1_1 = 0.023;
+
 uniform float unit;
 uniform float times;
+uniform float wanderProgress;
 uniform vec3 viewLight;
 uniform sampler2D noise2DTex;
 
@@ -53,6 +58,13 @@ void main()
 
 	float alpha = (1-noiseD)*sqrt(clamp(UV.y*2,0,1))*(1-UV.y);
 	alpha *= exp2(-lenV*unit*1e-9) * (1 - exp2(-lenV*unit*5e-7));
+	// progress
+	float ringGrowTime = clamp((wanderProgress-PROGRESS_0)*2/(PROGRESS_1-PROGRESS_0),0,1);
+	float ringFallTime = clamp((wanderProgress-PROGRESS_1_1)/(PROGRESS_1-PROGRESS_1_1),0,1);
+	float ringGrowSpace = clamp((1.5*ringGrowTime-UV.y)*2, 0, 1);
+	float ringFallSpace = clamp((UV.y-0.5+1.5*ringFallTime)*2, 0, 1);
+	alpha *= ringGrowSpace*ringFallSpace;
+
 	vec3 color = ToneMapping(ambient + diffuse);
 	fragColor = vec4(color, alpha);
 }

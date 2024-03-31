@@ -132,7 +132,7 @@ void main()
 #ifdef WANDERING
 	vec3 illumEngine = engineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
 	color = mix(color, vec3(1), illumEngine);
-	if((wanderProgress > PROGRESS_4) && (unit > 1e6))
+	if((wanderProgress > PROGRESS_0) && (unit > 1e6))
 	{
 		vec4 tailColor = texture(tailTex, screenCoord);
 		color = mix(color, tailColor.rgb, tailColor.a);

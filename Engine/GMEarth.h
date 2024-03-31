@@ -56,6 +56,7 @@ namespace GM
 			osg::Uniform* pAtmosHeight,
 			osg::Uniform* pMinDotUL,
 			osg::Uniform* pEyeAltitude,
+			osg::Uniform* pWorld2ECEF,
 			osg::Uniform* pView2ECEF);
 
 		/**
@@ -267,6 +268,7 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_fAtmosHeightUniform;			//!< 大气层高度
 		osg::ref_ptr<osg::Uniform>						m_fMinDotULUniform;				//!< 有光区域的最小DotUL值(-1,0)
 		osg::ref_ptr<osg::Uniform>						m_fEyeAltitudeUniform;			//!< 眼点海拔Uniform
+		osg::ref_ptr<osg::Uniform>						m_mWorld2ECEFUniform;			//!< “2级世界空间”转 ECEF 的矩阵
 		osg::ref_ptr<osg::Uniform>						m_mView2ECEFUniform;			//!< view空间转ECEF的矩阵
 		osg::ref_ptr<osg::Uniform>						m_vEarthCoordScaleUniform;		//!< 地球贴图的纹理坐标缩放
 		osg::ref_ptr<osg::Uniform>						m_fWanderProgressUniform;		//!< 流浪地球计划进展Uniform
