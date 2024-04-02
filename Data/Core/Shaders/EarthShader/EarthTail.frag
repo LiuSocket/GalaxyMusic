@@ -156,30 +156,44 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 	float radiusI = EARTH_RADIUS*1.03;
 	for(int i = 0 ; i < 2 ; i ++)
 	{
-		vec3 spherePosI = (float(i)*2-1)*EARTH_RADIUS*vec3(0.0, -0.1, 0.3);
+		vec3 sphereOutPosI = (float(i)*2-1)*EARTH_RADIUS*vec3(0.0, -0.1, 0.3);
 #ifdef TORQUE_TIME_1
-		spherePosI.z *= -1;
+		sphereOutPosI.z *= -1;
 #endif // TORQUE_TIME_0
-		vec2 lenTailMinMax = SphereLenMinMax(radiusI, spherePosI, modelEyePos, modelPixDir);
+		vec2 lenOutMinMax = SphereLenMinMax(radiusI, sphereOutPosI, modelEyePos, modelPixDir);
 
-		lenMinMax.x = min(lenMinMax.x, lenTailMinMax.x);
-		lenMinMax.y = max(lenMinMax.y, lenTailMinMax.y);
+		lenMinMax.x = min(lenMinMax.x, lenOutMinMax.x);
+		lenMinMax.y = max(lenMinMax.y, lenOutMinMax.y);
 	}
 
-	lenMinMax.y = min(lenMinMax.y, dotED - lenEarthH + 1e9*float(dstEarth>1));
+	lenMinMax.y = min(lenMinMax.y, dotED - lenEarthH + 1e9*float(1<dstEarth));
 	return lenMinMax;
 }
 
 float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 {
-	float ratioZ = modelStepPos.z / ATMOS_RADIUS;
-	float ratioXY = length(modelStepPos.xy) / ATMOS_RADIUS;
-	float ratioR = length(modelStepPos) / ATMOS_RADIUS;
-	float texDens = 0.1;
+	float ratioZ = modelStepPos.z / EARTH_RADIUS;
+	float thetaYZ = atan(modelStepPos.y / modelStepPos.z);
+
+	vec3 shapeUVW = vec3(modelStepPos.x, thetaYZ, length(modelStepPos.yz)) / vec3(EARTH_RADIUS, M_PI, 0.5*EARTH_RADIUS);
+
+	float upSpeed = exp2(-abs(ratioZ)*4)/M_PI;
+#ifdef TORQUE_TIME_0
+	upSpeed *= -1;
+#endif // TORQUE_TIME_0
+	shapeUVW.z += upSpeed*thetaYZ;
+
+	vec4 shape4 = texture3D(noiseShapeTex, fract(shapeUVW));
+	float texDens = max(0, shape4.x - 0.35*shape4.y - 0.11*shape4.z - 0.09*shape4.w);
+
+#ifdef TORQUE_TIME_0
+	thetaYZ *= -1;
+#endif // TORQUE_TIME_0
+	texDens *= max((thetaYZ + 0.5) * 0.5, exp2(-ratioZ*ratioZ*20));
 	return texDens;
 }
 
-#else // !BRAKE_TIME && !TORQUE_TIME_*
+#else // !BRAKE_TIME && !TORQUE_TIME_X
 
 // (length min,length max)
 // dstEarth means the normalized distance to Earth core, [0,1]
@@ -240,7 +254,7 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 	dstOut = min(dstOut, cydMask);
 
 	lenMinMax = max(vec2(0), lenMinMax);
-	lenMinMax = mix(lenMinMax, vec2(1e9, 0), step(1, dstOut));
+	lenMinMax = mix(lenMinMax, vec2(1e9, 0), float(1 < dstOut));
 	lenMinMax = mix(lenMinMax, vec2(max(0, modelEyePos.z-TAIL_LENGTH), lenEyePos), isInTail*isEyeTailSameSide);
 	lenMinMax.y = min(lenMinMax.y, dotED - lenEarthH + 1e9*step(1, dstEarth));
 
@@ -292,7 +306,7 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 	return texDens;
 }
 
-#endif // BRAKE_TIME || TORQUE_TIME_* || not
+#endif // BRAKE_TIME || TORQUE_TIME_X || not
 
 float Dens2Bright(float dens)
 {
@@ -411,14 +425,14 @@ void main()
 	vec3 modelPixDir = (world2SpiralMatrix*vec4(WVD,0)).xyz;
 	// sun direction in model space
 	vec3 modelSunDir = (view2SpiralMatrix*vec4(viewLight,0)).xyz;
-#else // !TORQUE_TIME_*
+#else // !TORQUE_TIME_X
 	// eye position in model space
 	vec3 modelEyePos = (world2ECEFMatrix*vec4(WCP,1)).xyz;
 	// pixel direction in model space
 	vec3 modelPixDir = (world2ECEFMatrix*vec4(WVD,0)).xyz;
 	// sun direction in model space
 	vec3 modelSunDir = (view2ECEFMatrix*vec4(viewLight,0)).xyz;
-#endif // TORQUE_TIME_* or not
+#endif // TORQUE_TIME_X or not
 
 	vec2 rayMarchScreenSize = screenSize.xy*screenSize.z;
 	vec2 projCoord = gl_FragCoord.xy/rayMarchScreenSize;
