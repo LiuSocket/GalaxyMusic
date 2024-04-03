@@ -3,10 +3,10 @@
 
 #ifdef WANDERING
 const float PROGRESS_0 = 0.005;
-const float PROGRESS_1 = 0.020;
-const float PROGRESS_2 = 0.050;
-const float PROGRESS_3 = 0.080;
-const float PROGRESS_4 = 0.084;
+const float PROGRESS_1 = 0.025;
+const float PROGRESS_2 = 0.065;
+const float PROGRESS_3 = 0.105;
+const float PROGRESS_4 = 0.109;
 uniform float wanderProgress;
 #endif // WANDERING	
 

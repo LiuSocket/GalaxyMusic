@@ -2,11 +2,12 @@
 #pragma import_defines(SPIRAL)
 
 const float M_PI = 3.141592657;
-const float PROGRESS_1 = 0.020;
-const float PROGRESS_2 = 0.050;
-const float PROGRESS_2_1 = 0.053;
-const float PROGRESS_3 = 0.080;
-const float PROGRESS_3_1 = 0.083;
+const float PROGRESS_1 = 0.025;
+const float PROGRESS_2 = 0.065;
+const float PROGRESS_2_1 = 0.068;
+const float PROGRESS_3 = 0.105;
+const float PROGRESS_3_1 = 0.108;
+const float PROGRESS_4 = 0.109;
 
 uniform float unit;
 uniform float times;

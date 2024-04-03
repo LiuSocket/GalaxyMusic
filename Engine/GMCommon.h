@@ -20,14 +20,14 @@ namespace GM
 	constexpr
 	*************************************************************************/
 	constexpr float PROGRESS_0 = 0.005f; 		// 前太阳时代结束，开启刹车时代
-	constexpr float PROGRESS_1 = 0.020f; 		// 刹车时代结束，开始调整地球姿态，旋转北极轴
-	constexpr float PROGRESS_1_1 = 0.023f; 		// 刹车时代残留的“地球环”由于转向而消失
-	constexpr float PROGRESS_2 = 0.050f;		// 地球姿态调整中期
-	constexpr float PROGRESS_2_1 = 0.053f;		// 地球加速的螺旋尾迹消失
-	constexpr float PROGRESS_3 = 0.080f;		// 地球姿态调整结束，北极与地球运行方向相反
-	constexpr float PROGRESS_3_1 = 0.083f;		// 地球减速的螺旋尾迹消失
-	constexpr float PROGRESS_4 = 0.084f;		// 全球发动机并网成功，启航
-	constexpr float PROGRESS_5 = 0.114f;		// 发动机全功率开启
+	constexpr float PROGRESS_1 = 0.025f; 		// 刹车时代结束，开始调整地球姿态，旋转北极轴
+	constexpr float PROGRESS_1_1 = 0.028f; 		// 刹车时代残留的“地球环”由于转向而消失
+	constexpr float PROGRESS_2 = 0.065f;		// 地球姿态调整中期
+	constexpr float PROGRESS_2_1 = 0.068f;		// 地球加速的螺旋尾迹消失
+	constexpr float PROGRESS_3 = 0.105f;		// 地球姿态调整结束，北极与地球运行方向相反
+	constexpr float PROGRESS_3_1 = 0.108f;		// 地球减速的螺旋尾迹消失
+	constexpr float PROGRESS_4 = 0.109f;		// 全球发动机并网成功，启航
+	constexpr float PROGRESS_5 = 0.139f;		// 发动机全功率开启
 
 	/*************************************************************************
 	 Macro Defines

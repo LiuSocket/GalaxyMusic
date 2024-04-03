@@ -3,8 +3,9 @@
 const float M_PI = 3.141592657;
 
 const float PROGRESS_0 = 0.005;
-const float PROGRESS_1 = 0.020;
-const float PROGRESS_1_1 = 0.023;
+const float PROGRESS_1 = 0.025;
+const float PROGRESS_1_1 = 0.028;
+
 
 uniform float unit;
 uniform float times;

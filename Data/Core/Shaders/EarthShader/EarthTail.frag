@@ -35,10 +35,10 @@ const float hash[256] = float[](
 );
 
 const float PROGRESS_0 = 0.005;
-const float PROGRESS_1 = 0.020;
-const float PROGRESS_2 = 0.050;
-const float PROGRESS_3 = 0.080;
-const float PROGRESS_4 = 0.084;
+const float PROGRESS_1 = 0.025;
+const float PROGRESS_2 = 0.065;
+const float PROGRESS_3 = 0.105;
+const float PROGRESS_4 = 0.109;
 
 const int STEP_NUM = 64;
 const int LIGHT_SAMPLE = 4;
@@ -172,24 +172,26 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 
 float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 {
+	float torqueSign = 1;
+#ifdef TORQUE_TIME_0
+	torqueSign = -1;
+#endif // TORQUE_TIME_0
+
 	float ratioZ = modelStepPos.z / EARTH_RADIUS;
 	float thetaYZ = atan(modelStepPos.y / modelStepPos.z);
 
-	vec3 shapeUVW = vec3(modelStepPos.x, thetaYZ, length(modelStepPos.yz)) / vec3(EARTH_RADIUS, M_PI, 0.5*EARTH_RADIUS);
+	vec3 erosionUVW = vec3(modelStepPos.x, thetaYZ, length(modelStepPos.yz)) / vec3(0.81*EARTH_RADIUS, 0.5*M_PI, 1.403*EARTH_RADIUS);
+	erosionUVW.y += times*0.021*torqueSign;
+	vec3 offsetUVW = texture3D(noiseErosionTex, fract(erosionUVW)).bgr;
 
-	float upSpeed = exp2(-abs(ratioZ)*4)/M_PI;
-#ifdef TORQUE_TIME_0
-	upSpeed *= -1;
-#endif // TORQUE_TIME_0
-	shapeUVW.z += upSpeed*thetaYZ;
+	vec3 shapeUVW = vec3(modelStepPos.x, thetaYZ, length(modelStepPos.yz)) / vec3(EARTH_RADIUS, M_PI, 0.5*EARTH_RADIUS);
+	shapeUVW.y += times*0.017*torqueSign;
+	shapeUVW += offsetUVW*0.5;
+	shapeUVW.z += thetaYZ*torqueSign*2*exp2(-abs(ratioZ))/M_PI;
 
 	vec4 shape4 = texture3D(noiseShapeTex, fract(shapeUVW));
 	float texDens = max(0, shape4.x - 0.35*shape4.y - 0.11*shape4.z - 0.09*shape4.w);
-
-#ifdef TORQUE_TIME_0
-	thetaYZ *= -1;
-#endif // TORQUE_TIME_0
-	texDens *= max((thetaYZ + 0.5) * 0.5, exp2(-ratioZ*ratioZ*20));
+	texDens *= max((thetaYZ*torqueSign + 0.5) * 0.4, 0.8*exp2(-ratioZ*ratioZ*20));
 	return texDens;
 }
 
@@ -268,7 +270,7 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 	float ratioR = length(modelStepPos) / ATMOS_RADIUS;
 
 	vec3 erosionUVW = modelStepPos/ATMOS_RADIUS;
-	erosionUVW *= vec3(1, 1, 0.413);		
+	erosionUVW *= vec3(1, 1, 0.413);
 	erosionUVW.z -= times*0.004;
 
 	vec3 offsetUVW = texture3D(noiseErosionTex, fract(erosionUVW)).bgr;
