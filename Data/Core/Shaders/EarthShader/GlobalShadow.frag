@@ -4,11 +4,11 @@
 #ifdef WANDERING
 const float PROGRESS_0 =	0.005;
 const float PROGRESS_1 =	0.03; // end of brake time
-const float PROGRESS_1_1 =	0.035;
+const float PROGRESS_1_1 =	0.04;
 const float PROGRESS_2 =	0.09; // middle of torque time
 const float PROGRESS_2_1 =	0.1;
 const float PROGRESS_3 =	0.15; // end of torque time
-const float PROGRESS_4 =	0.152;
+const float PROGRESS_3_1 =	0.152;
 uniform float wanderProgress;
 #endif // WANDERING	
 
@@ -35,7 +35,7 @@ void main()
 
 	float torqueArea = clamp((0.3-abs(texCoord_0.y*2-1))*4,0,1); torqueArea *= torqueArea;
 	float torqueStart = float(wanderProgress>PROGRESS_0 && wanderProgress<PROGRESS_3)*torqueArea;
-	float allStart = max(torqueStart, clamp((wanderProgress-(PROGRESS_4+0.02))*50, 0, 1));
+	float allStart = max(torqueStart, clamp((wanderProgress-(PROGRESS_3_1+0.02))*50, 0, 1));
 
 	cloudAlpha = mix(cloudAlpha, wanderingCloudAlpha, allStart);
 #endif // WANDERING	

@@ -547,7 +547,7 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 
 	// 暂时根据流浪地球计划进度来设置行星发动机的开启或关闭，由此改变地球的加速度，后续可以让用户自由控制
 	SEarthAcceleration sEA = SEarthAcceleration();
-	float fTorqueStart = CGMKit::Mix(PROGRESS_4, PROGRESS_5, 0.1f);// 转向发动机启动要稍微慢一些
+	float fTorqueStart = CGMKit::Mix(PROGRESS_3_1, PROGRESS_4, 0.1f);// 转向发动机启动要稍微慢一些
 	float fTorqueRatio = 0.0f; // 转向发动机
 	float fPropulsionRatio = 0.0f; // 推进发动机
 	float fON = 1.0f; // 0表示发动机正在逐步关闭，1表示发动机正在逐步开启
@@ -608,18 +608,18 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 
 		fPropulsionRatio = 0;
 	}
-	else if (fWanderProgress < PROGRESS_4)
+	else if (fWanderProgress < PROGRESS_3_1)
 	{
 		sEA = SEarthAcceleration();
 	}
-	else if (fWanderProgress < PROGRESS_5)
+	else if (fWanderProgress < PROGRESS_4)
 	{
 		// 启航
 		sEA.fAccelerationFront = 1.0;
 		sEA.fAccelerationRoll = 0.0;
 
-		fTorqueRatio = fmaxf((fWanderProgress - fTorqueStart) / (PROGRESS_5 - fTorqueStart), 0.0f);
-		fPropulsionRatio = fmaxf((fWanderProgress - PROGRESS_4) / (PROGRESS_5 - PROGRESS_4), 0.0f);
+		fTorqueRatio = fmaxf((fWanderProgress - fTorqueStart) / (PROGRESS_4 - fTorqueStart), 0.0f);
+		fPropulsionRatio = fmaxf((fWanderProgress - PROGRESS_3_1) / (PROGRESS_4 - PROGRESS_3_1), 0.0f);
 	}
 	else
 	{
@@ -627,8 +627,8 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 		sEA.fAccelerationFront = 1.0;
 		sEA.fAccelerationRoll = 0.0;
 
-		fTorqueRatio = fmaxf((fWanderProgress - fTorqueStart) / (PROGRESS_5 - fTorqueStart), 0.0f);
-		fPropulsionRatio = fmaxf((fWanderProgress - PROGRESS_4) / (PROGRESS_5 - PROGRESS_4), 0.0f);
+		fTorqueRatio = fmaxf((fWanderProgress - fTorqueStart) / (PROGRESS_4 - fTorqueStart), 0.0f);
+		fPropulsionRatio = fmaxf((fWanderProgress - PROGRESS_3_1) / (PROGRESS_4 - PROGRESS_3_1), 0.0f);
 	}
 
 	if (m_pEEDirControl->GetAcceleration() != sEA)

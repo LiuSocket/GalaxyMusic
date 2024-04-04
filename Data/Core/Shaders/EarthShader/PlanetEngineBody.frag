@@ -35,7 +35,7 @@ void main()
 	float Rv = gl_TexCoord[0].w;
 	color.rgb += AtmosColor(vertAlt, viewPos, viewDir, viewEngineUp, Rv);
 
-	if((wanderProgress > PROGRESS_4) && (unit > 1e6))
+	if((wanderProgress > PROGRESS_3_1) && (unit > 1e6))
 	{
 		vec4 tailColor = texture(tailTex, gl_FragCoord.xy/screenSize.xy);
 		color.rgb = mix(color.rgb, tailColor.rgb, tailColor.a);

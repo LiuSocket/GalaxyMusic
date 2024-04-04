@@ -58,7 +58,7 @@ void main()
 
 	float torqueArea = clamp((0.3-abs(texCoord_0.y*2-1))*4,0,1); torqueArea *= torqueArea;
 	float torqueStart = float(wanderProgress>PROGRESS_0 && wanderProgress<PROGRESS_3)*torqueArea;
-	float allStart = max(torqueStart, clamp((wanderProgress-(PROGRESS_4+0.02))*50, 0, 1));
+	float allStart = max(torqueStart, clamp((wanderProgress-(PROGRESS_3_1+0.02))*50, 0, 1));
 
 	baseColor.a = mix(baseColor.a, wanderingCloud, allStart);
 #endif // WANDERING	

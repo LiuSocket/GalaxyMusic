@@ -32,7 +32,7 @@ CGMEarthTail Methods
 CGMEarthTail::CGMEarthTail(): CGMVolumeBasic(),
 	m_strCoreGalaxyTexPath("Textures/Galaxy/"),
 	m_strEarthShaderPath("Shaders/EarthShader/"), m_strGalaxyShaderPath("Shaders/GalaxyShader/"),
-	m_bVisible(false), m_iWanderPeriod(0),
+	m_bVisible(false),
 	m_fTailVisibleUniform(new osg::Uniform("tailVisible", 1.0f)),
 	m_mWorld2SpiralUniform(new osg::Uniform("world2SpiralMatrix", osg::Matrixf())),
 	m_mView2SpiralUniform(new osg::Uniform("view2SpiralMatrix", osg::Matrixf()))
@@ -91,9 +91,9 @@ bool CGMEarthTail::Update(double dDeltaTime)
 	m_fWanderProgressUniform->get(fWanderProgress);
 
 	// 设置尾迹包络节点的显隐
-	if((fWanderProgress >= PROGRESS_4) && (0 == m_pTailEnvelopeGeode2->getNodeMask()))
+	if((fWanderProgress >= PROGRESS_3_1) && (0 == m_pTailEnvelopeGeode2->getNodeMask()))
 		m_pTailEnvelopeGeode2->setNodeMask(~0);
-	else if ((fWanderProgress < PROGRESS_4) && (0 != m_pTailEnvelopeGeode2->getNodeMask()))
+	else if ((fWanderProgress < PROGRESS_3_1) && (0 != m_pTailEnvelopeGeode2->getNodeMask()))
 		m_pTailEnvelopeGeode2->setNodeMask(0);
 	else{}
 
@@ -103,9 +103,9 @@ bool CGMEarthTail::Update(double dDeltaTime)
 	else if (((fWanderProgress < PROGRESS_1) || (fWanderProgress > PROGRESS_2_1)) && (0 != m_pSpiralPositiveGeode2->getNodeMask()))
 		m_pSpiralPositiveGeode2->setNodeMask(0);
 	else {}
-	if ((fWanderProgress >= PROGRESS_2) && (fWanderProgress <= PROGRESS_4) && (0 == m_pSpiralNegativeGeode2->getNodeMask()))
+	if ((fWanderProgress >= PROGRESS_2) && (fWanderProgress <= PROGRESS_3_1) && (0 == m_pSpiralNegativeGeode2->getNodeMask()))
 		m_pSpiralNegativeGeode2->setNodeMask(~0);
-	else if (((fWanderProgress < PROGRESS_2) || (fWanderProgress > PROGRESS_4)) && (0 != m_pSpiralNegativeGeode2->getNodeMask()))
+	else if (((fWanderProgress < PROGRESS_2) || (fWanderProgress > PROGRESS_3_1)) && (0 != m_pSpiralNegativeGeode2->getNodeMask()))
 		m_pSpiralNegativeGeode2->setNodeMask(0);
 	else {}
 
@@ -134,7 +134,7 @@ bool CGMEarthTail::Update(double dDeltaTime)
 		// 重新加速自转，调转地球北极方向
 		_SetWanderPeriod(2);
 	}
-	else if (fWanderProgress < PROGRESS_3)
+	else if (fWanderProgress < PROGRESS_3_1)
 	{
 		// 自转减慢到0，让地球北极方向与地球前进方向相反
 		_SetWanderPeriod(3);
@@ -1138,9 +1138,10 @@ osg::Vec3 CGMEarthTail::_GetTailEnvelopePos(const osg::Vec2 fCoordUV, const floa
 
 void CGMEarthTail::_SetWanderPeriod(const int iWanderPeriod)
 {
-	if (iWanderPeriod == m_iWanderPeriod) return;
+	static int s_iWanderPeriod = 0;
+	if (iWanderPeriod == s_iWanderPeriod) return;
 
-	m_iWanderPeriod = iWanderPeriod;
+	s_iWanderPeriod = iWanderPeriod;
 	if (1 == iWanderPeriod)
 	{
 		m_pSsTailDecFace->setDefine("BRAKE_TIME", osg::StateAttribute::ON);

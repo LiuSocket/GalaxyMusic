@@ -5,11 +5,11 @@ const float M_PI = 3.141592657;
 
 const float PROGRESS_0 =	0.005;
 const float PROGRESS_1 =	0.03; // end of brake time
-const float PROGRESS_1_1 =	0.035;
+const float PROGRESS_1_1 =	0.04;
 const float PROGRESS_2 =	0.09; // middle of torque time
 const float PROGRESS_2_1 =	0.1;
 const float PROGRESS_3 =	0.15; // end of torque time
-const float PROGRESS_4 =	0.152;
+const float PROGRESS_3_1 =	0.152;
 
 uniform float unit;
 uniform float times;
@@ -79,7 +79,7 @@ void main()
 	float spiralAcceFallSpace = clamp((v-0.7+1.6*spiralAcceFallTime)*4, 0, 1);
 	// decelerate progress
 	float spiralDeceGrowTime = clamp((wanderProgress-PROGRESS_2)*2/(PROGRESS_3-PROGRESS_2), 0, 1);
-	float spiralDeceFallTime = clamp((wanderProgress-PROGRESS_4)*0.09/(PROGRESS_3-PROGRESS_4), 0, 1);
+	float spiralDeceFallTime = clamp((wanderProgress-PROGRESS_3_1)*0.09/(PROGRESS_3-PROGRESS_3_1), 0, 1);
 	float spiralDeceGrowSpace = clamp((1.2*spiralDeceGrowTime-(v-1))*5, 0, 1);
 	float spiralDeceFallSpace = clamp((v-1.7+1.6*spiralDeceFallTime)*4, 0, 1);
 	// acce / dece

@@ -63,10 +63,12 @@ bool CGMPlanet::Init(SGMConfigData * pConfigData)
 osg::Geometry* CGMPlanet::MakeHexahedronSphereGeometry(int iSegment)
 {
 	// 为了效率，限制iSegment的上限，以防element超过65536
-	iSegment = osg::clampBetween(iSegment, 1, 32);
+	iSegment = osg::clampBetween(iSegment, 2, 32);
 	float fHalfSize = iSegment * 0.5f;
 	int iVertPerEdge = iSegment + 1;
 	int iVertPerFace = iVertPerEdge * iVertPerEdge;
+	// 国际日期变更线上需要两份UV，所以需要两份顶点
+	int iVertCalenderLine = (iSegment/2 + 1) * 2 + (iSegment + 1);
 	osg::Geometry* geom = new osg::Geometry();
 	geom->setUseVertexBufferObjects(true);
 
@@ -76,10 +78,10 @@ osg::Geometry* CGMPlanet::MakeHexahedronSphereGeometry(int iSegment)
 	osg::Vec3Array* normals = new osg::Vec3Array();
 	osg::DrawElementsUShort* el = new osg::DrawElementsUShort(GL_TRIANGLES);
 
-	verts->reserve(iVertPerFace * 6);
-	coords0->reserve(iVertPerFace * 6);
-	coords1->reserve(iVertPerFace * 6);
-	normals->reserve(iVertPerFace * 6);
+	verts->reserve(iVertPerFace * 6 + iVertCalenderLine);
+	coords0->reserve(iVertPerFace * 6 + iVertCalenderLine);
+	coords1->reserve(iVertPerFace * 6 + iVertCalenderLine);
+	normals->reserve(iVertPerFace * 6 + iVertCalenderLine);
 	el->reserve(iSegment * iSegment * 6 * 6);
 
 	geom->setTexCoordArray(0, coords0);
@@ -89,11 +91,11 @@ osg::Geometry* CGMPlanet::MakeHexahedronSphereGeometry(int iSegment)
 	geom->setVertexArray(verts);
 	geom->addPrimitiveSet(el);
 
+	osg::Vec3 vCenter = osg::Vec3(0, 1, 0);
+	osg::Vec3 vAxisX = osg::Vec3(1, 0, 0);
+	osg::Vec3 vAxisY = osg::Vec3(0, 0, 1);
 	for (int i = 0; i < 6; i++)
 	{
-		osg::Vec3 vCenter = osg::Vec3(0, 1, 0);
-		osg::Vec3 vAxisX = osg::Vec3(1, 0, 0);
-		osg::Vec3 vAxisY = osg::Vec3(0, 0, 1);
 		switch (i)
 		{
 		case 0:
@@ -157,7 +159,7 @@ osg::Geometry* CGMPlanet::MakeHexahedronSphereGeometry(int iSegment)
 					+ vAxisY * (y - fHalfSize) / fHalfSize;
 				vDir.normalize();
 
-				float fLon = atan2(vDir.y(), vDir.x());// 弧度
+				float fLon = atan2(vDir.y(), vDir.x());// 弧度 (-PI, PI]
 				float fLat = asin(vDir.z());// 弧度
 
 				verts->push_back(vDir);
@@ -168,18 +170,78 @@ osg::Geometry* CGMPlanet::MakeHexahedronSphereGeometry(int iSegment)
 				normals->push_back(vDir);
 				if (x < iSegment && y < iSegment)
 				{
-					int x_plus = x + 1;
-					int y_plus = y + 1;
+					osg::Vec3 vFragOut = vCenter
+						+ vAxisX * (x + 0.5 - fHalfSize) / fHalfSize
+						+ vAxisY * (y + 0.5 - fHalfSize) / fHalfSize;
+					bool bEast = vFragOut.y() > 0;
 
-					el->push_back(iVertPerFace * i + y * iVertPerEdge + x);
-					el->push_back(iVertPerFace * i + y * iVertPerEdge + x_plus);
-					el->push_back(iVertPerFace * i + y_plus * iVertPerEdge + x);
-					el->push_back(iVertPerFace * i + y * iVertPerEdge + x_plus);
-					el->push_back(iVertPerFace * i + y_plus * iVertPerEdge + x_plus);
-					el->push_back(iVertPerFace * i + y_plus * iVertPerEdge + x);
+					el->push_back(_GetVertIndex(i, x, y, iSegment, bEast));
+					el->push_back(_GetVertIndex(i, x + 1, y, iSegment, bEast));
+					el->push_back(_GetVertIndex(i, x, y + 1, iSegment, bEast));
+					el->push_back(_GetVertIndex(i, x + 1, y, iSegment, bEast));
+					el->push_back(_GetVertIndex(i, x + 1, y + 1, iSegment, bEast));
+					el->push_back(_GetVertIndex(i, x, y + 1, iSegment, bEast));
 				}
 			}
 		}
+	}
+
+	// 国际日期变更线上的顶点，由于处在三个面上，需要分成三段分别考虑
+	// 经度为-180°，按照纬度升序排列顶点，第一段面朝下(negZ)，第三段面朝上(posZ)
+	
+	// negZ
+	for (int k = 0; k <= iSegment / 2; k++)
+	{
+		vCenter = osg::Vec3(0, 0, -1);
+		vAxisX = osg::Vec3(0, 1, 0);
+		vAxisY = osg::Vec3(1, 0, 0);
+
+		osg::Vec3 vDir = vCenter - vAxisY * k / fHalfSize;
+		vDir.normalize();
+		float fLat = asin(vDir.z());// 弧度
+
+		verts->push_back(vDir);
+		// 0层纹理单元 xy = WGS84对应的UV，[0.0, 1.0]
+		// 1层纹理单元 xy = 六面体贴图UV，[0.0, 1.0]; z = 面对应的编号5
+		coords0->push_back(osg::Vec2(0.0f, 0.5f + fLat / (osg::PI)));
+		coords1->push_back(osg::Vec3(0.5f, 0.5f * (1 - k / float(iSegment / 2)), 5));
+		normals->push_back(vDir);
+	}
+	// negX
+	for (int k = 0; k <= iSegment; k++)
+	{
+		vCenter = osg::Vec3(-1, 0, 0);
+		vAxisX = osg::Vec3(0, -1, 0);
+		vAxisY = osg::Vec3(0, 0, 1);
+
+		osg::Vec3 vDir = vCenter + vAxisY * (k - fHalfSize) / fHalfSize;
+		vDir.normalize();
+		float fLat = asin(vDir.z());// 弧度
+
+		verts->push_back(vDir);
+		// 0层纹理单元 xy = WGS84对应的UV，[0.0, 1.0]
+		// 1层纹理单元 xy = 六面体贴图UV，[0.0, 1.0]; z = 面对应的编号1
+		coords0->push_back(osg::Vec2(0.0f, 0.5f + fLat / (osg::PI)));
+		coords1->push_back(osg::Vec3(0.5f, k / float(iSegment), 1));
+		normals->push_back(vDir);
+	}
+	// posZ
+	for (int k = 0; k <= iSegment / 2; k++)
+	{
+		vCenter = osg::Vec3(0, 0, 1);
+		vAxisX = osg::Vec3(0, 1, 0);
+		vAxisY = osg::Vec3(-1, 0, 0);
+
+		osg::Vec3 vDir = vCenter + vAxisY * (fHalfSize - k) / fHalfSize;
+		vDir.normalize();
+		float fLat = asin(vDir.z());// 弧度
+
+		verts->push_back(vDir);
+		// 0层纹理单元 xy = WGS84对应的UV，[0.0, 1.0]
+		// 1层纹理单元 xy = 六面体贴图UV，[0.0, 1.0]; z = 面对应的编号4
+		coords0->push_back(osg::Vec2(0.0f, 0.5f + fLat / (osg::PI)));
+		coords1->push_back(osg::Vec3(0.5f, 1.0f - 0.5f * k / float(iSegment / 2), 4));
+		normals->push_back(vDir);
 	}
 
 	return geom;
@@ -590,4 +652,38 @@ bool CGMPlanet::_Panorama_2_CubeMap(const std::string& strPanoramaPath, const st
 	}
 	); // end parallel_for
 	return true;
+}
+
+int CGMPlanet::_GetVertIndex(const int iFace, const int iX, const int iY, const int iSegment, const bool bEast)
+{
+	int iHalfSeg = iSegment / 2;
+	int iVertPerEdge = iSegment + 1;
+	int iVertPerFace = iVertPerEdge * iVertPerEdge;
+	int iIndex = iVertPerFace * iFace + iY * iVertPerEdge + iX;
+
+	// 如果在东半球，就不需要考虑“纬度突变”的情况
+	if (bEast) return iIndex;
+
+	// 判断是否在国际日期变更线上
+	if (iHalfSeg == iX)
+	{
+		if (5 == iFace && iHalfSeg >= iY)
+		{
+			// negZ
+			iIndex = iVertPerFace * 6 + (iHalfSeg - iY);
+		}
+		else if (1 == iFace)
+		{
+			// negX
+			iIndex = iVertPerFace * 6 + iHalfSeg + 1 + iY;
+		}
+		else if (4 == iFace && iHalfSeg <= iY)
+		{
+			// posZ
+			iIndex = iVertPerFace * 6 + 2*(iSegment + 1) + iHalfSeg - iY;
+		}
+		else {}
+	}
+
+	return iIndex;
 }

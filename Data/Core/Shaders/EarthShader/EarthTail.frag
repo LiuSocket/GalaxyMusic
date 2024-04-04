@@ -36,11 +36,11 @@ const float hash[256] = float[](
 
 const float PROGRESS_0 =	0.005;
 const float PROGRESS_1 =	0.03; // end of brake time
-const float PROGRESS_1_1 =	0.035;
+const float PROGRESS_1_1 =	0.04;
 const float PROGRESS_2 =	0.09; // middle of torque time
 const float PROGRESS_2_1 =	0.1;
 const float PROGRESS_3 =	0.15; // end of torque time
-const float PROGRESS_4 =	0.152;
+const float PROGRESS_3_1 =	0.152;
 
 const int STEP_NUM = 64;
 const int LIGHT_SAMPLE = 4;
@@ -175,7 +175,7 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 {
 	float startProgress = (wanderProgress - PROGRESS_2)*50;
-	float endProgress = 1-(PROGRESS_3 - wanderProgress)*100;
+	float endProgress = 1-(PROGRESS_3_1 - wanderProgress)*110;
 	float torqueSign = 1;
 #ifdef TORQUE_TIME_0
 	startProgress = (wanderProgress - PROGRESS_1)*50;

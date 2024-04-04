@@ -40,8 +40,9 @@ namespace GM
 
 		/**
 		* @brief 创建六面体细分后的球体，每个顶点都有法线和UV
-		* UV.xy = WGS84对应的UV，[0.0, 1.0]
-		* UV.zw = 六面体贴图UV，[0.0, 1.0]
+		* UV0.xy = WGS84对应的UV，[0.0, 1.0]
+		* UV1.xy = 六面体贴图UV，[0.0, 1.0]
+		* UV1.z = 六面体ID，0,1,2,3,4,5
 		* @param iSegment:			六面体的每个边长的分段数
 		* @return Geometry:			返回几何体指针
 		*/
@@ -94,6 +95,16 @@ namespace GM
 		bool _Panorama_2_CubeMap(
 			const std::string& strPanoramaPath,
 			const std::string& strCubeMapPath);
+
+		/**
+		* @brief 根据顶点的信息获取顶点的索引，会特殊处理国际日期变更线上的顶点
+		* @param iFace: 顶点所在的面
+		* @param iX，iY: 顶点的XY位置
+		* @param iSegment: 六面体的每个边长的分段数
+		* @param bEast:	是否是东半球，如果不是，就需要考虑去“变更线”上找索引 
+		* @return int: 顶点的索引
+		*/
+		int _GetVertIndex(const int iFace, const int iX, const int iY, const int iSegment, const bool bEast);
 
 		// 变量
 	protected:

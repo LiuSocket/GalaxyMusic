@@ -290,7 +290,6 @@ namespace GM
 		osg::ref_ptr<osg::StateSet>						m_pSsTailDecVert;				//!< 流浪地球尾迹12面体点状态集
 
 		bool											m_bVisible;						//!< 流浪地球尾迹是否可见
-		int												m_iWanderPeriod;				//!< 流浪地球计划，当前所处的阶段
 		osg::ref_ptr<osg::Uniform>						m_fTailVisibleUniform;			//!< 流浪地球尾迹可见度的Uniform
 		osg::ref_ptr<osg::Uniform>						m_mWorld2ECEFUniform;			//!< “2级世界空间”转 ECEF 的矩阵
 		osg::ref_ptr<osg::Uniform>						m_mView2ECEFUniform;			//!< view空间转ECEF的矩阵
