@@ -2,7 +2,7 @@
 
 const float M_PI = 3.1415926;
 
-uniform vec2 engineStartRatio;
+uniform vec3 engineStartRatio;
 uniform float unit;
 
 out float noise;
@@ -21,6 +21,7 @@ void main()
 	float startSpeed = 1-0.1*noise;
 	vec3 MVU = normalize(gl_Vertex.xyz);
 	float lon = abs(atan(MVU.x, MVU.y))/M_PI;
+	lon = (engineStartRatio.z > 0.5) ? lon : 1-lon;
 	intensity *= max(clamp(30*(MVU.z-1+engineStartRatio.y*startSpeed),0,1),
 		clamp(30*(2*engineStartRatio.x*startSpeed-lon),0,1)*clamp((0.2-abs(MVU.z))*10,0,1));
 	// for near discard

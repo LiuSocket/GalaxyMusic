@@ -103,9 +103,9 @@ bool CGMEarthTail::Update(double dDeltaTime)
 	else if (((fWanderProgress < PROGRESS_1) || (fWanderProgress > PROGRESS_2_1)) && (0 != m_pSpiralPositiveGeode2->getNodeMask()))
 		m_pSpiralPositiveGeode2->setNodeMask(0);
 	else {}
-	if ((fWanderProgress >= PROGRESS_2) && (fWanderProgress <= PROGRESS_3_1) && (0 == m_pSpiralNegativeGeode2->getNodeMask()))
+	if ((fWanderProgress >= PROGRESS_2) && (fWanderProgress <= PROGRESS_4) && (0 == m_pSpiralNegativeGeode2->getNodeMask()))
 		m_pSpiralNegativeGeode2->setNodeMask(~0);
-	else if (((fWanderProgress < PROGRESS_2) || (fWanderProgress > PROGRESS_3_1)) && (0 != m_pSpiralNegativeGeode2->getNodeMask()))
+	else if (((fWanderProgress < PROGRESS_2) || (fWanderProgress > PROGRESS_4)) && (0 != m_pSpiralNegativeGeode2->getNodeMask()))
 		m_pSpiralNegativeGeode2->setNodeMask(0);
 	else {}
 

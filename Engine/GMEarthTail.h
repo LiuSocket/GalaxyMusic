@@ -298,7 +298,8 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_mView2SpiralUniform;			//!< view空间转“螺旋尾迹空间”矩阵
 		osg::ref_ptr<osg::Uniform>						m_vViewLightUniform;			//!< view空间的光源方向
 		osg::ref_ptr<osg::Uniform>						m_fWanderProgressUniform;		//!< 流浪地球计划进展Uniform
-		osg::ref_ptr<osg::Uniform>						m_vEngineStartRatioUniform;		//!< 开启比例，x=转向，y=推进
+		//!< 开启比例，x=转向，y=推进，z=0表示发动机正在逐步关闭，z=1表示发动机正在逐步开启
+		osg::ref_ptr<osg::Uniform>						m_vEngineStartRatioUniform;
 
 		osg::ref_ptr<CEarthTailBoxVisitor>				m_pEarthTailBoxVisitor;			//!< 地球尾迹的画布盒的访问器
 	};

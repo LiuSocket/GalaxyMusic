@@ -34,11 +34,13 @@ const float hash[256] = float[](
 	222,114, 67, 29, 24, 72,243,141,128,195, 78, 66,215, 61,156,180
 );
 
-const float PROGRESS_0 = 0.005;
-const float PROGRESS_1 = 0.025;
-const float PROGRESS_2 = 0.065;
-const float PROGRESS_3 = 0.105;
-const float PROGRESS_4 = 0.109;
+const float PROGRESS_0 =	0.005;
+const float PROGRESS_1 =	0.03; // end of brake time
+const float PROGRESS_1_1 =	0.035;
+const float PROGRESS_2 =	0.09; // middle of torque time
+const float PROGRESS_2_1 =	0.1;
+const float PROGRESS_3 =	0.15; // end of torque time
+const float PROGRESS_4 =	0.152;
 
 const int STEP_NUM = 64;
 const int LIGHT_SAMPLE = 4;
@@ -52,9 +54,9 @@ uniform float times;
 uniform float pixelLength;
 uniform float tailVisible;
 uniform float wanderProgress;
-uniform vec2 engineStartRatio;
 uniform vec2 shakeVec;
 uniform vec2 deltaShakeVec;
+uniform vec3 engineStartRatio;
 uniform vec3 screenSize;
 uniform vec3 eyeFrontDir;
 uniform vec3 eyeRightDir;
@@ -172,26 +174,38 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 
 float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 {
+	float startProgress = (wanderProgress - PROGRESS_2)*50;
+	float endProgress = 1-(PROGRESS_3 - wanderProgress)*100;
 	float torqueSign = 1;
 #ifdef TORQUE_TIME_0
+	startProgress = (wanderProgress - PROGRESS_1)*50;
+	endProgress = 1-(PROGRESS_2 - wanderProgress)*100;
 	torqueSign = -1;
 #endif // TORQUE_TIME_0
 
+	float ratioAlt = length(modelStepPos) / EARTH_RADIUS;
 	float ratioZ = modelStepPos.z / EARTH_RADIUS;
-	float thetaYZ = atan(modelStepPos.y / modelStepPos.z);
+	float thetaYZ = atan(modelStepPos.y / modelStepPos.z)/M_PI;
 
-	vec3 erosionUVW = vec3(modelStepPos.x, thetaYZ, length(modelStepPos.yz)) / vec3(0.81*EARTH_RADIUS, 0.5*M_PI, 1.403*EARTH_RADIUS);
+	vec3 erosionUVW = vec3(modelStepPos.x, thetaYZ, length(modelStepPos.yz)) / vec3(0.81*EARTH_RADIUS, 0.5, 1.403*EARTH_RADIUS);
 	erosionUVW.y += times*0.021*torqueSign;
 	vec3 offsetUVW = texture3D(noiseErosionTex, fract(erosionUVW)).bgr;
 
-	vec3 shapeUVW = vec3(modelStepPos.x, thetaYZ, length(modelStepPos.yz)) / vec3(EARTH_RADIUS, M_PI, 0.5*EARTH_RADIUS);
+	vec3 shapeUVW = vec3(modelStepPos.x, thetaYZ, length(modelStepPos.yz)) / vec3(EARTH_RADIUS, 1.0, 0.5*EARTH_RADIUS);
 	shapeUVW.y += times*0.017*torqueSign;
 	shapeUVW += offsetUVW*0.5;
-	shapeUVW.z += thetaYZ*torqueSign*2*exp2(-abs(ratioZ))/M_PI;
+	shapeUVW.z += thetaYZ*torqueSign*2*exp2(-abs(ratioZ));
 
 	vec4 shape4 = texture3D(noiseShapeTex, fract(shapeUVW));
 	float texDens = max(0, shape4.x - 0.35*shape4.y - 0.11*shape4.z - 0.09*shape4.w);
-	texDens *= max((thetaYZ*torqueSign + 0.5) * 0.4, 0.8*exp2(-ratioZ*ratioZ*20));
+	texDens *= max((thetaYZ*torqueSign + 0.16) * 1.6, exp2(-ratioZ*ratioZ*20));
+	// fade by altitude
+	texDens *= exp2(min(0, 1-ratioAlt)*5);
+	// start progress
+	texDens *= clamp((startProgress-abs(ratioZ))*3, 0, 1);
+	// end progress
+	texDens *= clamp((abs(ratioZ)-endProgress)*3, 0, 1);
+
 	return texDens;
 }
 

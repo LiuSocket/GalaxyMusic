@@ -479,7 +479,7 @@ CGMEarthEngine::CGMEarthEngine() : m_pKernelData(nullptr), m_pCommonUniform(null
 	m_strCoreModelPath("Models/"),
 	m_strGalaxyShaderPath("Shaders/GalaxyShader/"),
 	m_strEarthShaderPath("Shaders/EarthShader/"),
-	m_vEngineStartRatioUniform(new osg::Uniform("engineStartRatio", osg::Vec2f(0.0f,0.0f))),
+	m_vEngineStartRatioUniform(new osg::Uniform("engineStartRatio", osg::Vec3f(0.0f,0.0f,0.0f))),
 	m_fEarthSpin(0.0)
 {
 	m_pEarthEngineRoot_1 = new osg::Group();
@@ -548,8 +548,9 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 	// 暂时根据流浪地球计划进度来设置行星发动机的开启或关闭，由此改变地球的加速度，后续可以让用户自由控制
 	SEarthAcceleration sEA = SEarthAcceleration();
 	float fTorqueStart = CGMKit::Mix(PROGRESS_4, PROGRESS_5, 0.1f);// 转向发动机启动要稍微慢一些
-	float fTorqueRatio = 0.0f;// 转向发动机
-	float fPropulsionRatio = 0.0f;//  推进发动机
+	float fTorqueRatio = 0.0f; // 转向发动机
+	float fPropulsionRatio = 0.0f; // 推进发动机
+	float fON = 1.0f; // 0表示发动机正在逐步关闭，1表示发动机正在逐步开启
 
 	if (fWanderProgress < PROGRESS_0)
 	{	
@@ -561,12 +562,15 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 		sEA.fAccelerationFront = 0;
 		sEA.fAccelerationRoll = -0.1;
 
-		float fTorqueFullStart = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.2f);// 转向发动机全部启动
-		float fTorqueFullEnd = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.8f);// 转向发动机开始关闭
+		float fTorqueFullStart = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.1f);// 转向发动机全部启动
+		float fTorqueShutDown = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.8f);// 转向发动机开始关闭
+		float fTorqueFullEnd = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.85f);// 转向发动机全部关闭
 		fTorqueRatio = osg::clampBetween((fWanderProgress - PROGRESS_0) / (fTorqueFullStart - PROGRESS_0), 0.0f, 1.0f)
-			* osg::clampBetween((fWanderProgress - PROGRESS_1) / (fTorqueFullEnd - PROGRESS_1), 0.0f, 1.0f);
+			* osg::clampBetween((fWanderProgress - fTorqueFullEnd) / (fTorqueShutDown - fTorqueFullEnd), 0.0f, 1.0f);
 
 		fPropulsionRatio = 0;
+		// 开始的时候发动机逐步开启，最后逐步关闭
+		fON = (fWanderProgress < (PROGRESS_0 + PROGRESS_1) * 0.5) ? 1.0f : 0.0f;
 	}
 	else if (fWanderProgress < PROGRESS_3)
 	{
@@ -579,19 +583,27 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 			// 重新加速自转，调转地球北极方向
 			sEA.qAccelerationTurn = osg::Quat(0.1, vTurnAxis);
 
-			float fTorqueFullStart = CGMKit::Mix(PROGRESS_1, PROGRESS_2, 0.2f);// 转向发动机全部启动
-			float fTorqueFullEnd = CGMKit::Mix(PROGRESS_1, PROGRESS_2, 0.8f);// 转向发动机开始关闭
+			float fTorqueFullStart = CGMKit::Mix(PROGRESS_1, PROGRESS_2, 0.1f);// 转向发动机全部启动
+			float fTorqueShutDown = CGMKit::Mix(PROGRESS_1, PROGRESS_2, 0.8f);// 转向发动机开始关闭
+			float fTorqueFullEnd = CGMKit::Mix(PROGRESS_1, PROGRESS_2, 0.85f);// 转向发动机全部关闭
 			fTorqueRatio = osg::clampBetween((fWanderProgress - PROGRESS_1) / (fTorqueFullStart - PROGRESS_1), 0.0f, 1.0f)
-				* osg::clampBetween((fWanderProgress - PROGRESS_2) / (fTorqueFullEnd - PROGRESS_2), 0.0f, 1.0f);
+				* osg::clampBetween((fWanderProgress - fTorqueFullEnd) / (fTorqueShutDown - fTorqueFullEnd), 0.0f, 1.0f);
+
+			// 开始的时候发动机逐步开启，最后逐步关闭
+			fON = (fWanderProgress < (PROGRESS_1 + PROGRESS_2) * 0.5) ? 1.0f : 0.0f;
 		}
 		else// 自转减慢到0，让地球北极方向与地球前进方向相反
 		{
 			sEA.qAccelerationTurn = osg::Quat(-0.1, vTurnAxis);
 
-			float fTorqueFullStart = CGMKit::Mix(PROGRESS_2, PROGRESS_3, 0.2f);// 转向发动机全部启动
-			float fTorqueFullEnd = CGMKit::Mix(PROGRESS_2, PROGRESS_3, 0.8f);// 转向发动机开始关闭
+			float fTorqueFullStart = CGMKit::Mix(PROGRESS_2, PROGRESS_3, 0.1f);// 转向发动机全部启动
+			float fTorqueShutDown = CGMKit::Mix(PROGRESS_2, PROGRESS_3, 0.8f);// 转向发动机开始关闭
+			float fTorqueFullEnd = CGMKit::Mix(PROGRESS_2, PROGRESS_3, 0.85f);// 转向发动机全部关闭
 			fTorqueRatio = osg::clampBetween((fWanderProgress - PROGRESS_2) / (fTorqueFullStart - PROGRESS_2), 0.0f, 1.0f)
-				* osg::clampBetween((fWanderProgress - PROGRESS_3) / (fTorqueFullEnd - PROGRESS_3), 0.0f, 1.0f);
+				* osg::clampBetween((fWanderProgress - fTorqueFullEnd) / (fTorqueShutDown - fTorqueFullEnd), 0.0f, 1.0f);
+
+			// 开始的时候发动机逐步开启，最后逐步关闭
+			fON = (fWanderProgress < (PROGRESS_2 + PROGRESS_3) * 0.5) ? 1.0f : 0.0f;
 		}
 
 		fPropulsionRatio = 0;
@@ -633,7 +645,7 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 	}
 
 	// 每帧更新发动机启动率
-	m_vEngineStartRatioUniform->set(osg::Vec2f(fTorqueRatio, fPropulsionRatio));
+	m_vEngineStartRatioUniform->set(osg::Vec3f(fTorqueRatio, fPropulsionRatio, fON));
 
 	return true;
 }

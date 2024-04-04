@@ -86,6 +86,7 @@ void main()
 
 	// for start
 	float lon = abs(fract(texCoord_0.x-0.25)*2-1);
+	lon = (engineStartRatio.z > 0.5) ? lon : 1-lon;
 	float torqueArea = clamp((0.3-abs(texCoord_0.y*2-1))*4,0,1); torqueArea *= torqueArea;
 	float engineStart = max(
 		smoothstep(0.0, 0.2, (texCoord_0.y-1)*2+engineStartRatio.y)*exp2(min(0,texCoord_0.y-0.67)*40),

@@ -2,11 +2,13 @@
 
 #pragma import_defines(ATMOS, EARTH, WANDERING)
 
-const float PROGRESS_0 = 0.005;
-const float PROGRESS_1 = 0.025;
-const float PROGRESS_2 = 0.065;
-const float PROGRESS_3 = 0.105;
-const float PROGRESS_4 = 0.109;
+const float PROGRESS_0 =	0.005;
+const float PROGRESS_1 =	0.03; // end of brake time
+const float PROGRESS_1_1 =	0.035;
+const float PROGRESS_2 =	0.09; // middle of torque time
+const float PROGRESS_2_1 =	0.1;
+const float PROGRESS_3 =	0.15; // end of torque time
+const float PROGRESS_4 =	0.152;
 
 uniform vec3 viewUp;
 uniform vec3 viewLight;
@@ -14,7 +16,7 @@ uniform float minDotUL;
 
 #ifdef WANDERING
 uniform sampler2D tailTex;
-uniform vec2 engineStartRatio;
+uniform vec3 engineStartRatio;
 uniform float wanderProgress;
 #endif // WANDERING
 

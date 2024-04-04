@@ -222,7 +222,8 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_fMinDotULUniform;				//!< 有光区域的最小DotUL值(-1,0)
 		osg::ref_ptr<osg::Uniform>						m_fEyeAltitudeUniform;			//!< 眼点海拔Uniform
 		osg::ref_ptr<osg::Uniform>						m_fWanderProgressUniform;		//!< 流浪地球计划进展Uniform
-		osg::ref_ptr<osg::Uniform>						m_vEngineStartRatioUniform;		//!< 开启比例，x=转向，y=推进
+		//!< 开启比例，x=转向，y=推进，z=0表示发动机正在逐步关闭，z=1表示发动机正在逐步开启
+		osg::ref_ptr<osg::Uniform>						m_vEngineStartRatioUniform;
 
 		osg::ref_ptr<osgDB::Options>					m_pDDSOptions;					//!< dds的纹理操作
 		osg::ref_ptr<osg::EllipsoidModel>				m_pEllipsoid;					//!< 椭球模型

@@ -2,17 +2,19 @@
 #pragma import_defines(SPIRAL)
 
 const float M_PI = 3.141592657;
-const float PROGRESS_1 = 0.025;
-const float PROGRESS_2 = 0.065;
-const float PROGRESS_2_1 = 0.068;
-const float PROGRESS_3 = 0.105;
-const float PROGRESS_3_1 = 0.108;
-const float PROGRESS_4 = 0.109;
+
+const float PROGRESS_0 =	0.005;
+const float PROGRESS_1 =	0.03; // end of brake time
+const float PROGRESS_1_1 =	0.035;
+const float PROGRESS_2 =	0.09; // middle of torque time
+const float PROGRESS_2_1 =	0.1;
+const float PROGRESS_3 =	0.15; // end of torque time
+const float PROGRESS_4 =	0.152;
 
 uniform float unit;
 uniform float times;
 uniform float wanderProgress;
-uniform vec2 engineStartRatio;
+uniform vec3 engineStartRatio;
 uniform vec3 viewLight;
 uniform sampler2D noise2DTex;
 
@@ -72,14 +74,14 @@ void main()
 
 	// accelerate progress
 	float spiralAcceGrowTime = clamp((wanderProgress-PROGRESS_1)*2/(PROGRESS_2-PROGRESS_1), 0, 1);
-	float spiralAcceFallTime = clamp((wanderProgress-PROGRESS_2_1)*0.2/(PROGRESS_2-PROGRESS_2_1), 0, 1);
+	float spiralAcceFallTime = clamp((wanderProgress-PROGRESS_2_1)*0.24/(PROGRESS_2-PROGRESS_2_1), 0, 1);
 	float spiralAcceGrowSpace = clamp((1.2*spiralAcceGrowTime-v)*5, 0, 1);
-	float spiralAcceFallSpace = clamp((v-0.5+1.5*spiralAcceFallTime)*2, 0, 1);
+	float spiralAcceFallSpace = clamp((v-0.7+1.6*spiralAcceFallTime)*4, 0, 1);
 	// decelerate progress
 	float spiralDeceGrowTime = clamp((wanderProgress-PROGRESS_2)*2/(PROGRESS_3-PROGRESS_2), 0, 1);
-	float spiralDeceFallTime = clamp((wanderProgress-PROGRESS_3_1)*0.2/(PROGRESS_3-PROGRESS_3_1), 0, 1);
+	float spiralDeceFallTime = clamp((wanderProgress-PROGRESS_4)*0.09/(PROGRESS_3-PROGRESS_4), 0, 1);
 	float spiralDeceGrowSpace = clamp((1.2*spiralDeceGrowTime-(v-1))*5, 0, 1);
-	float spiralDeceFallSpace = clamp((v-1.5+1.5*spiralDeceFallTime)*2, 0, 1);
+	float spiralDeceFallSpace = clamp((v-1.7+1.6*spiralDeceFallTime)*4, 0, 1);
 	// acce / dece
 	alpha *= mix(spiralAcceGrowSpace*spiralAcceFallSpace, spiralDeceGrowSpace*spiralDeceFallSpace, float(v>1));
 
