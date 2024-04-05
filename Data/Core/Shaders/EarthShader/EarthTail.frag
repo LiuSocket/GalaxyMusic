@@ -135,10 +135,30 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 
 float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 {
-	float ratioZ = modelStepPos.z / ATMOS_RADIUS;
-	float ratioXY = length(modelStepPos.xy) / ATMOS_RADIUS;
-	float ratioR = length(modelStepPos) / ATMOS_RADIUS;
-	float texDens = 0.1;
+	float ratioAlt = length(modelStepPos) / EARTH_RADIUS;
+	float ratioZ = modelStepPos.z / EARTH_RADIUS;
+	float thetaXY = atan(modelStepPos.y / modelStepPos.x)/M_PI;
+
+	vec3 erosionUVW = vec3(thetaXY, ratioAlt, ratioZ) * vec3(1.0, 1.0, 2.0);
+	erosionUVW.y += times*0.02;
+	vec3 offsetUVW = texture3D(noiseErosionTex, fract(erosionUVW)).bgr;
+
+	vec3 shapeUVW = vec3(thetaXY, ratioAlt, ratioZ) * vec3(5.0, 1.0, 5.0);
+	shapeUVW.x -= ratioAlt*(2.2-ratioAlt)*20;
+	shapeUVW.y -= times*0.05;
+	shapeUVW += offsetUVW*0.2;
+
+	vec4 shape4 = texture3D(noiseShapeTex, fract(shapeUVW));
+	float texDens = max(0, shape4.x - 0.35*shape4.y - 0.11*shape4.z - 0.09*shape4.w);
+	texDens *= max(0,1-abs(30*ratioZ))+2*exp2(min(0, 1-ratioAlt)*8);
+
+	float startProgress = (wanderProgress - PROGRESS_0)*200;
+	float endProgress = 1-(PROGRESS_1 - wanderProgress)*400;
+	// start progress
+	texDens *= clamp((startProgress-(ratioAlt-1))*2, 0, 1);
+	// end progress
+	texDens *= clamp(((ratioAlt-1)-endProgress)*2, 0, 1);
+
 	return texDens;
 }
 

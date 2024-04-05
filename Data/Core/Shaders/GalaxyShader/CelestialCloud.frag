@@ -46,7 +46,7 @@ void main()
 	
 	vec4 baseColor = texture(cloudTex, cloudCoord);
 #ifdef EARTH
-#ifdef WANDERING		
+#ifdef WANDERING
 	vec3 illumCoord = texCoord_1;
 	illumCoord.xy = (illumCoord.xy - 0.5)*celestialCoordScale.z + 0.5;
 	vec4 illum = texture(illumTex, illumCoord);
@@ -57,10 +57,15 @@ void main()
 	float wanderingCloud = max(0, min(wanderingColor.a, 1-illum.a*illum.a*1.5));
 
 	float torqueArea = clamp((0.3-abs(texCoord_0.y*2-1))*4,0,1); torqueArea *= torqueArea;
-	float torqueStart = float(wanderProgress>PROGRESS_0 && wanderProgress<PROGRESS_3)*torqueArea;
-	float allStart = max(torqueStart, clamp((wanderProgress-(PROGRESS_3_1+0.02))*50, 0, 1));
+	// for start
+	float lon = abs(fract(texCoord_0.x-0.25)*2-1);
+	lon = (engineStartRatio.z > 0.5) ? lon : 1-lon;
+	// x = torque, y = propulsion
+	vec2 engineStart = vec2(smoothstep(0.0, 0.2, clamp(2*engineStartRatio.x-lon,0,1)*torqueArea)*exp2(-abs(texCoord_0.y-0.5)*25),
+		smoothstep(0.0, 0.2, (texCoord_0.y-1)*2+engineStartRatio.y)*exp2(min(0,texCoord_0.y-0.67)*40));
+	float allEngineStart = max(engineStart.x, engineStart.y);
 
-	baseColor.a = mix(baseColor.a, wanderingCloud, allStart);
+	baseColor.a = mix(baseColor.a, wanderingCloud, allEngineStart*min(1, engineStartRatio.x));
 #endif // WANDERING	
 	float lenV = length(viewPos.xyz);
 	// cloud detail
@@ -97,18 +102,11 @@ void main()
 #endif // SATURN
 
 #ifdef EARTH
-	color = 0.03 + diffuse;
+	color = 0.05 + diffuse;
 #ifdef WANDERING
-	// for start
-	float lon = abs(fract(texCoord_0.x-0.25)*2-1);
-	lon = (engineStartRatio.z > 0.5) ? lon : 1-lon;
-	float engineStart = max(
-		smoothstep(0.0, 0.2, (texCoord_0.y-1)*2+engineStartRatio.y)*exp2(min(0,texCoord_0.y-0.67)*40),
-		smoothstep(0.0, 0.2, clamp(2*engineStartRatio.x-lon,0,1)*torqueArea)*exp2(-abs(texCoord_0.y-0.5)*25));
-
-	vec3 ambient = vec3(0.07,0.11,0.15)*engineStart;
-	color = 0.03 + ambient + diffuse;
-	vec3 illumEngine = engineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
+	vec3 ambient = vec3(0.07,0.11,0.15)*allEngineStart;
+	color = 0.05 + ambient + diffuse;
+	vec3 illumEngine = allEngineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
 	color += illumEngine;
 #endif // WANDERING
 #endif // EARTH

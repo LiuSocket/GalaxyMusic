@@ -564,7 +564,7 @@ bool CGMEarthEngine::Update(double dDeltaTime)
 
 		float fTorqueFullStart = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.1f);// 转向发动机全部启动
 		float fTorqueShutDown = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.8f);// 转向发动机开始关闭
-		float fTorqueFullEnd = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.85f);// 转向发动机全部关闭
+		float fTorqueFullEnd = CGMKit::Mix(PROGRESS_0, PROGRESS_1, 0.9f);// 转向发动机全部关闭
 		fTorqueRatio = osg::clampBetween((fWanderProgress - PROGRESS_0) / (fTorqueFullStart - PROGRESS_0), 0.0f, 1.0f)
 			* osg::clampBetween((fWanderProgress - fTorqueFullEnd) / (fTorqueShutDown - fTorqueFullEnd), 0.0f, 1.0f);
 

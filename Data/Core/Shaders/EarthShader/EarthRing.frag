@@ -32,6 +32,8 @@ vec3 ToneMapping(vec3 color)
 
 void main()
 {
+	float brakeProgress = clamp((wanderProgress-PROGRESS_0)/(PROGRESS_1_1-PROGRESS_0),0,1);
+
 	vec2 UV = gl_TexCoord[0].xy;
 	vec2 coord1 = UV;
 	coord1.y *= 2.8*coord1.y;
@@ -39,8 +41,10 @@ void main()
 	float noiseD1 = texture(noise2DTex, coord1).r;
 
 	vec2 coord = UV;
-	coord.y *= 10*coord.y*(1-0.8*coord.y);
-	coord -= vec2(times*(0.05+0.02*abs(gl_TexCoord[0].z-0.9)), 0.1*noiseD1);
+	coord.y *= 0.73*gl_TexCoord[0].z;
+	coord -= vec2(
+		times*(0.1 + 0.05*abs(gl_TexCoord[0].z-0.9)) + 10*brakeProgress*brakeProgress - 5*brakeProgress*gl_TexCoord[0].y,
+		0.1*noiseD1);
 	float noiseD = texture(noise2DTex, fract(coord)).r;
 
 	float lenV = length(viewPos);
@@ -60,13 +64,13 @@ void main()
 	// ambient color
 	vec3 ambient = vec3(0.2, 0.35, 0.5)*exp2(-UV.y*10);
 
-	float alpha = (1-noiseD)*sqrt(clamp(UV.y*2,0,1))*(1-UV.y);
+	float alpha = (1-noiseD)*clamp(UV.y*2,0,1)*(1-UV.y);
 	alpha *= exp2(-lenV*unit*1e-9) * (1 - exp2(-lenV*unit*5e-7));
 	// progress
 	float ringGrowTime = clamp((wanderProgress-PROGRESS_0)*2/(PROGRESS_1-PROGRESS_0),0,1);
-	float ringFallTime = clamp((wanderProgress-PROGRESS_1_1)/(PROGRESS_1-PROGRESS_1_1),0,1);
+	float ringFallTime = clamp((wanderProgress-PROGRESS_1_1)*0.5/(PROGRESS_1-PROGRESS_1_1),0,1);
 	float ringGrowSpace = clamp((1.5*ringGrowTime-UV.y)*2, 0, 1);
-	float ringFallSpace = clamp((UV.y-0.5+1.5*ringFallTime)*2, 0, 1);
+	float ringFallSpace = clamp((UV.y-1+2*ringFallTime)*2, 0, 1);
 	alpha *= ringGrowSpace*ringFallSpace;
 
 	vec3 color = ToneMapping(ambient + diffuse);

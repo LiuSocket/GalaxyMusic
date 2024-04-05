@@ -102,11 +102,11 @@ void main()
 		rockMask*(illumCity - seaLevelAddProgress));
 
 	color = mix(vec3(0.0,0.1,0.0), baseColor.rgb, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));
-	color *= 0.02 + ambient + 0.5*diffuse;
+	color *= 0.05 + ambient + diffuse;
 
 	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-elev2Sea*0.015, 0)))*clamp(-elev2Sea*0.01, 0, 1);
 	vec3 oceanColor = mix(vec3(0.06,0.13,0.2), vec3(0.2,0.3,0.3), seaLevelAddProgress*exp2(min(0, elev2Sea)*0.01));
-	oceanColor = oceanColor*(ambient + 0.5*diffuse) + specualr;
+	oceanColor = oceanColor*(ambient + diffuse) + specualr;
 #else // not WANDERING
 	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-elev*0.015, 0)));
 	vec3 oceanColor = vec3(0.08,0.1,0.12)*diffuse + specualr;

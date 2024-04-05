@@ -537,6 +537,7 @@ bool CGMEarth::_CreateGlobalCloudShadow()
 
 	if (m_pConfigData->bWanderingEarth)
 	{
+		m_pSSGlobalShadow->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
 		m_pSSGlobalShadow->addUniform(m_fWanderProgressUniform);
 		m_pSSGlobalShadow->setDefine("WANDERING", osg::StateAttribute::ON);
 	}

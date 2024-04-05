@@ -9,6 +9,7 @@ const float PROGRESS_2 =	0.09; // middle of torque time
 const float PROGRESS_2_1 =	0.1;
 const float PROGRESS_3 =	0.15; // end of torque time
 const float PROGRESS_3_1 =	0.152;
+uniform vec3 engineStartRatio;
 uniform float wanderProgress;
 #endif // WANDERING	
 
@@ -34,10 +35,15 @@ void main()
 	float wanderingCloudAlpha = texture(cloudTex, wanderingCloudCoord).a;
 
 	float torqueArea = clamp((0.3-abs(texCoord_0.y*2-1))*4,0,1); torqueArea *= torqueArea;
-	float torqueStart = float(wanderProgress>PROGRESS_0 && wanderProgress<PROGRESS_3)*torqueArea;
-	float allStart = max(torqueStart, clamp((wanderProgress-(PROGRESS_3_1+0.02))*50, 0, 1));
+	// for start
+	float lon = abs(fract(texCoord_0.x-0.25)*2-1);
+	lon = (engineStartRatio.z > 0.5) ? lon : 1-lon;
+	// x = torque, y = propulsion
+	vec2 engineStart = vec2(smoothstep(0.0, 0.2, clamp(2*engineStartRatio.x-lon,0,1)*torqueArea)*exp2(-abs(texCoord_0.y-0.5)*25),
+		smoothstep(0.0, 0.2, (texCoord_0.y-1)*2+engineStartRatio.y)*exp2(min(0,texCoord_0.y-0.67)*40));
+	float allEngineStart = max(engineStart.x, engineStart.y);
 
-	cloudAlpha = mix(cloudAlpha, wanderingCloudAlpha, allStart);
+	cloudAlpha = mix(cloudAlpha, wanderingCloudAlpha, allEngineStart*min(1, engineStartRatio.x));
 #endif // WANDERING	
 	// cloud detail
 	vec4 detail4 = texture(cloudDetailTex, texCoord_1.xy*27);
