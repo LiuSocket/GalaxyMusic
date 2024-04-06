@@ -44,6 +44,6 @@ void main()
 	vertexColor.rgb = mix(planetColor, asteroidColor, isAsteroid);
 	vertexColor.a = mix(1, planetPointAlpha, isAsteroid);
 
-	gl_PointSize = mix((2.5+2.5*planetPointAlpha)*(1+2*planetFalloff), (5+5*randomAsteroid)*(0.2+0.8*asteroidFalloff), isAsteroid);
+	gl_PointSize = mix((1.5+3.5*planetPointAlpha)*(1+2*planetFalloff), (5+5*randomAsteroid)*(0.2+0.8*asteroidFalloff), isAsteroid);
 	gl_Position = gl_ModelViewProjectionMatrix * modelPos;
 }
