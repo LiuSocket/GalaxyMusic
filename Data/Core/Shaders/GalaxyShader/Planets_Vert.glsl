@@ -26,7 +26,7 @@ void main()
 		0,		0,		0,	1);
 	modelPos = rotateMatrix * modelPos;
 
-	isAsteroid = step(planetNum, gl_VertexID + 0.5);
+	isAsteroid = float(planetNum < (gl_VertexID + 0.5));
 	float randomAsteroid = abs(sin(float(gl_VertexID)));
 	modelPos += vec4(sin(vec3(10.1,10.2,10.3)*gl_VertexID)*vec3(0.1,0.1,0.003)*length(vertXY)*isAsteroid,0.0);
 
@@ -40,7 +40,7 @@ void main()
 	vec3 planetColor = mix(vec3(1), playingStarColor.rgb*(1+planetFalloff)+vec3(0.5), planetPointAlpha);
 	vec3 asteroidColor = mix(vec3(0.2), playingStarColor.rgb, 0.3+0.7*asteroidFalloff)
 		+ vec3(clamp(1-length(modelPos.xyz)*unit*1.9e-12,0,1));
-	asteroidColor *= 0.1+0.9*randomAsteroid;
+	asteroidColor *= 0.1+0.3*randomAsteroid;
 	vertexColor.rgb = mix(planetColor, asteroidColor, isAsteroid);
 	vertexColor.a = mix(1, planetPointAlpha, isAsteroid);
 

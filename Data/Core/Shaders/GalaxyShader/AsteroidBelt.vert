@@ -31,7 +31,7 @@ void main()
 
 	vertexColor.rgb = mix(vec3(0.2), playingStarColor.rgb, 0.3+0.7*exp2(-lengthV*300.0))
 		+ vec3(clamp(1-length(modelPos.xyz)*1.9e-12*unit,0,1));
-	vertexColor.rgb *= 0.1+0.9*noise;
+	vertexColor.rgb *= 0.1+0.3*noise;
 	vertexColor.a = planetPointAlpha;
 
 	gl_PointSize = (1+noise)*(1+3*exp2(-lengthV*1e5))*clamp(1.5-length(asteroidPos*1e-12),0,1);

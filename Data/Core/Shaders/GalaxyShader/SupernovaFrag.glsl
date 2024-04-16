@@ -2,16 +2,14 @@
 
 uniform sampler2D supernovaTex;
 uniform vec4 playingStarColor;
-uniform vec2 supernovaAlpha;
+uniform float supernovaAlpha;
 
-in float bStick;
 in vec2 modelPosXY;
 out vec4 fragColor;
 
 void main() 
 {
-	vec4 supernovaColor = texture2D(supernovaTex, gl_TexCoord[0].xy);
-	supernovaColor.rgb *= mix(vec3(1), playingStarColor.rgb, clamp(length(modelPosXY)*(3-2*bStick),0,1));
-	supernovaColor *= mix(supernovaAlpha.x, supernovaAlpha.y, bStick);
-	fragColor = supernovaColor;
+	vec4 supernovaColor = texture(supernovaTex, gl_TexCoord[0].xy)
+		* mix(vec4(0.8), vec4(playingStarColor.rgb, 0.4), clamp(length(modelPosXY),0,1));
+	fragColor = supernovaColor*supernovaAlpha;
 }
