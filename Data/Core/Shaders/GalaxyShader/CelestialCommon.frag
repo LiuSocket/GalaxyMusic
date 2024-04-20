@@ -64,18 +64,11 @@ float GetCoordUL(float cosUL)
 	return (cosUL-minDotUL)/(1-minDotUL);
 }
 
-// get coord of altitude
-float GetCoordAlt(float alt, float horizonDisMax, float Rv)
-{
-	float horizonDis = sqrt(alt * alt + 2 * alt * Rv);
-	return horizonDis / horizonDisMax;
-}
-
 // x = cosVL, y = cosUL, z = pitch, w = alt
 vec4 Texture4D(vec4 coord)
 {
 	const float PITCH_NUM = 128.0;
-	const float ALT_NUM = 16.0;
+	const float ALT_NUM = 32.0;
 
 	float altI = coord.w*ALT_NUM;
 	float z = coord.z * (PITCH_NUM - 1) / PITCH_NUM + 0.5 / PITCH_NUM; // [0.5/PITCH_NUM, 1 - 0.5/PITCH_NUM]
@@ -92,9 +85,6 @@ vec4 Texture4D(vec4 coord)
 // Rv: radius at the vertex point
 vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, float Rv)
 {
-	// distance of horizon at top atmosphere
-	float horizonDisMax = sqrt(atmosHeight * atmosHeight + 2 * atmosHeight * Rv);
-
 	// vertex is up to eye: +, vertex is down to eye: -
 	// cosVertDir(at the vertex pos):
 	float cosVertDir = dot(viewVertUp, viewDir);
@@ -151,7 +141,7 @@ vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, 
 		(cosVL-cosMinVL)/deltaCosVL,
 		GetCoordUL(cosUL),
 		GetCoordPitch(CosDH(cosUV, cosNearHoriz)),
-		GetCoordAlt(eyeAltitude, horizonDisMax, Rv))).rgb;
+		min(1, eyeAltitude / atmosHeight))).rgb;
 
 	// sin & cos of horizon at vertex pos, affected by celestial radius
 	float sinVertHoriz = min(1, Rv / (Rv + vertAlt));
@@ -160,7 +150,7 @@ vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, 
 		(cosVL-cosVertMinVL)/deltaCosVertVL,
 		GetCoordUL(cosVertUL),
 		GetCoordPitch(CosDH(cosVertDir, cosVertHoriz)),
-		GetCoordAlt(vertAlt, horizonDisMax, Rv))).rgb;
+		min(1, vertAlt / atmosHeight))).rgb;
 	vec3 atmosSum = abs(atmosNear - atmosVert);
 
 #ifdef EARTH

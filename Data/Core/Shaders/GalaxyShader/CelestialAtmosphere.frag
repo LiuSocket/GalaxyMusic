@@ -59,18 +59,11 @@ float GetCoordUL(float cosUL)
 	return (cosUL-minDotUL)/(1-minDotUL);
 }
 
-// get coord of altitude
-float GetCoordAlt(float alt, float horizonDisMax, float Rv)
-{
-	float horizonDis = sqrt(alt * alt + 2 * alt * Rv);
-	return horizonDis / horizonDisMax;
-}
-
 // x = cosVL, y = cosUL, z = pitch, w = alt
 vec4 Texture4D(vec4 coord)
 {
 	const float PITCH_NUM = 128.0;
-	const float ALT_NUM = 16.0;
+	const float ALT_NUM = 32.0;
 
 	float altI = coord.w*ALT_NUM;
 	float z = coord.z * (PITCH_NUM - 1) / PITCH_NUM + 0.5 / PITCH_NUM; // [0.5/PITCH_NUM, 1 - 0.5/PITCH_NUM]
@@ -170,14 +163,11 @@ void main()
 		float cosMaxVL = dot(eyeViewFrontDir, eyeLightDir);
 		float deltaCosVL = cosMaxVL-cosMinVL;
 
-		// distance of horizon at top atmosphere
-		float horizonDisMax = sqrt(atmosHeight * atmosHeight + 2 * atmosHeight * midGeoRadius);
-
 		atmosSum = Texture4D(vec4(
 			(cosVL-cosMinVL)/deltaCosVL,
 			GetCoordUL(cosUL),
 			GetCoordPitch(CosSkyDH(cosUV, cosHoriz)),
-			GetCoordAlt(eyeAltitude, horizonDisMax, midGeoRadius))).rgb;
+			min(1, eyeAltitude / atmosHeight))).rgb;
 	}
 
 #ifdef EARTH
