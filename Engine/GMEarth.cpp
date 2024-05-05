@@ -127,8 +127,8 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 	osg::ref_ptr <osg::Image> pImg = osgDB::readImageFile(strSphereTexPath + "Inscattering/Inscattering_64_6400.raw");
 	if (pImg.valid())
 	{
-		pImg->setImage(SCAT_COS_NUM, SCAT_LIGHT_NUM, SCAT_PITCH_NUM * SCAT_ALT_NUM,
-			GL_RGB32F, GL_RGB, GL_FLOAT, pImg->data(), osg::Image::NO_DELETE);
+		pImg->setImage(SCAT_PITCH_NUM, SCAT_LIGHT_NUM, SCAT_COS_NUM * SCAT_ALT_NUM,
+			GL_RGBA32F, GL_RGBA, GL_FLOAT, pImg->data(), osg::Image::NO_DELETE);
 		m_pInscatteringTex = new osg::Texture3D;
 		m_pInscatteringTex->setImage(pImg);
 		m_pInscatteringTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
@@ -136,8 +136,8 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 		m_pInscatteringTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
 		m_pInscatteringTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 		m_pInscatteringTex->setWrap(osg::Texture::WRAP_R, osg::Texture::CLAMP_TO_EDGE);
-		m_pInscatteringTex->setInternalFormat(GL_RGB32F);
-		m_pInscatteringTex->setSourceFormat(GL_RGB);
+		m_pInscatteringTex->setInternalFormat(GL_RGBA32F);
+		m_pInscatteringTex->setSourceFormat(GL_RGBA);
 		m_pInscatteringTex->setSourceType(GL_FLOAT);
 	}
 
@@ -519,26 +519,26 @@ bool CGMEarth::_CreateGlobalCloudShadow()
 	m_pSSGlobalShadow->setMode(GL_BLEND, osg::StateAttribute::OFF);
 	m_pSSGlobalShadow->setAttributeAndModes(new osg::CullFace());
 
-	m_pSSGlobalShadow->addUniform(m_vPlanetRadiusUniform);
-	m_pSSGlobalShadow->addUniform(m_vEarthCoordScaleUniform);
-	m_pSSGlobalShadow->addUniform(m_fCloudTopUniform);
-	m_pSSGlobalShadow->addUniform(m_vViewLightUniform);
-	m_pSSGlobalShadow->addUniform(m_mView2ECEFUniform);
+	m_pSSGlobalShadow->addUniform(m_vPlanetRadiusUniform.get());
+	m_pSSGlobalShadow->addUniform(m_vEarthCoordScaleUniform.get());
+	m_pSSGlobalShadow->addUniform(m_fCloudTopUniform.get());
+	m_pSSGlobalShadow->addUniform(m_vViewLightUniform.get());
+	m_pSSGlobalShadow->addUniform(m_mView2ECEFUniform.get());
 
 	int iShadowUnit = 0;
 	// 基础纹理
 	m_pSSGlobalShadow->setTextureAttributeAndModes(iShadowUnit, m_aEarthCloudTex, osg::StateAttribute::ON);
 	osg::ref_ptr<osg::Uniform> pGlobalCloudUniform = new osg::Uniform("cloudTex", iShadowUnit++);
-	m_pSSGlobalShadow->addUniform(pGlobalCloudUniform);
+	m_pSSGlobalShadow->addUniform(pGlobalCloudUniform.get());
 	// 云的细节纹理
 	m_pSSGlobalShadow->setTextureAttributeAndModes(iShadowUnit, m_pCloudDetailTex, osg::StateAttribute::ON);
 	osg::ref_ptr<osg::Uniform> pCloudDetailUniform = new osg::Uniform("cloudDetailTex", iShadowUnit++);
-	m_pSSGlobalShadow->addUniform(pCloudDetailUniform);
+	m_pSSGlobalShadow->addUniform(pCloudDetailUniform.get());
 
 	if (m_pConfigData->bWanderingEarth)
 	{
 		m_pSSGlobalShadow->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
-		m_pSSGlobalShadow->addUniform(m_fWanderProgressUniform);
+		m_pSSGlobalShadow->addUniform(m_fWanderProgressUniform.get());
 		m_pSSGlobalShadow->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
@@ -589,46 +589,47 @@ bool CGMEarth::_CreateEarth_1()
 	// 基础贴图
 	m_pSSEarthGround_1->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGrundBaseUniform = new osg::Uniform("baseTex", iGroundUnit++);
-	m_pSSEarthGround_1->addUniform(pGrundBaseUniform);
+	m_pSSEarthGround_1->addUniform(pGrundBaseUniform.get());
 	// 自发光贴图
 	m_pSSEarthGround_1->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGrundIllumUniform = new osg::Uniform("illumTex", iGroundUnit++);
-	m_pSSEarthGround_1->addUniform(pGrundIllumUniform);
+	m_pSSEarthGround_1->addUniform(pGrundIllumUniform.get());
 	// DEM贴图
 	m_pSSEarthGround_1->setTextureAttributeAndModes(iGroundUnit, m_aDEMTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pDEMUniform = new osg::Uniform("DEMTex", iGroundUnit++);
-	m_pSSEarthGround_1->addUniform(pDEMUniform);
+	m_pSSEarthGround_1->addUniform(pDEMUniform.get());
 	// 全球阴影
 	m_pSSEarthGround_1->setTextureAttributeAndModes(iGroundUnit, m_pGlobalShadowTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGlobalShadowUniform = new osg::Uniform("globalShadowTex", iGroundUnit++);
-	m_pSSEarthGround_1->addUniform(pGlobalShadowUniform);
+	m_pSSEarthGround_1->addUniform(pGlobalShadowUniform.get());
 	// 地面上的大气“内散射”纹理
 	m_pSSEarthGround_1->setTextureAttributeAndModes(iGroundUnit, m_pInscatteringTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGroundInscatteringUniform = new osg::Uniform("inscatteringTex", iGroundUnit++);
-	m_pSSEarthGround_1->addUniform(pGroundInscatteringUniform);
+	m_pSSEarthGround_1->addUniform(pGroundInscatteringUniform.get());
 
 	if (m_pConfigData->bWanderingEarth)
 	{
 		// 流浪地球尾迹（吹散的大气）
 		m_pSSEarthGround_1->setTextureAttributeAndModes(iGroundUnit, m_pEarthTail->GetTAATex(), iOnOverride);
 		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
-		m_pSSEarthGround_1->addUniform(pGroundTailUniform);
+		m_pSSEarthGround_1->addUniform(pGroundTailUniform.get());
 
 		m_pSSEarthGround_1->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
-		m_pSSEarthGround_1->addUniform(m_fWanderProgressUniform);
+		m_pSSEarthGround_1->addUniform(m_fWanderProgressUniform.get());
 		m_pSSEarthGround_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
 	m_pSSEarthGround_1->addUniform(m_pCommonUniform->GetViewUp());
-	m_pSSEarthGround_1->addUniform(m_vViewLightUniform);
-	m_pSSEarthGround_1->addUniform(m_fAtmosHeightUniform);
-	m_pSSEarthGround_1->addUniform(m_fEyeAltitudeUniform);
-	m_pSSEarthGround_1->addUniform(m_fGroundTopUniform);
-	m_pSSEarthGround_1->addUniform(m_vPlanetRadiusUniform);
-	m_pSSEarthGround_1->addUniform(m_fMinDotULUniform);
+	m_pSSEarthGround_1->addUniform(m_vViewLightUniform.get());
+	m_pSSEarthGround_1->addUniform(m_fAtmosHeightUniform.get());
+	m_pSSEarthGround_1->addUniform(m_fEyeAltitudeUniform.get());
+	m_pSSEarthGround_1->addUniform(m_fGroundTopUniform.get());
+	m_pSSEarthGround_1->addUniform(m_vPlanetRadiusUniform.get());
+	m_pSSEarthGround_1->addUniform(m_fMinDotULUniform.get());
 	m_pSSEarthGround_1->addUniform(m_pCommonUniform->GetScreenSize());
-	m_pSSEarthGround_1->addUniform(m_vEarthCoordScaleUniform);
+	m_pSSEarthGround_1->addUniform(m_vEarthCoordScaleUniform.get());
 	m_pSSEarthGround_1->addUniform(m_pCommonUniform->GetUnit());
+	m_pSSEarthGround_1->addUniform(m_mView2ECEFUniform.get());
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthGround_1,
@@ -664,43 +665,44 @@ bool CGMEarth::_CreateEarth_1()
 	// 基础贴图
 	m_pSSEarthCloud_1->setTextureAttributeAndModes(iCloudUnit, m_aEarthCloudTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pCloudBaseUniform = new osg::Uniform("cloudTex", iCloudUnit++);
-	m_pSSEarthCloud_1->addUniform(pCloudBaseUniform);
+	m_pSSEarthCloud_1->addUniform(pCloudBaseUniform.get());
 	// 云的细节纹理
 	m_pSSEarthCloud_1->setTextureAttributeAndModes(iCloudUnit, m_pCloudDetailTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pCloudDetailUniform = new osg::Uniform("cloudDetailTex", iCloudUnit++);
-	m_pSSEarthCloud_1->addUniform(pCloudDetailUniform);
+	m_pSSEarthCloud_1->addUniform(pCloudDetailUniform.get());
 	// 云层上的“内散射”纹理
 	m_pSSEarthCloud_1->setTextureAttributeAndModes(iCloudUnit, m_pInscatteringTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pCloudInscatteringUniform = new osg::Uniform("inscatteringTex", iCloudUnit++);
-	m_pSSEarthCloud_1->addUniform(pCloudInscatteringUniform);
+	m_pSSEarthCloud_1->addUniform(pCloudInscatteringUniform.get());
 
 	if (m_pConfigData->bWanderingEarth)
 	{
 		// 流浪地球尾迹（吹散的大气）
 		m_pSSEarthCloud_1->setTextureAttributeAndModes(iCloudUnit, m_pEarthTail->GetTAATex(), iOnOverride);
 		osg::ref_ptr<osg::Uniform> pCloudTailUniform = new osg::Uniform("tailTex", iCloudUnit++);
-		m_pSSEarthCloud_1->addUniform(pCloudTailUniform);
+		m_pSSEarthCloud_1->addUniform(pCloudTailUniform.get());
 
 		m_pSSEarthCloud_1->setTextureAttributeAndModes(iCloudUnit, m_aIllumTex, iOnOverride);
 		osg::ref_ptr<osg::Uniform> pCloudIllumUniform = new osg::Uniform("illumTex", iCloudUnit++);
-		m_pSSEarthCloud_1->addUniform(pCloudIllumUniform);
+		m_pSSEarthCloud_1->addUniform(pCloudIllumUniform.get());
 
 		m_pSSEarthCloud_1->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
-		m_pSSEarthCloud_1->addUniform(m_fWanderProgressUniform);
+		m_pSSEarthCloud_1->addUniform(m_fWanderProgressUniform.get());
 		m_pSSEarthCloud_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
 	m_pSSEarthCloud_1->addUniform(m_pCommonUniform->GetViewUp());
-	m_pSSEarthCloud_1->addUniform(m_vViewLightUniform);
-	m_pSSEarthCloud_1->addUniform(m_fCloudTopUniform);
-	m_pSSEarthCloud_1->addUniform(m_fGroundTopUniform);
-	m_pSSEarthCloud_1->addUniform(m_fEyeAltitudeUniform);
-	m_pSSEarthCloud_1->addUniform(m_fAtmosHeightUniform);
-	m_pSSEarthCloud_1->addUniform(m_vPlanetRadiusUniform);
-	m_pSSEarthCloud_1->addUniform(m_fMinDotULUniform);
+	m_pSSEarthCloud_1->addUniform(m_vViewLightUniform.get());
+	m_pSSEarthCloud_1->addUniform(m_fCloudTopUniform.get());
+	m_pSSEarthCloud_1->addUniform(m_fGroundTopUniform.get());
+	m_pSSEarthCloud_1->addUniform(m_fEyeAltitudeUniform.get());
+	m_pSSEarthCloud_1->addUniform(m_fAtmosHeightUniform.get());
+	m_pSSEarthCloud_1->addUniform(m_vPlanetRadiusUniform.get());
+	m_pSSEarthCloud_1->addUniform(m_fMinDotULUniform.get());
 	m_pSSEarthCloud_1->addUniform(m_pCommonUniform->GetScreenSize());
-	m_pSSEarthCloud_1->addUniform(m_vEarthCoordScaleUniform);
+	m_pSSEarthCloud_1->addUniform(m_vEarthCoordScaleUniform.get());
 	m_pSSEarthCloud_1->addUniform(m_pCommonUniform->GetUnit());
+	m_pSSEarthCloud_1->addUniform(m_mView2ECEFUniform.get());
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthCloud_1,
@@ -730,19 +732,19 @@ bool CGMEarth::_CreateEarth_1()
 	// “内散射”贴图
 	m_pSSEarthAtmos_1->setTextureAttributeAndModes(iAtmosUnit, m_pInscatteringTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pInscatteringUniform = new osg::Uniform("inscatteringTex", iAtmosUnit++);
-	m_pSSEarthAtmos_1->addUniform(pInscatteringUniform);
+	m_pSSEarthAtmos_1->addUniform(pInscatteringUniform.get());
 
 	m_pSSEarthAtmos_1->addUniform(m_pCommonUniform->GetViewUp());
-	m_pSSEarthAtmos_1->addUniform(m_vViewLightUniform);
-	m_pSSEarthAtmos_1->addUniform(m_fAtmosHeightUniform);
-	m_pSSEarthAtmos_1->addUniform(m_fEyeAltitudeUniform);
-	m_pSSEarthAtmos_1->addUniform(m_vPlanetRadiusUniform);
-	m_pSSEarthAtmos_1->addUniform(m_fMinDotULUniform);
-	m_pSSEarthAtmos_1->addUniform(m_mView2ECEFUniform);
+	m_pSSEarthAtmos_1->addUniform(m_vViewLightUniform.get());
+	m_pSSEarthAtmos_1->addUniform(m_fAtmosHeightUniform.get());
+	m_pSSEarthAtmos_1->addUniform(m_fEyeAltitudeUniform.get());
+	m_pSSEarthAtmos_1->addUniform(m_vPlanetRadiusUniform.get());
+	m_pSSEarthAtmos_1->addUniform(m_fMinDotULUniform.get());
+	m_pSSEarthAtmos_1->addUniform(m_mView2ECEFUniform.get());
 
 	if (m_pConfigData->bWanderingEarth)
 	{
-		m_pSSEarthAtmos_1->addUniform(m_fWanderProgressUniform);
+		m_pSSEarthAtmos_1->addUniform(m_fWanderProgressUniform.get());
 		m_pSSEarthAtmos_1->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
@@ -788,46 +790,47 @@ bool CGMEarth::_CreateEarth_2()
 	// 基础贴图
 	m_pSSEarthGround_2->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGrundBaseUniform = new osg::Uniform("baseTex", iGroundUnit++);
-	m_pSSEarthGround_2->addUniform(pGrundBaseUniform);
+	m_pSSEarthGround_2->addUniform(pGrundBaseUniform.get());
 	// 自发光贴图
 	m_pSSEarthGround_2->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGrundIllumUniform = new osg::Uniform("illumTex", iGroundUnit++);
-	m_pSSEarthGround_2->addUniform(pGrundIllumUniform);
+	m_pSSEarthGround_2->addUniform(pGrundIllumUniform.get());
 	// DEM贴图
 	m_pSSEarthGround_2->setTextureAttributeAndModes(iGroundUnit, m_aDEMTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pDEMUniform = new osg::Uniform("DEMTex", iGroundUnit++);
-	m_pSSEarthGround_2->addUniform(pDEMUniform);
+	m_pSSEarthGround_2->addUniform(pDEMUniform.get());
 	// 全球阴影
 	m_pSSEarthGround_2->setTextureAttributeAndModes(iGroundUnit, m_pGlobalShadowTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGlobalShadowUniform = new osg::Uniform("globalShadowTex", iGroundUnit++);
-	m_pSSEarthGround_2->addUniform(pGlobalShadowUniform);
+	m_pSSEarthGround_2->addUniform(pGlobalShadowUniform.get());
 	// 地面上的大气“内散射”纹理
 	m_pSSEarthGround_2->setTextureAttributeAndModes(iGroundUnit, m_pInscatteringTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGroundInscatteringUniform = new osg::Uniform("inscatteringTex", iGroundUnit++);
-	m_pSSEarthGround_2->addUniform(pGroundInscatteringUniform);
+	m_pSSEarthGround_2->addUniform(pGroundInscatteringUniform.get());
 
 	if (m_pConfigData->bWanderingEarth)
 	{
 		// 流浪地球尾迹（吹散的大气）
 		m_pSSEarthGround_2->setTextureAttributeAndModes(iGroundUnit, m_pEarthTail->GetTAATex(), iOnOverride);
 		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
-		m_pSSEarthGround_2->addUniform(pGroundTailUniform);
+		m_pSSEarthGround_2->addUniform(pGroundTailUniform.get());
 
 		m_pSSEarthGround_2->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
-		m_pSSEarthGround_2->addUniform(m_fWanderProgressUniform);
+		m_pSSEarthGround_2->addUniform(m_fWanderProgressUniform.get());
 		m_pSSEarthGround_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
 	m_pSSEarthGround_2->addUniform(m_pCommonUniform->GetViewUp());
-	m_pSSEarthGround_2->addUniform(m_vViewLightUniform);
-	m_pSSEarthGround_2->addUniform(m_fAtmosHeightUniform);
-	m_pSSEarthGround_2->addUniform(m_fEyeAltitudeUniform);
-	m_pSSEarthGround_2->addUniform(m_fGroundTopUniform);
-	m_pSSEarthGround_2->addUniform(m_vPlanetRadiusUniform);
-	m_pSSEarthGround_2->addUniform(m_fMinDotULUniform);
+	m_pSSEarthGround_2->addUniform(m_vViewLightUniform.get());
+	m_pSSEarthGround_2->addUniform(m_fAtmosHeightUniform.get());
+	m_pSSEarthGround_2->addUniform(m_fEyeAltitudeUniform.get());
+	m_pSSEarthGround_2->addUniform(m_fGroundTopUniform.get());
+	m_pSSEarthGround_2->addUniform(m_vPlanetRadiusUniform.get());
+	m_pSSEarthGround_2->addUniform(m_fMinDotULUniform.get());
 	m_pSSEarthGround_2->addUniform(m_pCommonUniform->GetScreenSize());
-	m_pSSEarthGround_2->addUniform(m_vEarthCoordScaleUniform);
+	m_pSSEarthGround_2->addUniform(m_vEarthCoordScaleUniform.get());
 	m_pSSEarthGround_2->addUniform(m_pCommonUniform->GetUnit());
+	m_pSSEarthGround_2->addUniform(m_mView2ECEFUniform.get());
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthGround_2,
@@ -863,43 +866,44 @@ bool CGMEarth::_CreateEarth_2()
 	// 基础贴图
 	m_pSSEarthCloud_2->setTextureAttributeAndModes(iCloudUnit, m_aEarthCloudTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pCloudBaseUniform = new osg::Uniform("cloudTex", iCloudUnit++);
-	m_pSSEarthCloud_2->addUniform(pCloudBaseUniform);
+	m_pSSEarthCloud_2->addUniform(pCloudBaseUniform.get());
 	// 云的细节纹理
 	m_pSSEarthCloud_2->setTextureAttributeAndModes(iCloudUnit, m_pCloudDetailTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pCloudDetailUniform = new osg::Uniform("cloudDetailTex", iCloudUnit++);
-	m_pSSEarthCloud_2->addUniform(pCloudDetailUniform);
+	m_pSSEarthCloud_2->addUniform(pCloudDetailUniform.get());
 	// 云层上的“内散射”纹理
 	m_pSSEarthCloud_2->setTextureAttributeAndModes(iCloudUnit, m_pInscatteringTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pCloudInscatteringUniform = new osg::Uniform("inscatteringTex", iCloudUnit++);
-	m_pSSEarthCloud_2->addUniform(pCloudInscatteringUniform);
+	m_pSSEarthCloud_2->addUniform(pCloudInscatteringUniform.get());
 
 	if (m_pConfigData->bWanderingEarth)
 	{
 		// 流浪地球尾迹（吹散的大气）
 		m_pSSEarthCloud_2->setTextureAttributeAndModes(iCloudUnit, m_pEarthTail->GetTAATex(), iOnOverride);
 		osg::ref_ptr<osg::Uniform> pCloudTailUniform = new osg::Uniform("tailTex", iCloudUnit++);
-		m_pSSEarthCloud_2->addUniform(pCloudTailUniform);
+		m_pSSEarthCloud_2->addUniform(pCloudTailUniform.get());
 
 		m_pSSEarthCloud_2->setTextureAttributeAndModes(iCloudUnit, m_aIllumTex, iOnOverride);
 		osg::ref_ptr<osg::Uniform> pCloudIllumUniform = new osg::Uniform("illumTex", iCloudUnit++);
-		m_pSSEarthCloud_2->addUniform(pCloudIllumUniform);
+		m_pSSEarthCloud_2->addUniform(pCloudIllumUniform.get());
 
 		m_pSSEarthCloud_2->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
-		m_pSSEarthCloud_2->addUniform(m_fWanderProgressUniform);
+		m_pSSEarthCloud_2->addUniform(m_fWanderProgressUniform.get());
 		m_pSSEarthCloud_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
 	m_pSSEarthCloud_2->addUniform(m_pCommonUniform->GetViewUp());
-	m_pSSEarthCloud_2->addUniform(m_vViewLightUniform);
-	m_pSSEarthCloud_2->addUniform(m_fCloudTopUniform);
-	m_pSSEarthCloud_2->addUniform(m_fGroundTopUniform);
-	m_pSSEarthCloud_2->addUniform(m_fEyeAltitudeUniform);
-	m_pSSEarthCloud_2->addUniform(m_fAtmosHeightUniform);
-	m_pSSEarthCloud_2->addUniform(m_vPlanetRadiusUniform);
-	m_pSSEarthCloud_2->addUniform(m_fMinDotULUniform);
+	m_pSSEarthCloud_2->addUniform(m_vViewLightUniform.get());
+	m_pSSEarthCloud_2->addUniform(m_fCloudTopUniform.get());
+	m_pSSEarthCloud_2->addUniform(m_fGroundTopUniform.get());
+	m_pSSEarthCloud_2->addUniform(m_fEyeAltitudeUniform.get());
+	m_pSSEarthCloud_2->addUniform(m_fAtmosHeightUniform.get());
+	m_pSSEarthCloud_2->addUniform(m_vPlanetRadiusUniform.get());
+	m_pSSEarthCloud_2->addUniform(m_fMinDotULUniform.get());
 	m_pSSEarthCloud_2->addUniform(m_pCommonUniform->GetScreenSize());
-	m_pSSEarthCloud_2->addUniform(m_vEarthCoordScaleUniform);
+	m_pSSEarthCloud_2->addUniform(m_vEarthCoordScaleUniform.get());
 	m_pSSEarthCloud_2->addUniform(m_pCommonUniform->GetUnit());
+	m_pSSEarthCloud_2->addUniform(m_mView2ECEFUniform.get());
 
 	// 添加shader
 	CGMKit::LoadShaderWithCommonFrag(m_pSSEarthCloud_2,
@@ -929,19 +933,19 @@ bool CGMEarth::_CreateEarth_2()
 	// “内散射”贴图
 	m_pSSEarthAtmos_2->setTextureAttributeAndModes(iAtmosUnit, m_pInscatteringTex, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pInscatteringUniform = new osg::Uniform("inscatteringTex", iAtmosUnit++);
-	m_pSSEarthAtmos_2->addUniform(pInscatteringUniform);
+	m_pSSEarthAtmos_2->addUniform(pInscatteringUniform.get());
 
 	m_pSSEarthAtmos_2->addUniform(m_pCommonUniform->GetViewUp());
-	m_pSSEarthAtmos_2->addUniform(m_vViewLightUniform);
-	m_pSSEarthAtmos_2->addUniform(m_fAtmosHeightUniform);
-	m_pSSEarthAtmos_2->addUniform(m_fEyeAltitudeUniform);
-	m_pSSEarthAtmos_2->addUniform(m_vPlanetRadiusUniform);
-	m_pSSEarthAtmos_2->addUniform(m_fMinDotULUniform);
-	m_pSSEarthAtmos_2->addUniform(m_mView2ECEFUniform);
+	m_pSSEarthAtmos_2->addUniform(m_vViewLightUniform.get());
+	m_pSSEarthAtmos_2->addUniform(m_fAtmosHeightUniform.get());
+	m_pSSEarthAtmos_2->addUniform(m_fEyeAltitudeUniform.get());
+	m_pSSEarthAtmos_2->addUniform(m_vPlanetRadiusUniform.get());
+	m_pSSEarthAtmos_2->addUniform(m_fMinDotULUniform.get());
+	m_pSSEarthAtmos_2->addUniform(m_mView2ECEFUniform.get());
 
 	if (m_pConfigData->bWanderingEarth)
 	{
-		m_pSSEarthAtmos_2->addUniform(m_fWanderProgressUniform);
+		m_pSSEarthAtmos_2->addUniform(m_fWanderProgressUniform.get());
 		m_pSSEarthAtmos_2->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 

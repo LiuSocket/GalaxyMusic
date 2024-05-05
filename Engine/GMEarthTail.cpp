@@ -293,9 +293,9 @@ void CGMEarthTail::MakeEarthTail()
 
 	pSSSpiral->addUniform(m_pCommonUniform->GetUnit());
 	pSSSpiral->addUniform(m_pCommonUniform->GetTime());
-	pSSSpiral->addUniform(m_fWanderProgressUniform);
-	pSSSpiral->addUniform(m_vViewLightUniform);
-	pSSSpiral->addUniform(m_vEngineStartRatioUniform);
+	pSSSpiral->addUniform(m_fWanderProgressUniform.get());
+	pSSSpiral->addUniform(m_vViewLightUniform.get());
+	pSSSpiral->addUniform(m_vEngineStartRatioUniform.get());
 	CGMKit::AddTexture(pSSSpiral, pNoise2DTex, "noise2DTex", 0);
 	CGMKit::LoadShader(pSSSpiral,
 		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.vert",
@@ -336,9 +336,9 @@ void CGMEarthTail::MakeEarthTail()
 
 	pSSTailEnvelope->addUniform(m_pCommonUniform->GetUnit());
 	pSSTailEnvelope->addUniform(m_pCommonUniform->GetTime());
-	pSSTailEnvelope->addUniform(m_fWanderProgressUniform);
-	pSSTailEnvelope->addUniform(m_vViewLightUniform);
-	pSSTailEnvelope->addUniform(m_vEngineStartRatioUniform);
+	pSSTailEnvelope->addUniform(m_fWanderProgressUniform.get());
+	pSSTailEnvelope->addUniform(m_vViewLightUniform.get());
+	pSSTailEnvelope->addUniform(m_vEngineStartRatioUniform.get());
 	CGMKit::AddTexture(pSSTailEnvelope, pNoise2DTex, "noise2DTex", 0);
 	CGMKit::LoadShader(pSSTailEnvelope,
 		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.vert",
@@ -364,9 +364,9 @@ void CGMEarthTail::MakeEarthTail()
 
 	pSSEarthRing->addUniform(m_pCommonUniform->GetUnit());
 	pSSEarthRing->addUniform(m_pCommonUniform->GetTime());
-	pSSEarthRing->addUniform(m_fWanderProgressUniform);
-	pSSEarthRing->addUniform(m_vViewLightUniform);
-	pSSEarthRing->addUniform(m_vEngineStartRatioUniform);
+	pSSEarthRing->addUniform(m_fWanderProgressUniform.get());
+	pSSEarthRing->addUniform(m_vViewLightUniform.get());
+	pSSEarthRing->addUniform(m_vEngineStartRatioUniform.get());
 	CGMKit::AddTexture(pSSEarthRing, pNoise2DTex, "noise2DTex", 0);
 
 	CGMKit::LoadShader(pSSEarthRing,
@@ -1057,15 +1057,15 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	pSS->setAttributeAndModes(new osg::CullFace(osg::CullFace::BACK));
 
-	pSS->addUniform(m_fPixelLengthUniform);
-	pSS->addUniform(m_fTailVisibleUniform);
-	pSS->addUniform(m_vShakeVectorUniform);
-	pSS->addUniform(m_vDeltaShakeUniform);
-	pSS->addUniform(m_mWorld2ECEFUniform);
-	pSS->addUniform(m_mView2ECEFUniform);
-	pSS->addUniform(m_mWorld2SpiralUniform);
-	pSS->addUniform(m_mView2SpiralUniform);
-	pSS->addUniform(m_vViewLightUniform);
+	pSS->addUniform(m_fPixelLengthUniform.get());
+	pSS->addUniform(m_fTailVisibleUniform.get());
+	pSS->addUniform(m_vShakeVectorUniform.get());
+	pSS->addUniform(m_vDeltaShakeUniform.get());
+	pSS->addUniform(m_mWorld2ECEFUniform.get());
+	pSS->addUniform(m_mView2ECEFUniform.get());
+	pSS->addUniform(m_mWorld2SpiralUniform.get());
+	pSS->addUniform(m_mView2SpiralUniform.get());
+	pSS->addUniform(m_vViewLightUniform.get());
 	pSS->addUniform(m_pCommonUniform->GetUnit());
 	pSS->addUniform(m_pCommonUniform->GetTime());
 	pSS->addUniform(m_pCommonUniform->GetScreenSize());
@@ -1074,8 +1074,8 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->addUniform(m_pCommonUniform->GetEyeUpDir());
 	pSS->addUniform(m_pCommonUniform->GetMainInvProjMatrix());
 	pSS->addUniform(m_pCommonUniform->GetDeltaVPMatrix());
-	pSS->addUniform(m_vEngineStartRatioUniform);
-	pSS->addUniform(m_fWanderProgressUniform);
+	pSS->addUniform(m_vEngineStartRatioUniform.get());
+	pSS->addUniform(m_fWanderProgressUniform.get());
 
 	int iUnit = 0;
 	CGMKit::AddTexture(pSS, m_vectorMap_1, "lastVectorTex", iUnit++);

@@ -831,12 +831,12 @@ bool CGMEarthEngine::_GenEarthEnginePoint_1()
 	pSSPlanetEnginePoint->setRenderBinDetails(BIN_PLANET_POINT, "DepthSortedBin");
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEnginePoint->addUniform(m_vEngineStartRatioUniform);
+	pSSPlanetEnginePoint->addUniform(m_vEngineStartRatioUniform.get());
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
 	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEnginePoint->addUniform(pTailUniform);
+	pSSPlanetEnginePoint->addUniform(pTailUniform.get());
 
 	std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.vert";
 	std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.frag";
@@ -870,12 +870,12 @@ bool CGMEarthEngine::_GenEarthEnginePoint_2()
 	pSSPlanetEnginePoint->setRenderBinDetails(BIN_PLANET_POINT, "DepthSortedBin");
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEnginePoint->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEnginePoint->addUniform(m_vEngineStartRatioUniform);
+	pSSPlanetEnginePoint->addUniform(m_vEngineStartRatioUniform.get());
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
 	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEnginePoint->addUniform(pTailUniform);
+	pSSPlanetEnginePoint->addUniform(pTailUniform.get());
 
 	std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.vert";
 	std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.frag";
@@ -911,12 +911,12 @@ bool CGMEarthEngine::_GenEarthEngineJetLine_1()
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetTime());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEngineJet->addUniform(m_vEngineStartRatioUniform);
+	pSSPlanetEngineJet->addUniform(m_vEngineStartRatioUniform.get());
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEngineJet->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
 	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEngineJet->addUniform(pTailUniform);
+	pSSPlanetEngineJet->addUniform(pTailUniform.get());
 
 	std::string strJetVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.vert";
 	std::string strJetFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.frag";
@@ -952,12 +952,12 @@ bool CGMEarthEngine::_GenEarthEngineJetLine_2()
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetTime());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSPlanetEngineJet->addUniform(m_pCommonUniform->GetUnit());
-	pSSPlanetEngineJet->addUniform(m_vEngineStartRatioUniform);
+	pSSPlanetEngineJet->addUniform(m_vEngineStartRatioUniform.get());
 
 	// 流浪地球尾迹（吹散的大气）
 	pSSPlanetEngineJet->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
 	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEngineJet->addUniform(pTailUniform);
+	pSSPlanetEngineJet->addUniform(pTailUniform.get());
 
 	std::string strJetVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.vert";
 	std::string strJetFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.frag";
@@ -990,26 +990,26 @@ bool CGMEarthEngine::_GenEarthEngineBody_1()
 	pSSEngineBody->addUniform(m_pCommonUniform->GetUnit());
 	pSSEngineBody->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSEngineBody->addUniform(m_pCommonUniform->GetViewUp());
-	pSSEngineBody->addUniform(m_vViewLightUniform);
-	pSSEngineBody->addUniform(m_fMinDotULUniform);
-	pSSEngineBody->addUniform(m_fGroundTopUniform);
-	pSSEngineBody->addUniform(m_fEyeAltitudeUniform);
-	pSSEngineBody->addUniform(m_fAtmosHeightUniform);
-	pSSEngineBody->addUniform(m_vEngineStartRatioUniform);
-	pSSEngineBody->addUniform(m_fWanderProgressUniform);
+	pSSEngineBody->addUniform(m_vViewLightUniform.get());
+	pSSEngineBody->addUniform(m_fMinDotULUniform.get());
+	pSSEngineBody->addUniform(m_fGroundTopUniform.get());
+	pSSEngineBody->addUniform(m_fEyeAltitudeUniform.get());
+	pSSEngineBody->addUniform(m_fAtmosHeightUniform.get());
+	pSSEngineBody->addUniform(m_vEngineStartRatioUniform.get());
+	pSSEngineBody->addUniform(m_fWanderProgressUniform.get());
 
 	int iTexUnit = 0;
 	// base color贴图
 	osg::ref_ptr<osg::Uniform> pBaseColorTexUniform = new osg::Uniform("baseColorTex", iTexUnit++);
-	pSSEngineBody->addUniform(pBaseColorTexUniform);
+	pSSEngineBody->addUniform(pBaseColorTexUniform.get());
 	// 大气“内散射”纹理
 	pSSEngineBody->setTextureAttributeAndModes(iTexUnit, m_pInscatteringTex, osg::StateAttribute::ON);
 	osg::ref_ptr<osg::Uniform> pInscatteringUniform = new osg::Uniform("inscatteringTex", iTexUnit++);
-	pSSEngineBody->addUniform(pInscatteringUniform);
+	pSSEngineBody->addUniform(pInscatteringUniform.get());
 	// 流浪地球尾迹（吹散的大气）
 	pSSEngineBody->setTextureAttributeAndModes(iTexUnit, m_pEarthTailTex, osg::StateAttribute::ON);
 	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", iTexUnit++);
-	pSSEngineBody->addUniform(pTailUniform);
+	pSSEngineBody->addUniform(pTailUniform.get());
 
 	std::string strEarthShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
 	std::string strGalaxyShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
@@ -1046,26 +1046,26 @@ bool CGMEarthEngine::_GenEarthEngineBody_2()
 	pSSEngineBody->addUniform(m_pCommonUniform->GetUnit());
 	pSSEngineBody->addUniform(m_pCommonUniform->GetScreenSize());
 	pSSEngineBody->addUniform(m_pCommonUniform->GetViewUp());
-	pSSEngineBody->addUniform(m_vViewLightUniform);
-	pSSEngineBody->addUniform(m_fMinDotULUniform);
-	pSSEngineBody->addUniform(m_fGroundTopUniform);
-	pSSEngineBody->addUniform(m_fEyeAltitudeUniform);
-	pSSEngineBody->addUniform(m_fAtmosHeightUniform);
-	pSSEngineBody->addUniform(m_vEngineStartRatioUniform);
-	pSSEngineBody->addUniform(m_fWanderProgressUniform);
+	pSSEngineBody->addUniform(m_vViewLightUniform.get());
+	pSSEngineBody->addUniform(m_fMinDotULUniform.get());
+	pSSEngineBody->addUniform(m_fGroundTopUniform.get());
+	pSSEngineBody->addUniform(m_fEyeAltitudeUniform.get());
+	pSSEngineBody->addUniform(m_fAtmosHeightUniform.get());
+	pSSEngineBody->addUniform(m_vEngineStartRatioUniform.get());
+	pSSEngineBody->addUniform(m_fWanderProgressUniform.get());
 
 	int iTexUnit = 0;
 	// base color 贴图
 	osg::ref_ptr<osg::Uniform> pBaseColorTexUniform = new osg::Uniform("baseColorTex", iTexUnit++);
-	pSSEngineBody->addUniform(pBaseColorTexUniform);
+	pSSEngineBody->addUniform(pBaseColorTexUniform.get());
 	// 大气“内散射”纹理
 	pSSEngineBody->setTextureAttributeAndModes(iTexUnit, m_pInscatteringTex, osg::StateAttribute::ON);
 	osg::ref_ptr<osg::Uniform> pInscatteringUniform = new osg::Uniform("inscatteringTex", iTexUnit++);
-	pSSEngineBody->addUniform(pInscatteringUniform);
+	pSSEngineBody->addUniform(pInscatteringUniform.get());
 	// 流浪地球尾迹（吹散的大气）
 	pSSEngineBody->setTextureAttributeAndModes(iTexUnit, m_pEarthTailTex, osg::StateAttribute::ON);
 	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", iTexUnit++);
-	pSSEngineBody->addUniform(pTailUniform);
+	pSSEngineBody->addUniform(pTailUniform.get());
 
 	std::string strEarthShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
 	std::string strGalaxyShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
@@ -1097,14 +1097,14 @@ bool CGMEarthEngine::_GenEarthEngineStream()
 	pSSEngineStream->setRenderBinDetails(BIN_PLANET_JET, "DepthSortedBin"); // to do
 	pSSEngineStream->addUniform(m_pCommonUniform->GetTime());
 	pSSEngineStream->addUniform(m_pCommonUniform->GetUnit());
-	pSSEngineStream->addUniform(m_vEngineStartRatioUniform);
+	pSSEngineStream->addUniform(m_vEngineStartRatioUniform.get());
 
 	// 喷射流噪声贴图
 	pSSEngineStream->setTextureAttributeAndModes(0,
 		_CreateTexture2D(m_pConfigData->strCorePath + "Textures/Volume/BlueNoise.jpg", 1),
 		osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
 	osg::ref_ptr<osg::Uniform> pBlueNoiseUniform = new osg::Uniform("blueNoiseTex", 0);
-	pSSEngineStream->addUniform(pBlueNoiseUniform);
+	pSSEngineStream->addUniform(pBlueNoiseUniform.get());
 
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
 	CGMKit::LoadShader(pSSEngineStream,

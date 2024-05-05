@@ -35,6 +35,7 @@ vec3 ToneMapping(vec3 color)
 uniform float atmosHeight;
 uniform float eyeAltitude;
 uniform float groundTop;
+uniform mat4 view2ECEFMatrix;
 uniform mat4 osg_ViewMatrixInverse;
 uniform sampler3D inscatteringTex;
 
@@ -51,11 +52,9 @@ float CosDH(float cosDir, float cosHoriz)
 }
 
 // get coord of cosUV (the cos of local Up dir & view dir)
-// cosUV : [-1,1]
-// coord : [0,1]
 float GetCoordPitch(float cosUV)
 {
-	return 0.5 + cosUV * 0.5;
+	return 0.5 + sqrt(abs(cosUV))*sign(cosUV) * 0.5;
 }
 
 // get coord of cosUL (the cos of local Up dir & light source dir)
@@ -64,27 +63,26 @@ float GetCoordUL(float cosUL)
 	return (cosUL-minDotUL)/(1-minDotUL);
 }
 
-// x = cosVL, y = cosUL, z = pitch, w = alt
+// x = pitch, y = cosUL, z = cosVL, w = alt
 vec4 Texture4D(vec4 coord)
 {
-	const float PITCH_NUM = 128.0;
-	const float ALT_NUM = 32.0;
-
+	const float ALT_NUM = 16.0;
 	float altI = coord.w*ALT_NUM;
-	float z = coord.z * (PITCH_NUM - 1) / PITCH_NUM + 0.5 / PITCH_NUM; // [0.5/PITCH_NUM, 1 - 0.5/PITCH_NUM]
-
-	vec3 UVW_0 = vec3(coord.xy, (min(floor(altI), ALT_NUM - 1) + z)/ALT_NUM);
-	vec3 UVW_1 = vec3(coord.xy, (min(ceil(altI), ALT_NUM - 1) + z)/ALT_NUM);
+	vec3 UVW_0 = vec3(coord.xy, (min(floor(altI), ALT_NUM - 1) + coord.z)/ALT_NUM);
+	vec3 UVW_1 = vec3(coord.xy, (min(ceil(altI), ALT_NUM - 1) + coord.z)/ALT_NUM);
 	vec4 color_0 = texture(inscatteringTex, UVW_0);
 	vec4 color_1 = texture(inscatteringTex, UVW_1);
-
-	// don't know why the data at pos(0.999,0.999,0.999) is wrong, (less than zero)
+	
 	return mix(color_0, color_1, fract(altI));
 }
 
 // Rv: radius at the vertex point
 vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, float Rv)
 {
+	vec3 ECEFEyePos = view2ECEFMatrix[3].xyz;
+	float lenCore2Eye = length(ECEFEyePos);
+	float eyeGeoRadius = lenCore2Eye - eyeAltitude;
+
 	// vertex is up to eye: +, vertex is down to eye: -
 	// cosVertDir(at the vertex pos):
 	float cosVertDir = dot(viewVertUp, viewDir);
@@ -134,35 +132,42 @@ vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, 
 	float deltaCosVertVL = cosVertMaxVL-cosVertMinVL;
 	deltaCosVertVL = step(0, deltaCosVertVL) * max(1e-9, abs(deltaCosVertVL));
 
+	float nearEye = exp2(-length(viewVertPos)/atmosHeight);
+	// sin & cos of eye pos horizon
+	float sinEyeHoriz = min(1, eyeGeoRadius / lenCore2Eye);
+	float cosEyeHoriz = -sqrt(1 - sinEyeHoriz * sinEyeHoriz);
+
 	// sin & cos of horizon at near atmosphere pos, affected by celestial radius
 	float sinNearHoriz = min(1, Rv / min(Ra, Rv + eyeAltitude));
 	float cosNearHoriz = -sqrt(1-sinNearHoriz*sinNearHoriz);
+	cosNearHoriz = mix(cosNearHoriz, cosEyeHoriz, nearEye);
 	vec3 atmosNear = Texture4D(vec4(
-		(cosVL-cosMinVL)/deltaCosVL,
-		GetCoordUL(cosUL),
 		GetCoordPitch(CosDH(cosUV, cosNearHoriz)),
-		min(1, eyeAltitude / atmosHeight))).rgb;
+		GetCoordUL(cosUL),
+		(cosMaxVL-cosVL)/deltaCosVL,
+		min(1, sqrt(eyeAltitude / atmosHeight)))).rgb;
 
 	// sin & cos of horizon at vertex pos, affected by celestial radius
 	float sinVertHoriz = min(1, Rv / (Rv + vertAlt));
-	float cosVertHoriz = -sqrt(1-sinVertHoriz*sinVertHoriz);	
+	float cosVertHoriz = -sqrt(1-sinVertHoriz*sinVertHoriz);
+	cosVertHoriz = mix(cosVertHoriz, cosEyeHoriz, nearEye);	
 	vec3 atmosVert = Texture4D(vec4(
-		(cosVL-cosVertMinVL)/deltaCosVertVL,
-		GetCoordUL(cosVertUL),
 		GetCoordPitch(CosDH(cosVertDir, cosVertHoriz)),
-		min(1, vertAlt / atmosHeight))).rgb;
+		GetCoordUL(cosVertUL),
+		(cosVertMaxVL-cosVL)/deltaCosVertVL,
+		min(1, sqrt(vertAlt / atmosHeight)))).rgb;
 	vec3 atmosSum = abs(atmosNear - atmosVert);
 
 #ifdef EARTH
 #ifdef WANDERING
 	float meanSum = (atmosSum.r+atmosSum.g+atmosSum.b)*0.33;
-	return mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5*wanderProgress);
+	atmosSum = mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5*wanderProgress);
 #else // not WANDERING
-	return atmosSum;
 #endif // WANDERING
 #else // not EARTH
-	return (atmosColorMatrix*vec4(atmosSum,1)).rgb;
+	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;
 #endif // EARTH
+	return atmosSum;
 }
 
 #endif // ATMOS

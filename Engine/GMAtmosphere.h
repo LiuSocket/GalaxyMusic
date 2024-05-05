@@ -35,7 +35,7 @@ namespace GM
 	constexpr double ATMOS_FADE_B = 33.1e-6; 		// 大气的蓝光衰减系数
 
 	constexpr double ATMOS_RAYLEIGH_H = 0.132; 		// 大气的瑞丽散射标高比例
-	constexpr double ATMOS_MIE_H = 0.0187; 			// 大气的米氏散射标高比例
+	constexpr double ATMOS_MIE_H = 0.0188; 			// 大气的米氏散射标高比例
 	constexpr int ATMOS_MIN = 16;					// 最小的大气厚度，单位：km
 
 	/*************************************************************************
