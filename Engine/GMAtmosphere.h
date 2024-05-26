@@ -30,12 +30,12 @@ namespace GM
 	constexpr
 	*************************************************************************/
 
-	constexpr double ATMOS_FADE_R = 5.802e-6;		// 大气的红光衰减系数
-	constexpr double ATMOS_FADE_G = 13.558e-6; 		// 大气的绿光衰减系数
-	constexpr double ATMOS_FADE_B = 33.1e-6; 		// 大气的蓝光衰减系数
+	constexpr double ATMOS_FADE_R = 5.802e-6;		// 大气的红光散射系数
+	constexpr double ATMOS_FADE_G = 1.3558e-5; 		// 大气的绿光散射系数
+	constexpr double ATMOS_FADE_B = 3.31e-5; 		// 大气的蓝光散射系数
 
 	constexpr double ATMOS_RAYLEIGH_H = 0.132; 		// 大气的瑞丽散射标高比例
-	constexpr double ATMOS_MIE_H = 0.0188; 			// 大气的米氏散射标高比例
+	constexpr double ATMOS_MIE_H = 0.1; 			// 大气的米氏散射标高比例，6400m
 	constexpr int ATMOS_MIN = 16;					// 最小的大气厚度，单位：km
 
 	/*************************************************************************
@@ -131,7 +131,7 @@ namespace GM
 		{
 			// 大气密度随高度衰减，其中地球大气瑞丽散射的标高：8500m
 			double fEarthH = fAtmosThick * ATMOS_RAYLEIGH_H;
-			return osg::Vec3d(ATMOS_FADE_R, ATMOS_FADE_G, ATMOS_FADE_B) * exp(-std::fmax(0, fAlt) / fEarthH);
+			return osg::Vec3d(ATMOS_FADE_R, ATMOS_FADE_G, ATMOS_FADE_B) * exp2(-std::fmax(0, fAlt) / fEarthH);
 		};
 		/**
 		* @brief 根据“海拔高度”和“大气总厚度”，计算该位置的米氏散射系数
@@ -143,7 +143,7 @@ namespace GM
 		{
 			// 大气密度随高度衰减，其中地球大气米氏散射的标高：1200m
 			double fEarthH = fAtmosThick * ATMOS_MIE_H;
-			double fMie = 3.996e-6 * exp(-std::fmax(0, fAlt) / fEarthH);
+			double fMie = 3.996e-6 * exp2(-std::fmax(0, fAlt) / fEarthH);
 			return osg::Vec3d(fMie, fMie, fMie);
 		};
 
@@ -163,7 +163,7 @@ namespace GM
 		*/
 		inline double _MiePhase(const double& fCosVL) const
 		{
-			constexpr double g = 0.8;
+			constexpr double g = 0.9;
 			constexpr double g2 = g * g;
 			const double a = 3.0 / (8 * osg::PI);
 			constexpr double b = (1 - g2) / (2 + g2);
@@ -182,7 +182,7 @@ namespace GM
 		{
 			// 大气密度随高度衰减，其中地球大气米氏散射的标高：1200m
 			double fEarthH = fAtmosThick * ATMOS_MIE_H;
-			double fMie = 4.4e-6 * exp(-std::fmax(0, fAlt) / fEarthH);
+			double fMie = 4.4e-6 * exp2(-std::fmax(0, fAlt) / fEarthH);
 			return osg::Vec3d(fMie, fMie, fMie);
 		};
 		/**

@@ -109,7 +109,7 @@ void main()
 	oceanColor = oceanColor*(ambient + diffuse) + specualr;
 #else // not WANDERING
 	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-elev*0.015, 0)));
-	vec3 oceanColor = vec3(0.08,0.1,0.12)*diffuse + specualr;
+	vec3 oceanColor = vec3(0.1,0.14,0.3)*diffuse + specualr;
 #endif // WANDERING	or not
 	color = mix(oceanColor, color, rockMask);
 #endif // EARTH
@@ -124,7 +124,7 @@ void main()
 	// global shadow
 	vec2 screenCoord = gl_FragCoord.xy/screenSize.xy;
 	float globalShadow = texture(globalShadowTex, screenCoord).r;
-	color *= mix(1, globalShadow, clamp((eyeAltitude-0.1*atmosHeight)/atmosHeight,0,1));
+	color *= mix(vec3(1), mix(vec3(0.2,0.4,0.6), vec3(1), globalShadow), clamp((eyeAltitude-0.1*atmosHeight)/atmosHeight,0,1));
 #endif // EARTH
 	color = ToneMapping(color);
 

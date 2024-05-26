@@ -1,6 +1,8 @@
 #version 400 compatibility
 #pragma import_defines(AURORA, SATURN, EARTH, WANDERING)
 
+const float M_PI = 3.141592654;
+
 uniform vec3 viewUp;
 uniform vec3 viewLight;
 uniform float atmosHeight;
@@ -48,9 +50,10 @@ float CosSkyDH(float cosDir, float cosHoriz)
 }
 
 // get coord of cosUV (the cos of local Up dir & view dir)
-float GetCoordPitch(float cosUV)
+// pow is different by altRatio
+float GetCoordPitch(float cosUV, float altRatio)
 {
-	return 0.5 + sqrt(abs(cosUV))*sign(cosUV) * 0.5;
+	return 0.5 + sign(cosUV) * pow(abs(cosUV), 1.0/(1.0+0.8*altRatio)) * 0.5;
 }
 
 // get coord of cosUL (the cos of local Up dir & light source dir)
@@ -59,16 +62,17 @@ float GetCoordUL(float cosUL)
 	return (cosUL-minDotUL)/(1-minDotUL);
 }
 
-// x = pitch, y = cosUL, z = cosVL, w = alt
+// x = pitch, y = cosUL, z = coordYaw, w = alt
 vec4 Texture4D(vec4 coord)
 {
-	const float ALT_NUM = 16.0;
+	const float ALT_NUM = 32.0;
 	float altI = coord.w*ALT_NUM;
 	vec3 UVW_0 = vec3(coord.xy, (min(floor(altI), ALT_NUM - 1) + coord.z)/ALT_NUM);
 	vec3 UVW_1 = vec3(coord.xy, (min(ceil(altI), ALT_NUM - 1) + coord.z)/ALT_NUM);
 	vec4 color_0 = texture(inscatteringTex, UVW_0);
 	vec4 color_1 = texture(inscatteringTex, UVW_1);
 	
+	//return vec4(abs(coord.z-0.5)*2,0,0,1);
 	return mix(color_0, color_1, fract(altI));
 }
 
@@ -105,7 +109,7 @@ void main()
 	float lenCore2Eye = length(ECEFEyePos);
 	vec3 viewDir = normalize(viewPos.xyz);
 	//cosUV up is +, down is -
-	float cosUV = dot(viewUp, viewDir); 
+	float cosUV = dot(viewUp, viewDir);
 	float eyeGeoRadius = lenCore2Eye - eyeAltitude;
 	float lenCore2EyeAtmTop = eyeGeoRadius + atmosHeight;
 
@@ -129,11 +133,9 @@ void main()
 
 	vec3 viewNearUp = normalize(viewNearPos-viewCorePos);
 	float cosNUV = dot(viewNearUp, viewDir);
-	float sinNUV = sqrt(1 - cosNUV * cosNUV);
 	// cosNUL = viewUp at near atmosphere pos & light
 	float cosNUL = dot(viewNearUp, viewLight);
-	// cosVL = the cos of view dir & light source dir
-	float cosVL = dot(viewDir, viewLight);
+
 	// sin & cos of horizon, affected by celestial radius
 	float sinHoriz = min(1, midGeoRadius / lenCore2Near);
 	float cosHoriz = -sqrt(1 - sinHoriz * sinHoriz);
@@ -142,53 +144,48 @@ void main()
 	float cosEyeHoriz = -sqrt(1 - sinEyeHoriz * sinEyeHoriz);
 	cosHoriz = mix(cosHoriz, cosEyeHoriz, nearGround);
 
-	vec4 atmosSum = vec4(0,0,0,0);
+	vec3 viewLightRightDir = normalize(cross(viewLight, viewUp));
+	vec3 viewLightFrontDir = normalize(cross(viewUp, viewLightRightDir));
+	mat3 localLight2ViewMatrix = mat3(
+		viewLightRightDir.x,	viewLightRightDir.y,	viewLightRightDir.z,
+		viewLightFrontDir.x,	viewLightFrontDir.y,	viewLightFrontDir.z,
+		viewUp.x,				viewUp.y,				viewUp.z);
+	mat3 view2LocalLightMatrix = inverse(localLight2ViewMatrix);
+	vec3 localLightSpaceViewDir = view2LocalLightMatrix*viewDir;
+	float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
+
+	vec3 atmosSum = vec3(1,0,1);
 	if(isInAtmos)
 	{
 		// cosUL = cos of viewUp & light
 		float cosUL = dot(viewUp, viewLight);
-		float sinUV = sqrt(1 - cosUV * cosUV);
-
-		vec2 eyeLightDir = vec2(sqrt(1 - cosUL*cosUL), cosUL);
-		vec2 eyeViewFrontDir = vec2(sinUV, cosUV);
-		vec2 eyeViewBackDir = vec2(-sinUV, cosUV);
-		float cosMinVL = dot(eyeViewBackDir, eyeLightDir);
-		float cosMaxVL = dot(eyeViewFrontDir, eyeLightDir);
-		float deltaCosVL = cosMaxVL-cosMinVL;
+		float altRatio = eyeAltitude / atmosHeight;
 
 		atmosSum = Texture4D(vec4(
-			GetCoordPitch(CosSkyDH(cosUV, cosHoriz)),
+			GetCoordPitch(CosSkyDH(cosUV, cosHoriz), altRatio),
 			GetCoordUL(cosUL),
-			(cosMaxVL-cosVL)/deltaCosVL,
-			min(1, sqrt(eyeAltitude / atmosHeight))));
+			coordYaw,
+			min(1, sqrt(altRatio)))).rgb;
 	}
 	else
 	{
-		vec2 nearLightDir = vec2(sqrt(1 - cosNUL*cosNUL), cosNUL);
-		vec2 nearViewFrontDir = vec2(sinNUV, cosNUV);
-		vec2 nearViewBackDir = vec2(-sinNUV, cosNUV);
-		float cosMinVL = dot(nearViewBackDir, nearLightDir);
-		float cosMaxVL = dot(nearViewFrontDir, nearLightDir);
-		float deltaCosVL = cosMaxVL-cosMinVL;
-		deltaCosVL = (2*step(0, deltaCosVL)-1) * max(1e-9, abs(deltaCosVL));
-
 		atmosSum = Texture4D(vec4(
-			GetCoordPitch(CosSkyDH(cosNUV, cosHoriz)),
+			GetCoordPitch(CosSkyDH(cosNUV, cosHoriz), 1),
 			GetCoordUL(cosNUL),
-			(cosMaxVL-cosVL)/deltaCosVL,
-			1));
+			coordYaw,
+			1)).rgb;
 	}
 
 #ifdef EARTH
 #ifdef WANDERING
 	float meanSum = (atmosSum.r+atmosSum.g+atmosSum.b)*0.33;
-	atmosSum.rgb = mix(atmosSum.rgb, vec3(1.0,1.2,1.0)*meanSum, 0.5*clamp(10*(wanderProgress-0.1),0,1));
+	atmosSum = mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5*clamp(10*(wanderProgress-0.1),0,1));
 #endif // WANDERING
 #else // not EARTH
-	atmosSum.rgb = (atmosColorMatrix*vec4(atmosSum.rgb,1)).rgb;
+	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;
 #endif // EARTH
-	vec3 color = ToneMapping(atmosSum.rgb * (1 - shadow));
-	float alpha = atmosSum.a * (1 - shadow);
-
-	gl_FragColor = vec4(color, alpha);
+	vec3 color = ToneMapping(atmosSum * (1 - shadow));
+	float alpha = 1-exp2(-(atmosSum.r+atmosSum.g+atmosSum.b)*20);
+	alpha *= 1 - shadow;
+	gl_FragColor = vec4(color, alpha); //
 }
