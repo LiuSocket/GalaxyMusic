@@ -33,6 +33,17 @@ in vec3 shadowVertPos;
 in vec4 viewPos;
 in vec3 viewNormal;
 
+float MiePhase(float dotVS)
+{
+	const float g = 0.8;
+	return (1-g*g)/(4*M_PI*pow(1+g*g-2*g*dotVS, 1.5));	
+}
+
+float RayleighPhase(float dotVS)
+{
+	return 3.0 / (16 * M_PI) * (1 + dotVS * dotVS);
+}
+
 vec3 ToneMapping(vec3 color)
 {
 	const float A = 2.51;
@@ -154,27 +165,30 @@ void main()
 	vec3 localLightSpaceViewDir = view2LocalLightMatrix*viewDir;
 	float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
 
-	vec3 atmosSum = vec3(1,0,1);
+	vec4 inscattering = vec4(0,0,0,0);
 	if(isInAtmos)
 	{
 		// cosUL = cos of viewUp & light
 		float cosUL = dot(viewUp, viewLight);
 		float altRatio = eyeAltitude / atmosHeight;
 
-		atmosSum = Texture4D(vec4(
+		inscattering = Texture4D(vec4(
 			GetCoordPitch(CosSkyDH(cosUV, cosHoriz), altRatio),
 			GetCoordUL(cosUL),
 			coordYaw,
-			min(1, sqrt(altRatio)))).rgb;
+			min(1, sqrt(altRatio))));
 	}
 	else
 	{
-		atmosSum = Texture4D(vec4(
+		inscattering = Texture4D(vec4(
 			GetCoordPitch(CosSkyDH(cosNUV, cosHoriz), 1),
 			GetCoordUL(cosNUL),
 			coordYaw,
-			1)).rgb;
+			1));
 	}
+
+	float dotVS = dot(viewDir, viewLight);
+	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS)*vec3(1.0,0.9,0.6);
 
 #ifdef EARTH
 #ifdef WANDERING
@@ -187,5 +201,5 @@ void main()
 	vec3 color = ToneMapping(atmosSum * (1 - shadow));
 	float alpha = 1-exp2(-(atmosSum.r+atmosSum.g+atmosSum.b)*20);
 	alpha *= 1 - shadow;
-	gl_FragColor = vec4(color, alpha); //
+	gl_FragColor = vec4(color, alpha);
 }

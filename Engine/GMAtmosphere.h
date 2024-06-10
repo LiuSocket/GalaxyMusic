@@ -137,14 +137,13 @@ namespace GM
 		* @brief 根据“海拔高度”和“大气总厚度”，计算该位置的米氏散射系数
 		* @param fAlt:				海拔高度，单位：米
 		* @param fAtmosThick:		大气总厚度，单位：米
-		* @return osg::Vec3d:		该位置的米氏散射系数,(0,1]
+		* @return double:			该位置的米氏散射系数,(0,1]
 		*/
-		inline osg::Vec3d _MieCoefficient(const double& fAlt, const double& fAtmosThick) const
+		inline double _MieCoefficient(const double& fAlt, const double& fAtmosThick) const
 		{
 			// 大气密度随高度衰减，其中地球大气米氏散射的标高：1200m
 			double fEarthH = fAtmosThick * ATMOS_MIE_H;
-			double fMie = 3.996e-6 * exp2(-std::fmax(0, fAlt) / fEarthH);
-			return osg::Vec3d(fMie, fMie, fMie);
+			return 3.996e-6 * exp2(-std::fmax(0, fAlt) / fEarthH);
 		};
 
 		/**

@@ -22,6 +22,17 @@ uniform vec3 engineStartRatio;
 uniform float wanderProgress;
 #endif // WANDERING
 
+float MiePhase(float dotVS)
+{
+	const float g = 0.8;
+	return (1-g*g)/(4*M_PI*pow(1+g*g-2*g*dotVS, 1.5));	
+}
+
+float RayleighPhase(float dotVS)
+{
+	return 3.0 / (16 * M_PI) * (1 + dotVS * dotVS);
+}
+
 vec3 ToneMapping(vec3 color)
 {
 	const float A = 2.51;
@@ -89,67 +100,50 @@ vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, 
 	// vertex is up to eye: +, vertex is down to eye: -
 	// cosVertUV(at the vertex pos):
 	float cosVertUV = dot(viewVertUp, viewDir);
-	float sinVertUV = sqrt(1-cosVertUV*cosVertUV);
-	// radius at the top atmos above the vertex point
-	float Ra = Rv+atmosHeight;
-	// distance of view line to core
-	float Rt = sinVertUV*Rv;
-	// distance between the vertex and the top atmosphere point through the view path
-	float disVert2TopAtm = sqrt(Ra*Ra - Rt*Rt) - Rv*abs(cosVertUV);
-	vec3 viewTopAtmPos = viewVertPos - viewDir*disVert2TopAtm;
-	vec3 viewCorePos = viewVertPos - viewVertUp*Rv;
-	vec3 viewTopAtmUp = normalize(viewTopAtmPos-viewCorePos);
-
-	vec3 viewNearUp = viewTopAtmUp;
-	if(eyeAltitude < atmosHeight)
-	{
-		viewNearUp = viewUp;
-	}
-	//cosUV(at the atmos top pos or eye pos)
-	float cosUV = dot(viewNearUp, viewDir);
-	float sinUV = sqrt(1-cosUV*cosUV);
-	// cosUL = the cos of local Up dir & light source dir
-	float cosUL = dot(viewNearUp, viewLight);
 	// cosVertUL = the cos of vertex Up dir & light source dir
 	float cosVertUL = dot(viewVertUp, viewLight);
 
-	vec3 viewLightRightDir = normalize(cross(viewLight, viewNearUp));
-	vec3 viewLightFrontDir = normalize(cross(viewNearUp, viewLightRightDir));
+	vec3 viewLightRightDir = normalize(cross(viewLight, viewVertUp));
+	vec3 viewLightFrontDir = normalize(cross(viewVertUp, viewLightRightDir));
 	mat3 localLight2ViewMatrix = mat3(
 		viewLightRightDir.x,	viewLightRightDir.y,	viewLightRightDir.z,
 		viewLightFrontDir.x,	viewLightFrontDir.y,	viewLightFrontDir.z,
-		viewNearUp.x,			viewNearUp.y,			viewNearUp.z);
+		viewVertUp.x,			viewVertUp.y,			viewVertUp.z);
 	mat3 view2LocalLightMatrix = inverse(localLight2ViewMatrix);
 	vec3 localLightSpaceViewDir = view2LocalLightMatrix*viewDir;
-	float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
-
-	float nearEye = exp2(-length(viewVertPos)/atmosHeight);
-	// sin & cos of eye pos horizon
-	float sinEyeHoriz = min(1, eyeGeoRadius / lenCore2Eye);
-	float cosEyeHoriz = -sqrt(1 - sinEyeHoriz * sinEyeHoriz);
-
-	// sin & cos of horizon at near atmosphere pos, affected by celestial radius
-	float sinNearHoriz = min(1, Rv / min(Ra, Rv + eyeAltitude));
-	float cosNearHoriz = -sqrt(1-sinNearHoriz*sinNearHoriz);
-	cosNearHoriz = mix(cosNearHoriz, cosEyeHoriz, nearEye);
-	float altRatio = eyeAltitude / atmosHeight;
-	vec3 atmosNear = Texture4D(vec4(
-		GetCoordPitch(CosDH(cosUV, cosNearHoriz), altRatio),
-		GetCoordUL(cosUL),
-		coordYaw,
-		min(1, sqrt(altRatio)))).rgb;
+	float coordYaw = acos(-localLightSpaceViewDir.y)/M_PI; // ground is the inverse view dir
 
 	// sin & cos of horizon at vertex pos, affected by celestial radius
 	float sinVertHoriz = min(1, Rv / (Rv + vertAlt));
 	float cosVertHoriz = -sqrt(1-sinVertHoriz*sinVertHoriz);
-	cosVertHoriz = mix(cosVertHoriz, cosEyeHoriz, nearEye);
 	float vertAltRatio = vertAlt / atmosHeight;
-	vec3 atmosVert = Texture4D(vec4(
-		GetCoordPitch(CosDH(cosVertUV, cosVertHoriz), vertAltRatio),
+	vec4 inscatterVert = Texture4D(vec4(
+		GetCoordPitch(CosDH(-cosVertUV, cosVertHoriz), vertAltRatio),
 		GetCoordUL(cosVertUL),
 		coordYaw,
-		min(1, sqrt(vertAltRatio)))).rgb;
-	vec3 atmosSum = abs(atmosNear - atmosVert);
+		min(1, sqrt(vertAltRatio))));
+	vec4 inscattering = inscatterVert;
+
+	if(eyeAltitude < atmosHeight)
+	{
+		//cosUV(at the eye pos)
+		float cosUV = dot(viewUp, viewDir);
+		// cosUL = the cos of local Up dir & light source dir
+		float cosUL = dot(viewUp, viewLight);
+		// sin & cos of eye pos horizon
+		float sinEyeHoriz = min(1, eyeGeoRadius / lenCore2Eye);
+		float cosEyeHoriz = -sqrt(1 - sinEyeHoriz * sinEyeHoriz);
+		float altRatio = eyeAltitude / atmosHeight;
+		vec4 inscatterEye = Texture4D(vec4(
+			GetCoordPitch(CosDH(-cosUV, cosEyeHoriz), altRatio),
+			GetCoordUL(cosUL),
+			coordYaw,
+			min(1, sqrt(altRatio))));
+		inscattering = abs(inscatterVert-inscatterEye);
+	}
+
+	float dotVS = dot(viewDir, viewLight);
+	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS)*vec3(1.0,0.9,0.6);
 
 #ifdef EARTH
 #ifdef WANDERING

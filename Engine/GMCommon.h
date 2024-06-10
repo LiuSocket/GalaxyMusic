@@ -39,8 +39,8 @@ namespace GM
 	#define GM_HANDLE_RADIUS			(0.15)		// 把手半径，单位：万光年，1e20
 
 	#define SCAT_PITCH_NUM				(128)		// 散射图的俯仰方向与上方向的点乘采样数 [-1,1]
-	#define SCAT_LIGHT_NUM				(16)		// 散射图的太阳方向与上方向的点乘采样数 [-1,1]
-	#define SCAT_COS_NUM				(16)		// 散射图的太阳方向与视线方向的点乘采样数 [-1,1]
+	#define SCAT_LIGHT_NUM				(32)		// 散射图的太阳方向与上方向的点乘采样数 [-1,1]
+	#define SCAT_COS_NUM				(8)			// 散射图的太阳方向与视线方向的点乘采样数 [-1,1]
 	#define SCAT_ALT_NUM				(32)		// 散射图的大气点高度采样数 [0,fAtmosThick]m
 
 	/*************************************************************************
