@@ -60,7 +60,7 @@ uniform mat4 atmosColorMatrix;
 float CosDH(float cosDir, float cosHoriz)
 {
 	float deltaCos = cosDir-cosHoriz;
-	float isSky = step(0, deltaCos);
+	float isSky = step(0.0, deltaCos);
 	return deltaCos/mix(1+cosHoriz, 1-cosHoriz, isSky);
 }
 
@@ -81,9 +81,11 @@ float GetCoordUL(float cosUL)
 vec4 Texture4D(vec4 coord)
 {
 	const float ALT_NUM = 32.0;
+	const float MIN_Z = 0.5/8.0;
+	float coordYaw = clamp(coord.z, MIN_Z, 1-MIN_Z);
 	float altI = coord.w*ALT_NUM;
-	vec3 UVW_0 = vec3(coord.xy, (min(floor(altI), ALT_NUM - 1) + coord.z)/ALT_NUM);
-	vec3 UVW_1 = vec3(coord.xy, (min(ceil(altI), ALT_NUM - 1) + coord.z)/ALT_NUM);
+	vec3 UVW_0 = vec3(coord.xy, (min(floor(altI), ALT_NUM - 1) + coordYaw)/ALT_NUM);
+	vec3 UVW_1 = vec3(coord.xy, (min(ceil(altI), ALT_NUM - 1) + coordYaw)/ALT_NUM);
 	vec4 color_0 = texture(inscatteringTex, UVW_0);
 	vec4 color_1 = texture(inscatteringTex, UVW_1);
 
@@ -96,10 +98,13 @@ vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, 
 	vec3 ECEFEyePos = view2ECEFMatrix[3].xyz;
 	float lenCore2Eye = length(ECEFEyePos);
 	float eyeGeoRadius = lenCore2Eye - eyeAltitude;
+	float altRatio = max(0, eyeAltitude / atmosHeight);
 
+	// cosUL = the cos of local Up dir & light source dir
+	float cosUL = dot(viewUp, viewLight);
 	// vertex is up to eye: +, vertex is down to eye: -
 	// cosVertUV(at the vertex pos):
-	float cosVertUV = dot(viewVertUp, viewDir);
+	float cosVertUV = min(dot(viewVertUp, viewDir), max(0, eyeAltitude-vertAlt)); // to solve the black horizon bug
 	// cosVertUL = the cos of vertex Up dir & light source dir
 	float cosVertUL = dot(viewVertUp, viewLight);
 
@@ -113,10 +118,11 @@ vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, 
 	vec3 localLightSpaceViewDir = view2LocalLightMatrix*viewDir;
 	float coordYaw = acos(-localLightSpaceViewDir.y)/M_PI; // ground is the inverse view dir
 
+	float elev = max(0, vertAlt);
 	// sin & cos of horizon at vertex pos, affected by celestial radius
-	float sinVertHoriz = min(1, Rv / (Rv + vertAlt));
-	float cosVertHoriz = -sqrt(1-sinVertHoriz*sinVertHoriz);
-	float vertAltRatio = vertAlt / atmosHeight;
+	float sinVertHoriz = min(1, Rv / (Rv + elev)); // it must < 1
+	float cosVertHoriz = min(0, -sqrt(1 - sinVertHoriz * sinVertHoriz)); // it must < 0
+	float vertAltRatio = elev / atmosHeight;
 	vec4 inscatterVert = Texture4D(vec4(
 		GetCoordPitch(CosDH(-cosVertUV, cosVertHoriz), vertAltRatio),
 		GetCoordUL(cosVertUL),
@@ -128,12 +134,10 @@ vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, 
 	{
 		//cosUV(at the eye pos)
 		float cosUV = dot(viewUp, viewDir);
-		// cosUL = the cos of local Up dir & light source dir
-		float cosUL = dot(viewUp, viewLight);
 		// sin & cos of eye pos horizon
-		float sinEyeHoriz = min(1, eyeGeoRadius / lenCore2Eye);
-		float cosEyeHoriz = -sqrt(1 - sinEyeHoriz * sinEyeHoriz);
-		float altRatio = eyeAltitude / atmosHeight;
+		float sinEyeHoriz = min(1, eyeGeoRadius / lenCore2Eye); // it must < 1
+		float cosEyeHoriz = min(0, -sqrt(1 - sinEyeHoriz * sinEyeHoriz)); // it must < 0
+
 		vec4 inscatterEye = Texture4D(vec4(
 			GetCoordPitch(CosDH(-cosUV, cosEyeHoriz), altRatio),
 			GetCoordUL(cosUL),
@@ -143,14 +147,10 @@ vec3 AtmosColor(float vertAlt, vec3 viewVertPos, vec3 viewDir, vec3 viewVertUp, 
 	}
 
 	float dotVS = dot(viewDir, viewLight);
-	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS)*vec3(1.0,0.9,0.6);
+	vec3 sunColor = pow(vec3(1.0,0.8,0.2), vec3(5.0-4.0*sqrt(max(0,cosUL*10))*exp2(-altRatio*0.5)));
+	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS)*sunColor;
 
 #ifdef EARTH
-#ifdef WANDERING
-	float meanSum = (atmosSum.r+atmosSum.g+atmosSum.b)*0.33;
-	atmosSum = mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5*wanderProgress);
-#else // not WANDERING
-#endif // WANDERING
 #else // not EARTH
 	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;
 #endif // EARTH

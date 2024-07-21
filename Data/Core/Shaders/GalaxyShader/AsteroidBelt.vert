@@ -34,9 +34,9 @@ void main()
 	vertexColor.rgb *= 0.1+0.3*noise;
 	vertexColor.a = planetPointAlpha;
 
-	gl_PointSize = (1+noise)*(1+3*exp2(-lengthV*1e5))*clamp(1.5-length(asteroidPos*1e-12),0,1);
+	gl_PointSize = (1+noise)*(1+3*exp2(-lengthV*1e4))*clamp(1.5-length(asteroidPos*1e-12),0,1);
 	gl_Position = gl_ModelViewProjectionMatrix * modelPos;
 
-	//float isFast = clamp((length(asteroidVelocity)-5e3)*5e-5, 0, 1);
-	//vertexColor.rgb = mix(vertexColor.rgb, vertexColor.bgr, isFast);
+	float isFast = clamp((length(asteroidVelocity)-2e4)*5e-5, 0, 1);
+	vertexColor.rgb = mix(vertexColor.rgb, vec3(1), isFast);
 }

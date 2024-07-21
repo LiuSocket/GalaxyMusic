@@ -77,13 +77,14 @@ float GetCoordUL(float cosUL)
 vec4 Texture4D(vec4 coord)
 {
 	const float ALT_NUM = 32.0;
+	const float MIN_Z = 0.5/8.0;
+	float coordYaw = clamp(coord.z, MIN_Z, 1-MIN_Z);
 	float altI = coord.w*ALT_NUM;
-	vec3 UVW_0 = vec3(coord.xy, (min(floor(altI), ALT_NUM - 1) + coord.z)/ALT_NUM);
-	vec3 UVW_1 = vec3(coord.xy, (min(ceil(altI), ALT_NUM - 1) + coord.z)/ALT_NUM);
+	vec3 UVW_0 = vec3(coord.xy, (min(floor(altI), ALT_NUM - 1) + coordYaw)/ALT_NUM);
+	vec3 UVW_1 = vec3(coord.xy, (min(ceil(altI), ALT_NUM - 1) + coordYaw)/ALT_NUM);
 	vec4 color_0 = texture(inscatteringTex, UVW_0);
 	vec4 color_1 = texture(inscatteringTex, UVW_1);
 	
-	//return vec4(abs(coord.z-0.5)*2,0,0,1);
 	return mix(color_0, color_1, fract(altI));
 }
 
@@ -119,10 +120,15 @@ void main()
 	vec3 ECEFEyePos = view2ECEFMatrix[3].xyz;
 	float lenCore2Eye = length(ECEFEyePos);
 	vec3 viewDir = normalize(viewPos.xyz);
-	//cosUV up is +, down is -
-	float cosUV = dot(viewUp, viewDir);
+	
+	float altRatio = eyeAltitude / atmosHeight;
 	float eyeGeoRadius = lenCore2Eye - eyeAltitude;
 	float lenCore2EyeAtmTop = eyeGeoRadius + atmosHeight;
+
+	//cosUV up is +, down is -
+	float cosUV = dot(viewUp, viewDir);
+	// cosUL = cos of viewUp & light
+	float cosUL = dot(viewUp, viewLight);
 
 	vec3 viewCorePos = -viewUp*lenCore2Eye;
 	vec3 viewCore2FarPos = viewPos.xyz-viewCorePos;
@@ -168,10 +174,6 @@ void main()
 	vec4 inscattering = vec4(0,0,0,0);
 	if(isInAtmos)
 	{
-		// cosUL = cos of viewUp & light
-		float cosUL = dot(viewUp, viewLight);
-		float altRatio = eyeAltitude / atmosHeight;
-
 		inscattering = Texture4D(vec4(
 			GetCoordPitch(CosSkyDH(cosUV, cosHoriz), altRatio),
 			GetCoordUL(cosUL),
@@ -188,13 +190,10 @@ void main()
 	}
 
 	float dotVS = dot(viewDir, viewLight);
-	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS)*vec3(1.0,0.9,0.6);
+	vec3 sunColor = pow(vec3(1.0,0.8,0.2), vec3(5.0-4.0*sqrt(max(0,cosUL*10))*exp2(-altRatio*0.5)));
+	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS)*sunColor;
 
 #ifdef EARTH
-#ifdef WANDERING
-	float meanSum = (atmosSum.r+atmosSum.g+atmosSum.b)*0.33;
-	atmosSum = mix(atmosSum, vec3(1.0,1.2,1.0)*meanSum, 0.5*clamp(10*(wanderProgress-0.1),0,1));
-#endif // WANDERING
 #else // not EARTH
 	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;
 #endif // EARTH

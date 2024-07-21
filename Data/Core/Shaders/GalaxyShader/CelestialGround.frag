@@ -116,8 +116,8 @@ void main()
 
 #ifdef ATMOS
 	// radius at the vertex point
-	float Rv = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1));
-	color += AtmosColor(max(0, vertAlt), viewPos.xyz, viewDir, viewVertUp, Rv);
+	float Rv = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1)); // to consider
+	color += AtmosColor(vertAlt, viewPos.xyz, viewDir, viewVertUp, Rv);
 #endif // ATMOS
 
 #ifdef EARTH
