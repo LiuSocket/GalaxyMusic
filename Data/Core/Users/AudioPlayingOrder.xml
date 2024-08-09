@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Order>
-    <Audio name="Alan Silvestri - A Promise.mp3" />
-    <Audio name="澤野弘之 - BLUe-eXOSUiTe-toKYOto-弌.mp3" />
-    <Audio name="The Stark Expo Singers - Make Way For Tomorrow Today.mp3" />
     <Audio name="Marco Beltrami - Where to？.mp3" />
     <Audio name="横山克 - To Victory.mp3" />
     <Audio name="久石譲 - Summer.mp3" />
@@ -50,4 +47,7 @@
     <Audio name="Patrick Doyle - Thor Kills The Destroyer.mp3" />
     <Audio name="Ramin Djawadi - Iron Man.mp3" />
     <Audio name="The Hit House - Nuummite.mp3" />
+    <Audio name="Nirvana - Smells Like Teen Spirit.mp3" />
+    <Audio name="辻尾有紗 - 青い空に出逢えた(TV Mix).mp3" />
+    <Audio name="John Debney - Senate ／ Ivan Creates Drones.mp3" />
 </Order>
