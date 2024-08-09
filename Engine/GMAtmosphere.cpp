@@ -461,14 +461,14 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 	std::string strTransmittancePath = m_pConfigData->strCorePath + "Textures/Sphere/Transmittance/Transmittance_";
 	std::string strIrradiancePath = m_pConfigData->strCorePath + "Textures/Sphere/Irradiance/Irradiance_";
 
-	//int h = 2; //大气厚度
-	for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
+	int h = 2; //大气厚度
+	//for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
 	{
 		double fAtmosThick = ATMOS_MIN * 1e3 * exp2(h);				// 大气厚度，单位：米
 		double fDensAtmosBottom = _GetAtmosBottomDens(fAtmosThick);		// 星球表面大气密度
 
-		//for (int r = 1; r < 2; r++) //  星球半径
-		for (int r = 0; r < RADIUS_NUM; r++) //星球半径
+		for (int r = 1; r < 2; r++) //  星球半径
+		//for (int r = 0; r < RADIUS_NUM; r++) //星球半径
 		{
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
 			double fTopR = fSphereR + fAtmosThick;
@@ -482,53 +482,56 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 			float* data = new float[iAtmosImageBytes];
 
 			parallel_for(int(0), int(SCAT_PITCH_NUM), [&](int s) // 多线程
-			//for (int s = 0; s < SCAT_PITCH_NUM; s++) // 视线与上方向夹角余弦值
+			//for (int s = 0; s < SCAT_PITCH_NUM; s++) // d0/dH 或 d0/dh
 			{
 				for (int t = 0; t < SCAT_ALT_NUM; t++) // 海拔高度 
 				{
 					double fEyeAltCoord = (SCAT_ALT_NUM - 1 - t) / double(SCAT_ALT_NUM - 1);
 					double fEyeAltRatio = fEyeAltCoord * fEyeAltCoord;
-					double fPitchPow = 1 + 0.8 * fEyeAltRatio;
 					// 根据海拔高度分段，海拔越低，分段越细
 					double fEyeR = CGMKit::Mix(fSphereR + 1, fTopR - 1, fEyeAltRatio);
+					// 预计算
+					double fEyeR2 = fEyeR * fEyeR;
+					double fSphereR2 = fSphereR * fSphereR;
+					double fTopR2 = fTopR * fTopR;
+
 					// 计算地平线的正弦值
 					double fSinHoriz = fSphereR / fEyeR;
 					// 计算地平线的余弦值
 					double fCosHoriz = -sqrt(max(0, 1 - fSinHoriz * fSinHoriz));
 					// 将每一个s按照俯仰角由高到低排列
-					// fRatioS 和视线与上方向夹角的余弦值同正负
+					// fRatioS 代表 d0/dH 或 d0/dh
 					// 必须取到比1.0小一点点的值，保证天顶位置不突变
 					// 必须取到比-1.0大一点点的值，保证地面中心位置不突变
 					double fRatioS = 2 * double(s) / double(SCAT_PITCH_NUM - 1) - 1;
 					fRatioS = osg::clampBetween(fRatioS, -0.99999, 0.99999);
-					// 为了提高地平线附近的精度，需要将pitch分布地不均匀，将地平线上下分成两部分
-					// 视线与上方向夹角余弦值
-					double fCosUV = -1;
-					double fCosUV_1 = fCosHoriz;
-					if (fRatioS <= 0.0)
+					// 是否是天空
+					bool bSky = fRatioS > 0.0;
+					// 计算地平线（或者地平线后面天空的）最远距离
+					// 眼点到地平线的距离
+					double fDisEye2Horizon = sqrt(fEyeR2 - fSphereR2);
+					// 地面上的某点到水平方向大气顶端的距离
+					double fDisHorizon2Top = sqrt(fTopR2 - fSphereR2);
+					// 眼点到地平线后面的大气顶端的距离
+					double fDisEye2Top = fDisEye2Horizon + fDisHorizon2Top;
+
+					// 视线末端距离（默认地面）
+					double fDisMax = CGMKit::Mix(fDisEye2Horizon, max(0.0, fEyeR - fSphereR), abs(fRatioS));
+					// 视线与上方向夹角余弦值(默认视线朝向地面)
+					double fCosUV = -(fEyeR2 + fDisMax * fDisMax - fSphereR2) / (2 * fEyeR * fDisMax);
+					if (bSky)// 视线看向大气
 					{
-						fCosUV = fCosHoriz - pow(abs(fRatioS), fPitchPow) * (1 + fCosHoriz);
-						// 比“fRatioS”小一格
-						double fRatioS_1 = 2 * double(s + 2) / double(SCAT_PITCH_NUM) - 1;
-						if (fRatioS_1 <= 0.0)
-						{
-							fCosUV_1 = fCosHoriz - pow(abs(fRatioS_1), fPitchPow) * (1 + fCosHoriz);
-						}
-					}
-					else
+						// 视线末端距离（大气顶部）
+						 fDisMax = CGMKit::Mix(fDisEye2Top, max(0.0, fTopR - fEyeR), fRatioS);
+						// 视线与上方向夹角余弦值（看向大气）
+						fCosUV = -(fEyeR2 + fDisMax * fDisMax - fTopR2) / (2 * fEyeR * fDisMax);
+					}	
+					double fSinUV = sqrt(1 - fCosUV * fCosUV);
+					double fSampleNum = fDisMax / GROUND_STEP_UNIT;
+					if (bSky)
 					{
-						fCosUV = fCosHoriz + pow(abs(fRatioS), fPitchPow) * (1 - fCosHoriz);
-						// 比“fRatioS”小一格
-						double fRatioS_1 = 2 * double(s) / double(SCAT_PITCH_NUM) - 1;
-						if (fRatioS_1 > 0.0)
-						{
-							fCosUV_1 = fCosHoriz + pow(abs(fRatioS_1), fPitchPow) * (1 - fCosHoriz);
-						}
+						fSampleNum = fDisMax / SKY_STEP_UNIT;
 					}
-					double fDeltaCos = abs(fCosUV - fCosUV_1);
-					fDeltaCos = min(0.05, fDeltaCos);
-					double fSinUV2 = 1 - fCosUV * fCosUV;
-					double fSinUV = sqrt(fSinUV2);
 
 					for (int y = 0; y < SCAT_LIGHT_NUM; y++) // 上方向与太阳方向夹角余弦值
 					{
@@ -549,26 +552,6 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 							// local空间下，视线方向
 							osg::Vec3d vViewDir = osg::Vec3d(fSinUV * sin(fYaw), fSinUV * cos(fYaw), fCosUV);
 
-							double fTopR = fSphereR + fAtmosThick;
-							double fTmp = fEyeR * fSinUV;
-							// vEyePos到vTopPos的距离
-							double fLenET = sqrt(fTopR * fTopR - fTmp * fTmp) - fEyeR * fCosUV;
-							// 计算视线方向最远距离
-							double fLenMax = fLenET;
-							bool bSky = fCosUV > fCosHoriz;
-							// 如果视线余弦值小于地平线余弦值，则最远点为地面
-							if (!bSky)
-							{		
-								// vEyePos到vGroundPos的距离	
-								double fLenEG = -fEyeR * fCosUV - sqrt(fSphereR * fSphereR - fTmp * fTmp);
-								fLenMax = fLenEG;
-							}
-	
-							double fSampleNum = fLenMax / GROUND_STEP_UNIT;
-							if (bSky)
-							{
-								fSampleNum = fLenMax / SKY_STEP_UNIT;
-							}
 							osg::Vec4d vInscatterSum(0,0,0,0);
 							for (int j = 0; j < int(fSampleNum + 1); j++)
 							{
@@ -578,18 +561,10 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 								// 为了避免采样间隔过大引起的不连续，需要在采样方向上做一定的随机扰动
 								if (bSky)
 								{
-									vNoiseViewDir.x() += fDeltaCos * (iPseudoNoise(m_iRandom) * 0.001 - 0.5);
-									vNoiseViewDir.y() += fDeltaCos * (iPseudoNoise(m_iRandom) * 0.001 - 0.5);
-									vNoiseViewDir.z() += fDeltaCos * (iPseudoNoise(m_iRandom) * 0.001 - 0.5);
-
 									fLenS *= SKY_STEP_UNIT;
 								}
 								else
 								{
-									vNoiseViewDir.x() += fDeltaCos * 0.1 * (iPseudoNoise(m_iRandom) * 0.001 - 0.5);
-									vNoiseViewDir.y() += fDeltaCos * 0.1 * (iPseudoNoise(m_iRandom) * 0.001 - 0.5);
-									vNoiseViewDir.z() += fDeltaCos * 0.1 * (iPseudoNoise(m_iRandom) * 0.001 - 0.5);
-
 									fLenS *= GROUND_STEP_UNIT;
 								}
 								vNoiseViewDir.normalize();
