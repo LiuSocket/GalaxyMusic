@@ -162,7 +162,7 @@ namespace GM
 		*/
 		inline double _MiePhase(const double& fCosVL) const
 		{
-			constexpr double g = 0.9;
+			constexpr double g = 0.8;
 			constexpr double g2 = g * g;
 			const double a = 3.0 / (8 * osg::PI);
 			constexpr double b = (1 - g2) / (2 + g2);

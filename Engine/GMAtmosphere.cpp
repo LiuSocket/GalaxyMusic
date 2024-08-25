@@ -48,7 +48,7 @@ CGMAtmosphere Methods
 *************************************************************************/
 
 /** @brief 构造 */
-CGMAtmosphere::CGMAtmosphere(): m_strCoreModelPath("Models/")
+CGMAtmosphere::CGMAtmosphere(): m_pConfigData(nullptr), m_strCoreModelPath("Models/")
 {
 	m_iRandom.seed(0);
 }
@@ -56,6 +56,8 @@ CGMAtmosphere::CGMAtmosphere(): m_strCoreModelPath("Models/")
 /** @brief 析构 */
 CGMAtmosphere::~CGMAtmosphere()
 {
+	m_pConfigData = nullptr;
+	m_pInscatteringTexVector.clear();
 }
 
 /** @brief 初始化 */
@@ -85,7 +87,7 @@ bool CGMAtmosphere::Init(SGMConfigData * pConfigData)
 				+ strAtmosH + "_" + strSphereR + ".raw");
 			if (!pImg.valid()) break;
 			pImg->setImage(SCAT_PITCH_NUM, SCAT_LIGHT_NUM, SCAT_COS_NUM * SCAT_ALT_NUM,
-				GL_RGBA32F, GL_RGBA, GL_FLOAT, pImg->data(), osg::Image::NO_DELETE);
+				GL_RGBA16F, GL_RGBA, GL_FLOAT, pImg->data(), osg::Image::NO_DELETE);
 			osg::ref_ptr<osg::Texture3D> pInscatteringTex = new osg::Texture3D;
 			pInscatteringTex->setImage(pImg.get());
 			pInscatteringTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
@@ -93,7 +95,7 @@ bool CGMAtmosphere::Init(SGMConfigData * pConfigData)
 			pInscatteringTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
 			pInscatteringTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 			pInscatteringTex->setWrap(osg::Texture::WRAP_R, osg::Texture::CLAMP_TO_EDGE);
-			pInscatteringTex->setInternalFormat(GL_RGBA32F);
+			pInscatteringTex->setInternalFormat(GL_RGBA16F);
 			pInscatteringTex->setSourceFormat(GL_RGBA);
 			pInscatteringTex->setSourceType(GL_FLOAT);
 
@@ -451,6 +453,8 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 		32 km			暂无						16,32,64,128		*100km
 		64 km			地球、泰坦（土卫六）		32,64,128,256		*100km
 		128 km			金、天、海、木、土			64,128,256,512		*100km
+
+		从指定高度的一点（暂且命名为“Omni”）向四周发射光线，计算大气内的光线传播情况，得到内散射值
 	*/
 	const double GROUND_STEP_UNIT = 50;				// 地面采样步长
 	const double SKY_STEP_UNIT = 100;				// 天空采样步长
@@ -472,6 +476,8 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 		{
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
 			double fTopR = fSphereR + fAtmosThick;
+			double fSphereR2 = fSphereR * fSphereR;
+			double fTopR2 = fTopR * fTopR;
 			double fMinDotUL = GetMinDotUL(fAtmosThick, fSphereR);
 
 			osg::ref_ptr<osg::Image> pIrraImg = osgDB::readImageFile(strIrradiancePath
@@ -486,17 +492,14 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 			{
 				for (int t = 0; t < SCAT_ALT_NUM; t++) // 海拔高度 
 				{
-					double fEyeAltCoord = (SCAT_ALT_NUM - 1 - t) / double(SCAT_ALT_NUM - 1);
-					double fEyeAltRatio = fEyeAltCoord * fEyeAltCoord;
+					double fOmniAltCoord = (SCAT_ALT_NUM - 1 - t) / double(SCAT_ALT_NUM - 1);
+					double fOmniAltRatio = fOmniAltCoord * fOmniAltCoord;
 					// 根据海拔高度分段，海拔越低，分段越细
-					double fEyeR = CGMKit::Mix(fSphereR + 1, fTopR - 1, fEyeAltRatio);
-					// 预计算
-					double fEyeR2 = fEyeR * fEyeR;
-					double fSphereR2 = fSphereR * fSphereR;
-					double fTopR2 = fTopR * fTopR;
+					double fOmniR = CGMKit::Mix(fSphereR + 1, fTopR - 1, fOmniAltRatio);
+					double fOmniR2 = fOmniR * fOmniR;
 
 					// 计算地平线的正弦值
-					double fSinHoriz = fSphereR / fEyeR;
+					double fSinHoriz = fSphereR / fOmniR;
 					// 计算地平线的余弦值
 					double fCosHoriz = -sqrt(max(0, 1 - fSinHoriz * fSinHoriz));
 					// 将每一个s按照俯仰角由高到低排列
@@ -508,23 +511,23 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 					// 是否是天空
 					bool bSky = fRatioS > 0.0;
 					// 计算地平线（或者地平线后面天空的）最远距离
-					// 眼点到地平线的距离
-					double fDisEye2Horizon = sqrt(fEyeR2 - fSphereR2);
-					// 地面上的某点到水平方向大气顶端的距离
+					// Omni到地平线的距离
+					double fDisOmni2Horizon = sqrt(fOmniR2 - fSphereR2);
+					// 海平面到水平方向大气顶端的距离
 					double fDisHorizon2Top = sqrt(fTopR2 - fSphereR2);
-					// 眼点到地平线后面的大气顶端的距离
-					double fDisEye2Top = fDisEye2Horizon + fDisHorizon2Top;
+					// Omni到地平线后面的大气顶端的距离
+					double fDisOmni2Top = fDisOmni2Horizon + fDisHorizon2Top;
 
-					// 视线末端距离（默认地面）
-					double fDisMax = CGMKit::Mix(fDisEye2Horizon, max(0.0, fEyeR - fSphereR), abs(fRatioS));
-					// 视线与上方向夹角余弦值(默认视线朝向地面)
-					double fCosUV = -(fEyeR2 + fDisMax * fDisMax - fSphereR2) / (2 * fEyeR * fDisMax);
-					if (bSky)// 视线看向大气
+					// 光线末端距离（默认光线射向地面）
+					double fDisMax = CGMKit::Mix(fDisOmni2Horizon, max(0.0, fOmniR - fSphereR), abs(fRatioS));
+					// 光线与上方向夹角余弦值(默认光线射向地面)
+					double fCosUV = -(fOmniR2 + fDisMax * fDisMax - fSphereR2) / (2 * fOmniR * fDisMax);
+					if (bSky)// 光线射向大气
 					{
-						// 视线末端距离（大气顶部）
-						 fDisMax = CGMKit::Mix(fDisEye2Top, max(0.0, fTopR - fEyeR), fRatioS);
-						// 视线与上方向夹角余弦值（看向大气）
-						fCosUV = -(fEyeR2 + fDisMax * fDisMax - fTopR2) / (2 * fEyeR * fDisMax);
+						// 光线末端距离（大气顶部）
+						 fDisMax = CGMKit::Mix(fDisOmni2Top, max(0.0, fTopR - fOmniR), fRatioS);
+						// 光线与上方向夹角余弦值（射向大气）
+						fCosUV = -(fOmniR2 + fDisMax * fDisMax - fTopR2) / (2 * fOmniR * fDisMax);
 					}	
 					double fSinUV = sqrt(1 - fCosUV * fCosUV);
 					double fSampleNum = fDisMax / GROUND_STEP_UNIT;
@@ -538,38 +541,35 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 						// 小于 fMinDotUL 就不计算，提高纹理利用率
 						double fCosUL = 1 - (1 - fMinDotUL) * double(y+1) / double(SCAT_LIGHT_NUM);
 						double fSinUL = sqrt(1 - fCosUL * fCosUL);
-						for (int x = 0; x < SCAT_COS_NUM; x++) // 视线与太阳夹角的余弦值
+						for (int x = 0; x < SCAT_COS_NUM; x++) // 光线与太阳夹角的余弦值
 						{
 							// 首先定义local坐标系：
 							// 人朝着太阳站在地平面上，脸正面是Y轴，右手是X轴，头顶是Z轴，地心是原点
 
-							// local空间下的眼点坐标
-							osg::Vec3d vEyePos = osg::Vec3d(0, 0, fEyeR);
+							// local空间下的Omni坐标
+							osg::Vec3d vOmniPos = osg::Vec3d(0, 0, fOmniR);
 							// local空间下的太阳方向
 							osg::Vec3d vSunDir = osg::Vec3d(0, fSinUL, fCosUL);
-							// 当前Pitch线上，视线方向的偏航角
+							// 光线方向相对于当前Pitch所在的垂直平面的偏航角
 							double fYaw = osg::PI * (1 - double(x) / double(SCAT_COS_NUM-1));
-							// local空间下，视线方向
-							osg::Vec3d vViewDir = osg::Vec3d(fSinUV * sin(fYaw), fSinUV * cos(fYaw), fCosUV);
+							// local空间下，光线方向
+							osg::Vec3d vScatterDir = osg::Vec3d(fSinUV * sin(fYaw), fSinUV * cos(fYaw), fCosUV);
+							//// 散射光与太阳方向夹角余弦值
+							//double fCosIL = vScatterDir * vSunDir;
+							//// 瑞丽散射相位函数
+							//double fRayleighPhase = _RayleighPhase(fCosIL);
+							//// 米氏散射相位函数
+							//double fMiePhase = _MiePhase(fCosIL);
 
 							osg::Vec4d vInscatterSum(0,0,0,0);
 							for (int j = 0; j < int(fSampleNum + 1); j++)
 							{
-								osg::Vec3d vNoiseViewDir = vViewDir;
 								// 注意：这里的步长为了避免锯齿，而做了微小的调整
 								double fLenS = (j + fmod(fSampleNum, 1));
-								// 为了避免采样间隔过大引起的不连续，需要在采样方向上做一定的随机扰动
-								if (bSky)
-								{
-									fLenS *= SKY_STEP_UNIT;
-								}
-								else
-								{
-									fLenS *= GROUND_STEP_UNIT;
-								}
-								vNoiseViewDir.normalize();
-
-								osg::Vec3d vStepPos = vEyePos + vNoiseViewDir * fLenS;
+								if (bSky) fLenS *= SKY_STEP_UNIT;
+								else fLenS *= GROUND_STEP_UNIT;
+								// 每一步的位置
+								osg::Vec3d vStepPos = vOmniPos + vScatterDir * fLenS;
 								// 每一步的上方向
 								osg::Vec3d vStepUp = vStepPos;
 								// 每一步与地心的距离
@@ -578,17 +578,10 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 								double fStepAlt = fStepR - fSphereR;
 								// 每一步所在位置的高度坐标
 								double fStepAltCoord = fStepAlt / fAtmosThick;
-
 								// 每一步的散射系数
 								osg::Vec4d vStepCoef = osg::Vec4d(_RayleighCoefficient(fStepAlt, fAtmosThick), _MieCoefficient(fStepAlt, fAtmosThick));
 								// 每一步的上方向与太阳方向夹角余弦值
 								float fStepCosUL = vStepUp * vSunDir;
-								// 每一步的上方向与视线方向夹角余弦值
-								float fStepCosUV = vStepUp * vNoiseViewDir;
-								// 每一步所在位置看到的地平线的正弦值
-								double fStepSinHoriz = fSphereR / fStepR;
-								// 每一步所在位置看到的地平线的余弦值
-								double fStepCosHoriz = -sqrt(max(0, 1 - fStepSinHoriz * fStepSinHoriz));
 
 								// 计算辐照度	
 								osg::Vec4d vI = CGMKit::GetImageColor(pIrraImg.get(),

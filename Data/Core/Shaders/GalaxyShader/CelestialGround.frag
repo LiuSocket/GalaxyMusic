@@ -115,9 +115,9 @@ void main()
 #endif // EARTH
 
 #ifdef ATMOS
-	// radius at the vertex point
-	float Rv = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1)); // to consider
-	color += AtmosColor(vertAlt, viewPos.xyz, viewDir, viewVertUp, Rv);
+	// radius of sealevel at the vertex point
+	float Rs = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1)); // to consider
+	color += AtmosColor(vertAlt, viewDir, viewVertUp, Rs);
 #endif // ATMOS
 
 #ifdef EARTH
@@ -129,7 +129,7 @@ void main()
 	color = ToneMapping(color);
 
 #ifdef EARTH
-	color = mix(color, vec3(1), illumCity);
+	//color = mix(color, vec3(1), illumCity);
 #ifdef WANDERING
 	vec3 illumEngine = engineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
 	color = mix(color, vec3(1), illumEngine);

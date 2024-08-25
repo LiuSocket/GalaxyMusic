@@ -113,9 +113,9 @@ void main()
 #endif // EARTH
 	float alpha = baseColor.a*sqrt(clamp(15*abs(dot(viewVertUp, viewDir)), 0, 1));
 
-	// radius at the vertex point
-	float Rv = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1));
-	color += AtmosColor(cloudTop, viewPos.xyz, viewDir, viewVertUp, Rv);
+	// radius of sealevel at the vertex point
+	float Rs = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1));
+	color += AtmosColor(cloudTop, viewDir, viewVertUp, Rs);
 	color = ToneMapping(color*(1 - 0.9*shadow));
 
 #ifdef EARTH

@@ -31,9 +31,9 @@ void main()
 	// building progress
 	color.a *= step(0, wanderProgress*10-vertAlt*unit*1e-4);
 
-	// radius at the vertex point
-	float Rv = gl_TexCoord[0].w;
-	color.rgb += AtmosColor(vertAlt, viewPos, viewDir, viewEngineUp, Rv);
+	// radius of sealevel at the vertex point
+	float Rs = gl_TexCoord[0].w;
+	color.rgb += AtmosColor(vertAlt, viewDir, viewEngineUp, Rs);
 
 	if((wanderProgress > PROGRESS_3_1) && (unit > 1e6))
 	{

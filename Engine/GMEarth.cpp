@@ -128,7 +128,7 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 	if (pImg.valid())
 	{
 		pImg->setImage(SCAT_PITCH_NUM, SCAT_LIGHT_NUM, SCAT_COS_NUM * SCAT_ALT_NUM,
-			GL_RGBA32F, GL_RGBA, GL_FLOAT, pImg->data(), osg::Image::NO_DELETE);
+			GL_RGBA16F, GL_RGBA, GL_FLOAT, pImg->data(), osg::Image::NO_DELETE);
 		m_pInscatteringTex = new osg::Texture3D;
 		m_pInscatteringTex->setImage(pImg);
 		m_pInscatteringTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
@@ -136,7 +136,7 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 		m_pInscatteringTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
 		m_pInscatteringTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 		m_pInscatteringTex->setWrap(osg::Texture::WRAP_R, osg::Texture::CLAMP_TO_EDGE);
-		m_pInscatteringTex->setInternalFormat(GL_RGBA32F);
+		m_pInscatteringTex->setInternalFormat(GL_RGBA16F);
 		m_pInscatteringTex->setSourceFormat(GL_RGBA);
 		m_pInscatteringTex->setSourceType(GL_FLOAT);
 	}
