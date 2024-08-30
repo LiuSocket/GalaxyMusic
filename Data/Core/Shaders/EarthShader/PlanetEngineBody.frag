@@ -11,8 +11,6 @@ in vec3 viewPos;
 in vec3 viewVertUp;
 in float engineIntensity;
 
-out vec4 color;
-
 void main()
 {
 	float lenV = length(viewPos);
@@ -26,14 +24,14 @@ void main()
 	float illumAlt = clamp(vertAlt*unit*1e-4,0,1);
 	vec3 streamLight = vec3(0.0,0.4,0.6)*(illumAlt*engineIntensity);
 	vec4 baseColor = texture(baseColorTex, gl_TexCoord[0].xy);
-	color = vec4(max(streamLight,vec3(diffuse))*baseColor.rgb, baseColor.a);
+	vec4 color = vec4(max(streamLight,vec3(diffuse))*baseColor.rgb, baseColor.a);
 	color.a -= clamp(1-(maxDistance-lenV)/(0.9*maxDistance), 0, 1);
 	// building progress
 	color.a *= step(0, wanderProgress*10-vertAlt*unit*1e-4);
 
 	// radius of sealevel at the vertex point
 	float Rs = gl_TexCoord[0].w;
-	color.rgb += AtmosColor(vertAlt, viewDir, viewEngineUp, Rs);
+	color.rgb += AtmosColor(vertAlt, viewDir, viewEngineUp, lenV, Rs);
 
 	if((wanderProgress > PROGRESS_3_1) && (unit > 1e6))
 	{
@@ -41,6 +39,6 @@ void main()
 		color.rgb = mix(color.rgb, tailColor.rgb, tailColor.a);
 	}
 
-	color.rgb = ToneMapping(color.rgb);
+	gl_FragColor = vec4(ToneMapping(color.rgb), color.a);
 }
 #endif // EARTH

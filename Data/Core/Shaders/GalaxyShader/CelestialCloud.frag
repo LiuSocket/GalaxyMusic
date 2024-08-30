@@ -41,6 +41,7 @@ void main()
 	celestialCoordScale = coordScale;
 #endif // EARTH or not
 
+	float lenV = length(viewPos.xyz);
 	vec3 cloudCoord = texCoord_1;
 	cloudCoord.xy = (cloudCoord.xy - 0.5)*celestialCoordScale.y + 0.5;
 	
@@ -68,7 +69,7 @@ void main()
 
 	baseColor.a = mix(baseColor.a, wanderingCloud, allEngineStart*min(1, engineStartRatio.x));
 #endif // WANDERING	
-	float lenV = length(viewPos.xyz);
+
 	// cloud detail
 	vec4 detail4 = texture(cloudDetailTex, texCoord_1.xy*27);
 	vec4 detailMix = clamp((baseColor.a-vec4(0.2,0.35,0.5,0.65))/0.15, vec4(0), vec4(1));
@@ -115,7 +116,7 @@ void main()
 
 	// radius of sealevel at the vertex point
 	float Rs = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1));
-	color += AtmosColor(cloudTop, viewDir, viewVertUp, Rs);
+	color += AtmosColor(cloudTop, viewDir, viewVertUp, lenV, Rs);
 	color = ToneMapping(color*(1 - 0.9*shadow));
 
 #ifdef EARTH

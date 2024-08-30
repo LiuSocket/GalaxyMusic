@@ -185,13 +185,8 @@ void main()
 		float lenAtmosHorizon = lenEye2Horizon + lenHorizonMax;
 
 		float lenEye2Atmos = length(viewFarPos);
-		//float lenEye2Ground = Rc*cosUV - sqrt(max(0.0, Rs2 - Rc2*sinUV2));
 		float lenEye2Top = max(0.0, atmosHeight - eyeAltitude);
-
-		//bool isToSky = cosUV > cosEyeHoriz;
 		float eyeSkyCoordPitch = GetSkyCoordPitch(lenEye2Atmos, lenEye2Top, lenAtmosHorizon);
-		//float eyeGroundCoordPitch = GetGroundCoordPitch(lenEye2Ground, eyeAltitude, lenEye2Horizon);
-
 		inscattering = Texture4D(vec4(
 			eyeSkyCoordPitch,
 			GetCoordUL(cosUL),
@@ -201,12 +196,7 @@ void main()
 	else
 	{
 		float lenFar2Atmos = 2*lenMid2Far;
-		//float lenFar2Ground = lenCore2Far*cosFUV - sqrt(max(0.0, Rs2 - lenCore2Far2*sinFUV*sinFUV));
-
-		//bool isToSky = (-cosUV) > cosEyeHoriz;
 		float skyCoordPitch = GetSkyCoordPitch(lenFar2Atmos, 0.0, 2*lenHorizonMax);
-		//float groundCoordPitch = GetGroundCoordPitch(lenFar2Ground, atmosHeight, lenHorizonMax);
-
 		inscattering = Texture4D(vec4(
 			skyCoordPitch,
 			GetCoordUL(cosFUL),

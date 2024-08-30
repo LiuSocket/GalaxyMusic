@@ -310,6 +310,7 @@ void CGMEarth::SetUniform(
 			pAtmosHeight,
 			pMinDotUL,
 			pEyeAltitude,
+			pView2ECEF,
 			m_fWanderProgressUniform);
 	}
 }

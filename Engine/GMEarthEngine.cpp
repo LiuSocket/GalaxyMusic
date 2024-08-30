@@ -729,6 +729,7 @@ void CGMEarthEngine::SetUniform(
 	osg::Uniform* pAtmosHeight,
 	osg::Uniform* pMinDotUL,
 	osg::Uniform* pEyeAltitude,
+	osg::Uniform* pView2ECEF,
 	osg::Uniform* pWanderProgress)
 {
 	m_vViewLightUniform = pViewLight;
@@ -736,6 +737,7 @@ void CGMEarthEngine::SetUniform(
 	m_fAtmosHeightUniform = pAtmosHeight;
 	m_fMinDotULUniform = pMinDotUL;
 	m_fEyeAltitudeUniform = pEyeAltitude;
+	m_mView2ECEFUniform = pView2ECEF;
 	m_fWanderProgressUniform = pWanderProgress;
 }
 
@@ -997,6 +999,7 @@ bool CGMEarthEngine::_GenEarthEngineBody_1()
 	pSSEngineBody->addUniform(m_fAtmosHeightUniform.get());
 	pSSEngineBody->addUniform(m_vEngineStartRatioUniform.get());
 	pSSEngineBody->addUniform(m_fWanderProgressUniform.get());
+	pSSEngineBody->addUniform(m_mView2ECEFUniform.get());
 
 	int iTexUnit = 0;
 	// base colorÌùÍ¼
@@ -1053,6 +1056,7 @@ bool CGMEarthEngine::_GenEarthEngineBody_2()
 	pSSEngineBody->addUniform(m_fAtmosHeightUniform.get());
 	pSSEngineBody->addUniform(m_vEngineStartRatioUniform.get());
 	pSSEngineBody->addUniform(m_fWanderProgressUniform.get());
+	pSSEngineBody->addUniform(m_mView2ECEFUniform.get());
 
 	int iTexUnit = 0;
 	// base color ÌùÍ¼
