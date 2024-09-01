@@ -196,19 +196,19 @@ namespace GM
 						vBottomPos.x(),	vBottomPos.y(),	vBottomPos.z(),	1);
 
 					// 行星发动机直径分两种，大的30000米，小的21000米
-					float fScale = 1.0 / _fUnit;
-					fScale *= (vData.w() > 1e4) ? 1.0f : 0.7f;
-					// 发动机所在位置的地球半径
-					float fRadius = vBottomPos.length();
+					float fScale = (vData.w() > 1e4) ? 1.0f : 0.7f;
+					float fScaleHie = fScale / _fUnit;
+					// 发动机所在位置的地球半径，单位：米
+					float fRadius = vBottomPos.length() * _fUnit;
 
 					// 绘制发动机主体
 					for (int j = 0; j < iVertPerEngine; j++)
 					{
-						// xy = UV, z = vertex altitude, w = earth radius at the vertex point
+						// xy = UV, z = vertex altitude(meter), w = earth radius at the vertex point(meter)
 						osg::Vec4 vCoord = osg::Vec4(pCoordOld->at(j).x(), pCoordOld->at(j).y(),
 							pVertOld->at(j).z() * fScale, fRadius);
 
-						pVerts->push_back(mModelMatrix.preMult(pVertOld->at(j) * fScale));
+						pVerts->push_back(mModelMatrix.preMult(pVertOld->at(j) * fScaleHie));
 						pCoords->push_back(vCoord);
 						pEle->push_back(i * iVertPerEngine + j);
 					}
@@ -725,7 +725,6 @@ void CGMEarthEngine::SetTex(osg::Texture* pEarthTailTex, osg::Texture* pInscatte
 
 void CGMEarthEngine::SetUniform(
 	osg::Uniform* pViewLight,
-	osg::Uniform* pGroundTop,
 	osg::Uniform* pAtmosHeight,
 	osg::Uniform* pMinDotUL,
 	osg::Uniform* pEyeAltitude,
@@ -733,7 +732,6 @@ void CGMEarthEngine::SetUniform(
 	osg::Uniform* pWanderProgress)
 {
 	m_vViewLightUniform = pViewLight;
-	m_fGroundTopUniform = pGroundTop;
 	m_fAtmosHeightUniform = pAtmosHeight;
 	m_fMinDotULUniform = pMinDotUL;
 	m_fEyeAltitudeUniform = pEyeAltitude;
@@ -994,7 +992,6 @@ bool CGMEarthEngine::_GenEarthEngineBody_1()
 	pSSEngineBody->addUniform(m_pCommonUniform->GetViewUp());
 	pSSEngineBody->addUniform(m_vViewLightUniform.get());
 	pSSEngineBody->addUniform(m_fMinDotULUniform.get());
-	pSSEngineBody->addUniform(m_fGroundTopUniform.get());
 	pSSEngineBody->addUniform(m_fEyeAltitudeUniform.get());
 	pSSEngineBody->addUniform(m_fAtmosHeightUniform.get());
 	pSSEngineBody->addUniform(m_vEngineStartRatioUniform.get());
@@ -1051,7 +1048,6 @@ bool CGMEarthEngine::_GenEarthEngineBody_2()
 	pSSEngineBody->addUniform(m_pCommonUniform->GetViewUp());
 	pSSEngineBody->addUniform(m_vViewLightUniform.get());
 	pSSEngineBody->addUniform(m_fMinDotULUniform.get());
-	pSSEngineBody->addUniform(m_fGroundTopUniform.get());
 	pSSEngineBody->addUniform(m_fEyeAltitudeUniform.get());
 	pSSEngineBody->addUniform(m_fAtmosHeightUniform.get());
 	pSSEngineBody->addUniform(m_vEngineStartRatioUniform.get());

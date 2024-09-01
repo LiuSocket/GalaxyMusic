@@ -3,7 +3,6 @@ uniform vec2 planetRadius;
 
 #ifdef EARTH
 
-uniform float unit;
 uniform vec3 screenSize;
 uniform vec4 coordScale_Earth;
 uniform sampler2DArray DEMTex;
@@ -57,7 +56,7 @@ void main()
 	vec3 diffuse = vec3(max(dotVUL,minFact));
 	vec3 color = baseColor.rgb * (0.02+diffuse);
 
-	float vertAlt = 0;
+	float vertAlt = 0.0; // meter
 
 #ifdef EARTH
 	vec3 illumCoord = texCoord_1;
@@ -69,8 +68,7 @@ void main()
 
 	vec3 DEMCoord = texCoord_1;
 	DEMCoord.xy = (DEMCoord.xy - 0.5)*celestialCoordScale.w + 0.5;
-	float elev = DEM(texture(DEMTex, DEMCoord).r);
-	vertAlt = elev/unit;
+	vertAlt = DEM(texture(DEMTex, DEMCoord).r); // meter
 
 	vec3 viewHalf = normalize(viewLight - viewDir);
 	float dotNH = max(dot(viewVertUp, viewHalf), 0);
@@ -95,7 +93,7 @@ void main()
 
 	float latCoord = texCoord_0.y*2-1;
 	float seaLevel = SeaLevel(latCoord, seaLevelAddProgress);
-	float elev2Sea = elev-seaLevel;
+	float elev2Sea = vertAlt-seaLevel;
 	// [0.0,0.1] seaLevel + 66m
 	rockMask = mix(rockMask, smoothstep(-10.0, 0.0, elev2Sea), seaLevelAddProgress);
 	illumCity = max((0.2+0.04*baseColor.rgb)*darkness*engineMask,
@@ -108,17 +106,17 @@ void main()
 	vec3 oceanColor = mix(vec3(0.06,0.13,0.2), vec3(0.2,0.3,0.3), seaLevelAddProgress*exp2(min(0, elev2Sea)*0.01));
 	oceanColor = oceanColor*(ambient + diffuse) + specualr;
 #else // not WANDERING
-	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-elev*0.015, 0)));
+	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-vertAlt*0.015, 0)));
 	vec3 oceanColor = vec3(0.1,0.14,0.3)*diffuse + specualr;
 #endif // WANDERING	or not
 	color = mix(oceanColor, color, rockMask);
 #endif // EARTH
 
 #ifdef ATMOS
-	float lenV = length(viewPos.xyz);
-	// radius of sealevel at the vertex point
-	float Rs = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1));
-	color += AtmosColor(vertAlt, viewDir, viewVertUp, lenV, Rs);
+	float lenV = length(viewPos.xyz); // hierarchy unit
+	// radius of sealevel ground at the vertex point, meter
+	float Rg = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1))*unit;
+	color += AtmosColor(vertAlt, viewDir, viewVertUp, lenV*unit, Rg);
 #endif // ATMOS
 
 #ifdef EARTH

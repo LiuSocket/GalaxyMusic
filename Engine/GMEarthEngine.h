@@ -48,7 +48,6 @@ namespace GM
 		/* @brief 传递Uniform */
 		void SetUniform(
 			osg::Uniform* pViewLigh,
-			osg::Uniform* pGroundTop,
 			osg::Uniform* pAtmosHeight,
 			osg::Uniform* pMinDotUL,
 			osg::Uniform* pEyeAltitude,
@@ -218,7 +217,6 @@ namespace GM
 
 		osg::ref_ptr<osg::Uniform>						m_vViewLightUniform;			//!< view空间的光源方向
 		osg::ref_ptr<osg::Uniform>						m_fCloudTopUniform;				//!< 云层顶高
-		osg::ref_ptr<osg::Uniform>						m_fGroundTopUniform;			//!< 地面最高山顶的海拔高
 		osg::ref_ptr<osg::Uniform>						m_fAtmosHeightUniform;			//!< 大气层高度
 		osg::ref_ptr<osg::Uniform>						m_fMinDotULUniform;				//!< 有光区域的最小DotUL值(-1,0)
 		osg::ref_ptr<osg::Uniform>						m_fEyeAltitudeUniform;			//!< 眼点海拔Uniform

@@ -245,7 +245,7 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 
 					osg::Vec3f vAlbedo(0, 0, 0);
 // 开启后会出现不连续的怪异结果，所以决定不加上地面反射因素
-//#define SURFACE_ALBEDO 0.3
+//#define SURFACE_ALBEDO 0.1
 #ifdef SURFACE_ALBEDO
 					// 地面类型		反照率(%)
 					// 水面			6~8
@@ -312,7 +312,7 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 							vAlbedo += osg::Vec3(vD.x(), vD.y(), vD.z()) * abs(-vDir * vGroundNorm) / (fLen * fLen);
 						}
 					}
-					vAlbedo *= SURFACE_ALBEDO * 1e-3 * fGroundS / iSurfaceNum;
+					vAlbedo *= SURFACE_ALBEDO * 1e-4 * fGroundS / iSurfaceNum;
 #endif // SURFACE_ALBEDO
 
 					osg::Vec3d vIrradiance(0, 0, 0);
@@ -456,23 +456,21 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 
 		从指定高度的一点（暂且命名为“Omni”）向四周发射光线，计算大气内的光线传播情况，得到内散射值
 	*/
-	const double GROUND_STEP_UNIT = 50;				// 地面采样步长
-	const double SKY_STEP_UNIT = 100;				// 天空采样步长
+	const double STEP_UNIT = 10;				// 采样步长
 	const int iAtmosImageBytes = 4 * sizeof(float)
 		* SCAT_PITCH_NUM * SCAT_LIGHT_NUM * SCAT_COS_NUM * SCAT_ALT_NUM;
-	std::uniform_int_distribution<> iPseudoNoise(0, 999);
 
 	std::string strTransmittancePath = m_pConfigData->strCorePath + "Textures/Sphere/Transmittance/Transmittance_";
 	std::string strIrradiancePath = m_pConfigData->strCorePath + "Textures/Sphere/Irradiance/Irradiance_";
 
-	int h = 2; //大气厚度
-	//for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
+	//int h = 2; //大气厚度
+	for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
 	{
 		double fAtmosThick = ATMOS_MIN * 1e3 * exp2(h);				// 大气厚度，单位：米
 		double fDensAtmosBottom = _GetAtmosBottomDens(fAtmosThick);		// 星球表面大气密度
 
-		for (int r = 1; r < 2; r++) //  星球半径
-		//for (int r = 0; r < RADIUS_NUM; r++) //星球半径
+		//for (int r = 1; r < 2; r++) //  星球半径
+		for (int r = 0; r < RADIUS_NUM; r++) //星球半径
 		{
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
 			double fTopR = fSphereR + fAtmosThick;
@@ -530,11 +528,7 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 						fCosUV = -(fOmniR2 + fDisMax * fDisMax - fTopR2) / (2 * fOmniR * fDisMax);
 					}	
 					double fSinUV = sqrt(1 - fCosUV * fCosUV);
-					double fSampleNum = fDisMax / GROUND_STEP_UNIT;
-					if (bSky)
-					{
-						fSampleNum = fDisMax / SKY_STEP_UNIT;
-					}
+					double fSampleNum = fDisMax / STEP_UNIT;
 
 					for (int y = 0; y < SCAT_LIGHT_NUM; y++) // 上方向与太阳方向夹角余弦值
 					{
@@ -565,9 +559,7 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 							for (int j = 0; j < int(fSampleNum + 1); j++)
 							{
 								// 注意：这里的步长为了避免锯齿，而做了微小的调整
-								double fLenS = (j + fmod(fSampleNum, 1));
-								if (bSky) fLenS *= SKY_STEP_UNIT;
-								else fLenS *= GROUND_STEP_UNIT;
+								double fLenS = (j + fmod(fSampleNum, 1)) * STEP_UNIT;
 								// 每一步的位置
 								osg::Vec3d vStepPos = vOmniPos + vScatterDir * fLenS;
 								// 每一步的上方向
@@ -596,17 +588,10 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 									vStepCoef.x() * vI.x(),
 									vStepCoef.y() * vI.y(),
 									vStepCoef.z() * vI.z(),
-									vStepCoef.w() * (vI.x() + vI.y() + vI.z()) * 0.33333);
+									vStepCoef.w() * (vI.x() + vI.y() + vI.z())*0.3);
 							}
+							vInscatterSum *= STEP_UNIT;
 
-							if (bSky)
-							{
-								vInscatterSum *= SKY_STEP_UNIT;
-							}
-							else
-							{
-								vInscatterSum *= GROUND_STEP_UNIT;
-							}
 							int iAddress = ((t * SCAT_COS_NUM + x) * SCAT_LIGHT_NUM + y) * SCAT_PITCH_NUM + s;
 							data[4 * iAddress] = float(vInscatterSum.x());
 							data[4 * iAddress + 1] = float(vInscatterSum.y());

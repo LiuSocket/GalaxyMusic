@@ -125,15 +125,8 @@ void main()
 	
 	float altRatio = eyeAltitude / atmosHeight;
 	float eyeGeoRadius = Rc - eyeAltitude;
-
-	//cosUV up is +, down is -
-	float cosUV = dot(viewUp, viewDir);
-	float sinUV2 = max(0.0, 1.0 - cosUV*cosUV);
 	// cosUL = cos of viewUp & light
 	float cosUL = dot(viewUp, viewLight);
-	// sin & cos of eye pos horizon
-	float sinEyeHoriz = min(1.0, eyeGeoRadius / Rc); // it must < 1
-	float cosEyeHoriz = -sqrt(1.0 - sinEyeHoriz * sinEyeHoriz); // it must < 0
 
 	vec3 viewCorePos = -viewUp*Rc;
 	vec3 viewCore2FarPos = viewPos.xyz-viewCorePos;
@@ -155,9 +148,6 @@ void main()
 	// approach top atmos pos
 	vec3 viewFarPos = viewMidPos + normalize(viewMid2Far)*lenMid2Far;
 	vec3 viewFarUp = normalize(viewFarPos-viewCorePos);
-	//cosFUV up is +, down is -
-	float cosFUV = dot(viewFarUp, viewDir);
-	float sinFUV = sqrt(max(0.0, 1.0-cosFUV*cosFUV));
 	// cosFUL = viewUp at far atmosphere pos & light
 	float cosFUL = dot(viewFarUp, viewLight);
 
@@ -205,15 +195,16 @@ void main()
 	}
 
 	float dotVS = dot(viewDir, viewLight);
-	const vec3 sunColor = vec3(1.0,0.5,0.0);
-	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS)*sunColor;
+	const vec3 sunColor = vec3(1.0,0.7,0.1);
+	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*(0.03+MiePhase(dotVS))*sunColor;
 
 #ifdef EARTH
 #else // not EARTH
 	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;
 #endif // EARTH
 	vec3 color = ToneMapping(atmosSum * (1 - shadow));
-	float alpha = 1-exp2(-(atmosSum.r+atmosSum.g+atmosSum.b)*20);
+	float alphaSum = atmosSum.r+atmosSum.g+atmosSum.b;
+	float alpha = 1-exp2(-alphaSum*alphaSum*30);
 	alpha *= 1 - shadow;
 	gl_FragColor = vec4(color, alpha);
 }

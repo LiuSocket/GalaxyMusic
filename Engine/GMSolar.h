@@ -451,7 +451,6 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_mPlanetShadowMatrixUniform;	//!< 2层级行星转阴影空间的矩阵
 		osg::ref_ptr<osg::Uniform>						m_fNorthDotLightUniform;		//!< 行星自转轴与阳光前进方向的点乘
 		osg::ref_ptr<osg::Uniform>						m_fCloudTopUniform;				//!< 云层顶高
-		osg::ref_ptr<osg::Uniform>						m_fGroundTopUniform;			//!< 地面最高山顶的海拔高
 		osg::ref_ptr<osg::Uniform>						m_fAtmosHeightUniform;			//!< 大气层高度
 		osg::ref_ptr<osg::Uniform>						m_fMinDotULUniform;				//!< 有光区域的最小DotUL值(-1,0)
 		osg::ref_ptr<osg::Uniform>						m_fEyeAltitudeUniform;			//!< 眼点海拔Uniform

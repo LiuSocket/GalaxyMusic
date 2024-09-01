@@ -13,7 +13,6 @@ uniform vec3 screenSize;
 uniform sampler2DArray illumTex;
 #endif // WANDERING
 
-uniform float unit;
 uniform vec4 coordScale_Earth;
 uniform sampler2D cloudDetailTex;
 
@@ -41,7 +40,7 @@ void main()
 	celestialCoordScale = coordScale;
 #endif // EARTH or not
 
-	float lenV = length(viewPos.xyz);
+	float lenV = length(viewPos.xyz); // hierarchy unit
 	vec3 cloudCoord = texCoord_1;
 	cloudCoord.xy = (cloudCoord.xy - 0.5)*celestialCoordScale.y + 0.5;
 	
@@ -114,9 +113,9 @@ void main()
 #endif // EARTH
 	float alpha = baseColor.a*sqrt(clamp(15*abs(dot(viewVertUp, viewDir)), 0, 1));
 
-	// radius of sealevel at the vertex point
-	float Rs = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1));
-	color += AtmosColor(cloudTop, viewDir, viewVertUp, lenV, Rs);
+	// radius of sealevel ground at the vertex point, meter
+	float Rg = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1))*unit;
+	color += AtmosColor(cloudTop*unit, viewDir, viewVertUp, lenV*unit, Rg);
 	color = ToneMapping(color*(1 - 0.9*shadow));
 
 #ifdef EARTH

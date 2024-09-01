@@ -279,7 +279,6 @@ void CGMEarth::SetUniform(
 	osg::Uniform* pPlanetRadius,
 	osg::Uniform* pViewLight,
 	osg::Uniform* pCloudTop,
-	osg::Uniform* pGroundTop,
 	osg::Uniform* pAtmosHeight,
 	osg::Uniform* pMinDotUL,
 	osg::Uniform* pEyeAltitude,
@@ -289,7 +288,6 @@ void CGMEarth::SetUniform(
 	m_vPlanetRadiusUniform = pPlanetRadius;
 	m_vViewLightUniform = pViewLight;
 	m_fCloudTopUniform = pCloudTop;
-	m_fGroundTopUniform = pGroundTop;
 	m_fAtmosHeightUniform = pAtmosHeight;
 	m_fMinDotULUniform = pMinDotUL;
 	m_fEyeAltitudeUniform = pEyeAltitude;
@@ -306,7 +304,6 @@ void CGMEarth::SetUniform(
 			m_fWanderProgressUniform);
 		m_pEarthEngine->SetUniform(
 			pViewLight,
-			pGroundTop,
 			pAtmosHeight,
 			pMinDotUL,
 			pEyeAltitude,
@@ -624,7 +621,6 @@ bool CGMEarth::_CreateEarth_1()
 	m_pSSEarthGround_1->addUniform(m_vViewLightUniform.get());
 	m_pSSEarthGround_1->addUniform(m_fAtmosHeightUniform.get());
 	m_pSSEarthGround_1->addUniform(m_fEyeAltitudeUniform.get());
-	m_pSSEarthGround_1->addUniform(m_fGroundTopUniform.get());
 	m_pSSEarthGround_1->addUniform(m_vPlanetRadiusUniform.get());
 	m_pSSEarthGround_1->addUniform(m_fMinDotULUniform.get());
 	m_pSSEarthGround_1->addUniform(m_pCommonUniform->GetScreenSize());
@@ -695,7 +691,6 @@ bool CGMEarth::_CreateEarth_1()
 	m_pSSEarthCloud_1->addUniform(m_pCommonUniform->GetViewUp());
 	m_pSSEarthCloud_1->addUniform(m_vViewLightUniform.get());
 	m_pSSEarthCloud_1->addUniform(m_fCloudTopUniform.get());
-	m_pSSEarthCloud_1->addUniform(m_fGroundTopUniform.get());
 	m_pSSEarthCloud_1->addUniform(m_fEyeAltitudeUniform.get());
 	m_pSSEarthCloud_1->addUniform(m_fAtmosHeightUniform.get());
 	m_pSSEarthCloud_1->addUniform(m_vPlanetRadiusUniform.get());
@@ -825,7 +820,6 @@ bool CGMEarth::_CreateEarth_2()
 	m_pSSEarthGround_2->addUniform(m_vViewLightUniform.get());
 	m_pSSEarthGround_2->addUniform(m_fAtmosHeightUniform.get());
 	m_pSSEarthGround_2->addUniform(m_fEyeAltitudeUniform.get());
-	m_pSSEarthGround_2->addUniform(m_fGroundTopUniform.get());
 	m_pSSEarthGround_2->addUniform(m_vPlanetRadiusUniform.get());
 	m_pSSEarthGround_2->addUniform(m_fMinDotULUniform.get());
 	m_pSSEarthGround_2->addUniform(m_pCommonUniform->GetScreenSize());
@@ -896,7 +890,6 @@ bool CGMEarth::_CreateEarth_2()
 	m_pSSEarthCloud_2->addUniform(m_pCommonUniform->GetViewUp());
 	m_pSSEarthCloud_2->addUniform(m_vViewLightUniform.get());
 	m_pSSEarthCloud_2->addUniform(m_fCloudTopUniform.get());
-	m_pSSEarthCloud_2->addUniform(m_fGroundTopUniform.get());
 	m_pSSEarthCloud_2->addUniform(m_fEyeAltitudeUniform.get());
 	m_pSSEarthCloud_2->addUniform(m_fAtmosHeightUniform.get());
 	m_pSSEarthCloud_2->addUniform(m_vPlanetRadiusUniform.get());

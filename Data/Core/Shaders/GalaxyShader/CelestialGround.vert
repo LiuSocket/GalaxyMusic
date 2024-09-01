@@ -27,7 +27,7 @@ void main()
 #ifdef EARTH
 	vec3 DEMCoord = gl_MultiTexCoord1.xyz;
 	DEMCoord.xy = (DEMCoord.xy - 0.5)*coordScale_Earth.w + 0.5;
-	float elev = DEM(texture(DEMTex, DEMCoord).r);
+	float elev = DEM(texture(DEMTex, DEMCoord).r); // meter
 	modelVertex.xyz += max(0, elev/unit)*gl_Normal;
 	gl_Position = gl_ModelViewProjectionMatrix*modelVertex;
 #else // not EARTH
