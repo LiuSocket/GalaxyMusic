@@ -132,6 +132,7 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float lenV, float 
 	float lenVertAtmosHorizon = lenVertHorizon + lenHorizonMax; // meter
 	float lenVert2Top = max(0.0, atmosHeight*unit - elev); // meter
 
+	float elevCoord = min(1.0, sqrt(elev / (atmosHeight*unit)));
 	vec4 inscattering = vec4(0);
 	if(eyeAltitude < atmosHeight)
 	{
@@ -172,7 +173,7 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float lenV, float 
 			isToSky ? skyCoordPitch : groundCoordPitch,
 			GetCoordUL(cosVertUL),
 			coordYaw,
-			min(1.0, sqrt(elev / (atmosHeight*unit)))));
+			elevCoord));
 
 		inscattering = abs(inscatterEye-inscatterVert);
 	}
@@ -185,12 +186,12 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float lenV, float 
 			skyCoordPitch,
 			GetCoordUL(cosVertUL),
 			coordYaw,
-			min(1.0, sqrt(elev / (atmosHeight*unit)))));
+			elevCoord));
 	}
 
 	float dotVS = dot(viewDir, viewLight);
-	const vec3 sunColor = vec3(1.0,0.7,0.1);
-	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*(0.03+MiePhase(dotVS))*sunColor;
+	const vec3 sunColor = vec3(1.0,0.8,0.6);
+	vec3 atmosSum = (inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS))*sunColor;
 
 #ifdef EARTH
 #else // not EARTH

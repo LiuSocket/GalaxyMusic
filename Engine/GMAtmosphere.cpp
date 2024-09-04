@@ -426,7 +426,7 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 							}
 						}
 					}
-					vIrradiance *= 1e6 / double(iPitchNum * iYawNum);
+					vIrradiance *= 2e6 / double(iPitchNum * iYawNum);
 
 					osg::Vec3d vSumColor = (vAlbedo + vIrradiance) * fmin(1.0, fDensAtmosBottom);
 					int iAddress = IRRA_UP_NUM * t + s;
@@ -456,21 +456,21 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 
 		从指定高度的一点（暂且命名为“Omni”）向四周发射光线，计算大气内的光线传播情况，得到内散射值
 	*/
-	const double STEP_UNIT = 10;				// 采样步长
+	const double STEP_UNIT = 50;				// 采样步长
 	const int iAtmosImageBytes = 4 * sizeof(float)
 		* SCAT_PITCH_NUM * SCAT_LIGHT_NUM * SCAT_COS_NUM * SCAT_ALT_NUM;
 
 	std::string strTransmittancePath = m_pConfigData->strCorePath + "Textures/Sphere/Transmittance/Transmittance_";
 	std::string strIrradiancePath = m_pConfigData->strCorePath + "Textures/Sphere/Irradiance/Irradiance_";
 
-	//int h = 2; //大气厚度
-	for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
+	int h = 2; //大气厚度
+	//for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
 	{
 		double fAtmosThick = ATMOS_MIN * 1e3 * exp2(h);				// 大气厚度，单位：米
 		double fDensAtmosBottom = _GetAtmosBottomDens(fAtmosThick);		// 星球表面大气密度
 
-		//for (int r = 1; r < 2; r++) //  星球半径
-		for (int r = 0; r < RADIUS_NUM; r++) //星球半径
+		for (int r = 1; r < 2; r++) //  星球半径
+		//for (int r = 0; r < RADIUS_NUM; r++) //星球半径
 		{
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
 			double fTopR = fSphereR + fAtmosThick;
@@ -548,12 +548,6 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 							double fYaw = osg::PI * (1 - double(x) / double(SCAT_COS_NUM-1));
 							// local空间下，光线方向
 							osg::Vec3d vScatterDir = osg::Vec3d(fSinUV * sin(fYaw), fSinUV * cos(fYaw), fCosUV);
-							//// 散射光与太阳方向夹角余弦值
-							//double fCosIL = vScatterDir * vSunDir;
-							//// 瑞丽散射相位函数
-							//double fRayleighPhase = _RayleighPhase(fCosIL);
-							//// 米氏散射相位函数
-							//double fMiePhase = _MiePhase(fCosIL);
 
 							osg::Vec4d vInscatterSum(0,0,0,0);
 							for (int j = 0; j < int(fSampleNum + 1); j++)
@@ -588,7 +582,7 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 									vStepCoef.x() * vI.x(),
 									vStepCoef.y() * vI.y(),
 									vStepCoef.z() * vI.z(),
-									vStepCoef.w() * (vI.x() + vI.y() + vI.z())*0.3);
+									vStepCoef.w() * (vI.x() + vI.y() + vI.z())*0.3333);
 							}
 							vInscatterSum *= STEP_UNIT;
 

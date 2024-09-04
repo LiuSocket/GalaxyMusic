@@ -12,6 +12,7 @@
 
 #include "GMPlanet.h"
 #include "GMEngine.h"
+#include "GMTerrain.h"
 #include "GMKit.h"
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>
@@ -40,10 +41,10 @@ CGMPlanet Methods
 *************************************************************************/
 
 /** @brief 构造 */
-CGMPlanet::CGMPlanet(): m_pConfigData(nullptr),
-	m_strCoreModelPath("Models/"),
-	m_pCelestialScaleVisitor(nullptr)
+CGMPlanet::CGMPlanet(): m_pKernelData(nullptr), m_pConfigData(nullptr), m_pCommonUniform(nullptr),
+	m_strCoreModelPath("Models/"),m_pTerrain(nullptr), m_pCelestialScaleVisitor(nullptr)
 {
+	m_pTerrain = new CGMTerrain();
 	m_pCelestialScaleVisitor = new CGMCelestialScaleVisitor();
 }
 
@@ -53,11 +54,22 @@ CGMPlanet::~CGMPlanet()
 }
 
 /** @brief 初始化 */
-bool CGMPlanet::Init(SGMConfigData * pConfigData)
+bool CGMPlanet::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCommonUniform* pCommonUniform)
 {
+	m_pKernelData = pKernelData;
 	m_pConfigData = pConfigData;
+	m_pCommonUniform = pCommonUniform;
+
+	m_pTerrain->Init(m_pKernelData, m_pConfigData, m_pCommonUniform);
 
 	return true;
+}
+
+bool CGMPlanet::CreatePlanet()
+{
+	m_pTerrain->CreateTerrain();
+
+	return false;
 }
 
 osg::Geometry* CGMPlanet::MakeHexahedronSphereGeometry(int iSegment)

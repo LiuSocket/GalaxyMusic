@@ -42,7 +42,7 @@ CGMEarth Methods
 *************************************************************************/
 
 /** @brief 构造 */
-CGMEarth::CGMEarth() : CGMPlanet(), m_pKernelData(nullptr),m_pCommonUniform(nullptr),
+CGMEarth::CGMEarth() : CGMPlanet(),
 	m_strGalaxyShaderPath("Shaders/GalaxyShader/"),
 	m_strEarthShaderPath("Shaders/EarthShader/"),
 	m_fCurrentObliquity(osg::DegreesToRadians(23.44)), m_fNorthRotateSpeed(0.0),
@@ -67,12 +67,9 @@ CGMEarth::~CGMEarth()
 /** @brief 初始化 */
 bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCommonUniform* pCommonUniform)
 {
-	CGMPlanet::Init(pConfigData);
+	CGMPlanet::Init(pKernelData, pConfigData, pCommonUniform);
 
 	Panorama2CubeMap();
-
-	m_pKernelData = pKernelData;
-	m_pCommonUniform = pCommonUniform;
 
 	// 读取dds时需要垂直翻转
 	m_pDDSOptions = new osgDB::Options("dds_flip");
@@ -378,7 +375,7 @@ void CGMEarth::SetEarthRotate(const double fSpin, const double fObliquity, const
 	osg::Quat qPlanetInclination = osg::Quat(fObliquity, osg::Vec3d(1, 0, 0));
 	osg::Quat qPlanetNorthYaw = osg::Quat(fNorthYaw, osg::Vec3d(0, 0, 1));
 	osg::Quat qRotate = qPlanetSpin * qPlanetInclination * qPlanetNorthYaw;
-	m_pShadow_2_Transform->asPositionAttitudeTransform()->setAttitude(qRotate);
+	m_pShadowTransform_2->asPositionAttitudeTransform()->setAttitude(qRotate);
 
 	if (m_pConfigData->bWanderingEarth)
 	{
@@ -396,6 +393,8 @@ void CGMEarth::SetWanderingEarthProgress(const float fProgress)
 
 bool CGMEarth::CreateEarth()
 {
+	CGMPlanet::CreatePlanet();
+
 	_CreateGlobalCloudShadow();
 
 	// 创建地球，用于1级空间
@@ -502,9 +501,9 @@ bool CGMEarth::_CreateGlobalCloudShadow()
 		pShadowEarth->addDrawable(pShadowEarthGeom);
 		if (2 == i)
 		{
-			m_pShadow_2_Transform = new osg::PositionAttitudeTransform();
-			m_pShadow_2_Transform->addChild(pShadowEarth);
-			m_pGlobalShadowCamera->addChild(m_pShadow_2_Transform);
+			m_pShadowTransform_2 = new osg::PositionAttitudeTransform();
+			m_pShadowTransform_2->addChild(pShadowEarth);
+			m_pGlobalShadowCamera->addChild(m_pShadowTransform_2);
 		}
 		else
 		{

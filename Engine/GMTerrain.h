@@ -12,6 +12,7 @@
 #pragma once
 
 #include "GMCommonUniform.h"
+#include "GMCelestialScaleVisitor.h"
 
 namespace GM
 {
@@ -77,6 +78,28 @@ namespace GM
 		*/
 		bool _CreateTerrain_1();
 
+		/**
+		* @brief 创建六面体细分后的球体的一个面的四分之一的部分，每个顶点都有法线和UV
+		* UV0.xy = WGS84对应的UV，[0.0, 1.0]
+		* UV1.xy = 六面体贴图UV，[0.0, 1.0]
+		* UV1.z = 六面体ID，0,1,2,3,4,5
+		* @param bPolar:			是否是极地区域
+		* @param iHalfSegment:		四分之一面体的边长的分段数，也就是一个六面体的半边长的分段数
+		* @return Geometry:			返回几何体指针
+		*/
+		osg::Geometry* _MakeHexahedronQuaterGeometry(const bool bPolar, int iHalfSegment = 64) const;
+
+		/**
+		* @brief 根据顶点的信息获取顶点的索引，会特殊处理国际日期变更线上的顶点
+		* @param iX，iY: 顶点的XY位置
+		* @param iHalfSeg: 四分之一面体的边长的分段数，也就是一个六面体的半边长的分段数
+		* @return int: 顶点的索引
+		*/
+		inline int _GetVertIndex(const int iX, const int iY, const int iHalfSeg) const
+		{
+			return iY * (iHalfSeg + 1) + iX;
+		}
+
 		// 变量
 	private:
 		SGMKernelData*								m_pKernelData;					//!< 内核数据
@@ -87,6 +110,8 @@ namespace GM
 		std::string									m_strGalaxyShaderPath;			//!< galaxy shader 路径
 		std::string									m_strTerrainShaderPath;			//!< Terrain shader 路径
 
-		osg::ref_ptr<osg::Group>					m_pTerrainRoot_1;				//!< 第1层级地形共用球体
+		std::vector<osg::ref_ptr<osg::Transform>>	m_pTerrainPolarTransVec;		//!< 四分之一面的极地节点vector
+		std::vector<osg::ref_ptr<osg::Transform>>	m_pTerrainEquatorTransVec;		//!< 四分之一面的赤道节点vector
+		CGMCelestialScaleVisitor*					m_pCelestialScaleVisitor;		//!< 用于控制天体大小
 	};
 }	// GM

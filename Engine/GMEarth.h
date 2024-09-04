@@ -11,9 +11,7 @@
 //////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "GMCommonUniform.h"
 #include "GMPlanet.h"
-
 #include <osg/Texture2DArray>
 
 namespace GM
@@ -231,9 +229,6 @@ namespace GM
 
 		// 变量
 	private:
-		SGMKernelData*									m_pKernelData;					//!< 内核数据
-		CGMCommonUniform*								m_pCommonUniform;				//!< 公共Uniform
-
 		std::string										m_strGalaxyShaderPath;			//!< galaxy shader 路径
 		std::string										m_strEarthShaderPath;			//!< Earth shader 路径
 
@@ -242,7 +237,7 @@ namespace GM
 		float											m_fCloudBottom;					//!< 云底高度
 		float											m_fCloudTop;					//!< 云顶高度
 
-		osg::ref_ptr<osg::Transform>					m_pShadow_2_Transform;			//!< 第2层级当前全球阴影变换结点
+		osg::ref_ptr<osg::Transform>					m_pShadowTransform_2;			//!< 第2层级当前全球阴影变换结点
 		osg::ref_ptr<osg::Group>						m_pEarthRoot_1;					//!< 第1层级地球根节点
 		osg::ref_ptr<osg::Group>						m_pEarthRoot_2;					//!< 第2层级地球根节点
 		osg::ref_ptr<osg::Geometry>						m_pEarthGeom_1;					//!< 第1层级地球几何节点
@@ -281,7 +276,7 @@ namespace GM
 		osg::ref_ptr<osg::Texture3D>					m_pInscatteringTex;
 
 		osg::ref_ptr<osg::EllipsoidModel>				m_pEllipsoid;					//!< 椭球模型
-		std::map<int,osg::ref_ptr<osg::Geode>>			m_mShadowEarthGeode;			//!< 用于全球阴影渲染的节点vector
+		std::map<int,osg::ref_ptr<osg::Geode>>			m_mShadowEarthGeode;			//!< 用于全球阴影渲染的节点map
 		osg::ref_ptr<osg::Texture2D>					m_pGlobalShadowTex;				//!< 全球云层阴影贴图
 		osg::ref_ptr<osg::Camera>						m_pGlobalShadowCamera;			//!< 全球云层阴影的RTT相机
 

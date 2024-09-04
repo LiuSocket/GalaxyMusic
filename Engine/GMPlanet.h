@@ -13,6 +13,7 @@
 
 #include "GMCommon.h"
 #include "GMKernel.h"
+#include "GMCommonUniform.h"
 #include "GMCelestialScaleVisitor.h"
 
 namespace GM
@@ -20,6 +21,7 @@ namespace GM
 	/*************************************************************************
 	Class
 	*************************************************************************/
+	class CGMTerrain;
 
 	/*!
 	*  @class CGMPlanet
@@ -36,7 +38,13 @@ namespace GM
 		~CGMPlanet();
 
 		/** @brief 初始化 */
-		bool Init(SGMConfigData* pConfigData);
+		bool Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCommonUniform* pCommonUniform);
+
+		/**
+		* @brief 创建行星
+		* @return bool 成功true， 失败false
+		*/
+		bool CreatePlanet();
 
 		/**
 		* @brief 创建六面体细分后的球体，每个顶点都有法线和UV
@@ -108,8 +116,12 @@ namespace GM
 
 		// 变量
 	protected:
+		SGMKernelData*							m_pKernelData;					//!< 内核数据
 		SGMConfigData*							m_pConfigData;					//!< 配置数据
+		CGMCommonUniform*						m_pCommonUniform;				//!< 公共Uniform
 		std::string								m_strCoreModelPath;				//!< 核心模型资源路径
+
+		CGMTerrain*								m_pTerrain;						//!< 地形模块
 		CGMCelestialScaleVisitor*				m_pCelestialScaleVisitor;		//!< 用于控制天体大小
 	};
 }	// GM

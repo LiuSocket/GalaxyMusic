@@ -37,6 +37,9 @@ float SeaLevel(in float latCoord, in float seaLevelAddProgress)
 
 void main()
 {
+	float lenV = length(viewPos.xyz)*unit; // meter
+	//if(lenV < 2e6) discard;
+
 	vec4 celestialCoordScale = vec4(1,1,1,1);
 #ifdef EARTH
 	celestialCoordScale = coordScale_Earth;
@@ -113,10 +116,9 @@ void main()
 #endif // EARTH
 
 #ifdef ATMOS
-	float lenV = length(viewPos.xyz); // hierarchy unit
 	// radius of sealevel ground at the vertex point, meter
 	float Rg = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1))*unit;
-	color += AtmosColor(vertAlt, viewDir, viewVertUp, lenV*unit, Rg);
+	color += AtmosColor(vertAlt, viewDir, viewVertUp, lenV, Rg);
 #endif // ATMOS
 
 #ifdef EARTH

@@ -78,7 +78,7 @@ uniform sampler3D noiseShapeTex;
 uniform sampler3D noiseErosionTex;
 
 float STEP_LENGTH = 1e4/unit;
-float EARTH_RADIUS = 6.36e6/unit;
+float EARTH_RADIUS = 6.378e6/unit;
 float ATMOS_RADIUS = 7.2e6/unit;
 float TAIL_RADIUS = 1.7e6/unit;
 float TAIL_LENGTH = 4e7/unit;

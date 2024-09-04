@@ -118,93 +118,90 @@ void main()
 	shadow *= step(0, shadowVertPos.y*sign(cosNorthLight));
 #endif // SATURN
 
+	vec3 viewDir = normalize(viewPos.xyz);
 	vec3 ECEFEyePos = view2ECEFMatrix[3].xyz;
 	float Rc = length(ECEFEyePos);
-	float Rc2 = Rc*Rc;
-	vec3 viewDir = normalize(viewPos.xyz);
-	
-	float altRatio = eyeAltitude / atmosHeight;
-	float eyeGeoRadius = Rc - eyeAltitude;
-	// cosUL = cos of viewUp & light
-	float cosUL = dot(viewUp, viewLight);
-
-	vec3 viewCorePos = -viewUp*Rc;
-	vec3 viewCore2FarPos = viewPos.xyz-viewCorePos;
-	vec3 viewMid2Far = dot(viewCore2FarPos,viewDir)*viewDir;
-	vec3 viewMidPos = viewPos.xyz - viewMid2Far;
-	float lenCore2Mid = distance(viewCorePos, viewMidPos);
-	vec3 ECEFFarPos = (view2ECEFMatrix*viewPos).xyz;
+	//cosUV(at the eye pos)
+	float cosUV = dot(viewUp, viewDir);
+	float signDisEye2Mid = -Rc*cosUV;
+	float lenEye2MidPos = max(0, signDisEye2Mid); // >0
+	vec3 viewMidPos = viewDir*lenEye2MidPos;
 	vec3 ECEFMidPos = (view2ECEFMatrix*vec4(viewMidPos, 1.0)).xyz;
-	float farGeoRadius = GeoRadius(planetRadius.x, planetRadius.y, abs(normalize(ECEFFarPos).z));
-	// lenCore2Mid => lenCore2Far: wrong but useful
-	float midGeoRadius = GeoRadius(planetRadius.x, planetRadius.y, abs(normalize(ECEFMidPos).z));
-	float nearGround = exp2(min(0,atmosHeight-eyeAltitude)/atmosHeight);
-	// mid geo radius near eye -> eyeGeoRadius
-	midGeoRadius = mix(midGeoRadius, eyeGeoRadius, nearGround);
-	
-	float lenCore2Far = atmosHeight + farGeoRadius;
-	float lenCore2Far2 = lenCore2Far*lenCore2Far;
-	float lenMid2Far = sqrt(lenCore2Far2 - lenCore2Mid*lenCore2Mid);
-	// approach top atmos pos
-	vec3 viewFarPos = viewMidPos + normalize(viewMid2Far)*lenMid2Far;
-	vec3 viewFarUp = normalize(viewFarPos-viewCorePos);
-	// cosFUL = viewUp at far atmosphere pos & light
-	float cosFUL = dot(viewFarUp, viewLight);
-
-	vec3 viewLightRightDir = normalize(cross(viewLight, viewUp));
-	vec3 viewLightFrontDir = normalize(cross(viewUp, viewLightRightDir));
-	mat3 localLight2ViewMatrix = mat3(
-		viewLightRightDir.x,	viewLightRightDir.y,	viewLightRightDir.z,
-		viewLightFrontDir.x,	viewLightFrontDir.y,	viewLightFrontDir.z,
-		viewUp.x,				viewUp.y,				viewUp.z);
-	mat3 view2LocalLightMatrix = inverse(localLight2ViewMatrix);
-	vec3 localLightSpaceViewDir = view2LocalLightMatrix*viewDir;
-	float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
-
-	// radius of sealevel ground
-	float Rs = midGeoRadius;
-	float Rs2 = Rs*Rs;
+	float Rs = GeoRadius(planetRadius.x, planetRadius.y, abs(normalize(ECEFMidPos).z));
 	float Rt = Rs + atmosHeight;
+	float Rs2 = Rs*Rs;
 	float Rt2 = Rt*Rt;
 	float lenHorizonMax = sqrt(Rt2 - Rs2);
 
 	vec4 inscattering = vec4(0);
 	if(eyeAltitude < atmosHeight)
 	{
+		float Rc2 = Rc*Rc;
+		// sinVertUV(at the vertex pos):
+		float sinUV2 = max(0, 1-cosUV*cosUV);
+		// cosUL = cos of viewUp & light
+		float cosUL = dot(viewUp, viewLight);
+
+		vec3 viewLightRightDir = normalize(cross(viewLight, viewUp));
+		vec3 viewLightFrontDir = normalize(cross(viewUp, viewLightRightDir));
+		mat3 localLight2ViewMatrix = mat3(
+			viewLightRightDir.x,	viewLightRightDir.y,	viewLightRightDir.z,
+			viewLightFrontDir.x,	viewLightFrontDir.y,	viewLightFrontDir.z,
+			viewUp.x,				viewUp.y,				viewUp.z);
+		mat3 view2LocalLightMatrix = inverse(localLight2ViewMatrix);
+		vec3 localLightSpaceViewDir = view2LocalLightMatrix*viewDir;
+		float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
+
+		float lenEye2Atmos = signDisEye2Mid + sqrt(max(0.0, Rt2 - Rc2*sinUV2));
+		float lenEye2Top = max(0.0, atmosHeight - eyeAltitude);
 		float lenEye2Horizon = sqrt(max(0.0, Rc2 - Rs2));
 		float lenAtmosHorizon = lenEye2Horizon + lenHorizonMax;
-
-		float lenEye2Atmos = length(viewFarPos);
-		float lenEye2Top = max(0.0, atmosHeight - eyeAltitude);
-		float eyeSkyCoordPitch = GetSkyCoordPitch(lenEye2Atmos, lenEye2Top, lenAtmosHorizon);
+			
 		inscattering = Texture4D(vec4(
-			eyeSkyCoordPitch,
+			GetSkyCoordPitch(lenEye2Atmos, lenEye2Top, lenAtmosHorizon),
 			GetCoordUL(cosUL),
 			coordYaw,
-			min(1, sqrt(altRatio))));
+			min(1, sqrt(eyeAltitude / atmosHeight))));
 	}
 	else
 	{
-		float lenFar2Atmos = 2*lenMid2Far;
-		float skyCoordPitch = GetSkyCoordPitch(lenFar2Atmos, 0.0, 2*lenHorizonMax);
+		vec3 viewCorePos = -viewUp*Rc;
+		vec3 viewCore2Mid = viewMidPos - viewCorePos;
+		float lenCore2Mid = length(viewCore2Mid);
+		float lenMid2Near = sqrt(max(0, Rt2 - lenCore2Mid*lenCore2Mid));
+		vec3 viewNearPos = (viewMidPos - lenMid2Near*viewDir);
+		vec3 viewCore2NearPos = viewNearPos - viewCorePos;
+		vec3 viewNearUp = normalize(viewCore2NearPos);
+		// cosNUL = viewUp at near atmosphere pos & light
+		float cosNUL = dot(viewNearUp, viewLight);
+
+		vec3 viewLightRightDir = normalize(cross(viewLight, viewNearUp));
+		vec3 viewLightFrontDir = normalize(cross(viewNearUp, viewLightRightDir));
+		mat3 localLight2ViewMatrix = mat3(
+			viewLightRightDir.x,	viewLightRightDir.y,	viewLightRightDir.z,
+			viewLightFrontDir.x,	viewLightFrontDir.y,	viewLightFrontDir.z,
+			viewNearUp.x,			viewNearUp.y,			viewNearUp.z);
+		mat3 view2LocalLightMatrix = inverse(localLight2ViewMatrix);
+		vec3 localLightSpaceViewDir = view2LocalLightMatrix*viewDir;
+		float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
+
 		inscattering = Texture4D(vec4(
-			skyCoordPitch,
-			GetCoordUL(cosFUL),
+			GetSkyCoordPitch(2*lenMid2Near, 0, 2*lenHorizonMax),
+			GetCoordUL(cosNUL),
 			coordYaw,
 			1));
 	}
 
 	float dotVS = dot(viewDir, viewLight);
-	const vec3 sunColor = vec3(1.0,0.7,0.1);
-	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*(0.03+MiePhase(dotVS))*sunColor;
+	const vec3 sunColor = vec3(1.0,0.8,0.6);
+	vec3 atmosSum = (inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS))*sunColor;
 
 #ifdef EARTH
 #else // not EARTH
 	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;
 #endif // EARTH
 	vec3 color = ToneMapping(atmosSum * (1 - shadow));
-	float alphaSum = atmosSum.r+atmosSum.g+atmosSum.b;
-	float alpha = 1-exp2(-alphaSum*alphaSum*30);
+	float alpha = 1-exp2(-(atmosSum.r+atmosSum.g+atmosSum.b)*9);
 	alpha *= 1 - shadow;
 	gl_FragColor = vec4(color, alpha);
 }
