@@ -62,14 +62,6 @@ float GetSkyCoordPitch(float d0, float dV, float dH)
 {
 	return 1.0 - 0.5 * clamp((d0 - dV) / (dH - dV), 0.0, 1.0);
 }
-// get ground coord of pitch (d0/dh)
-// d0 = distance of point to the ground
-// dv = distance of point to the ground point vertical below
-// dh = distance of horizon
-float GetGroundCoordPitch(float d0, float dv, float dh)
-{
-	return 0.5 * clamp((d0 - dv) / (dh - dv), 0.0, 1.0);
-}
 
 // get coord of cosUL (the cos of local Up dir & light source dir)
 float GetCoordUL(float cosUL)
@@ -127,11 +119,11 @@ void main()
 	float lenEye2MidPos = max(0, signDisEye2Mid); // >0
 	vec3 viewMidPos = viewDir*lenEye2MidPos;
 	vec3 ECEFMidPos = (view2ECEFMatrix*vec4(viewMidPos, 1.0)).xyz;
-	float Rs = GeoRadius(planetRadius.x, planetRadius.y, abs(normalize(ECEFMidPos).z));
-	float Rt = Rs + atmosHeight;
-	float Rs2 = Rs*Rs;
+	float Rg = GeoRadius(planetRadius.x, planetRadius.y, abs(normalize(ECEFMidPos).z));
+	float Rt = Rg + atmosHeight;
+	float Rg2 = Rg*Rg;
 	float Rt2 = Rt*Rt;
-	float lenHorizonMax = sqrt(Rt2 - Rs2);
+	float lenHorizonMax = sqrt(Rt2 - Rg2);
 
 	vec4 inscattering = vec4(0);
 	if(eyeAltitude < atmosHeight)
@@ -154,7 +146,7 @@ void main()
 
 		float lenEye2Atmos = signDisEye2Mid + sqrt(max(0.0, Rt2 - Rc2*sinUV2));
 		float lenEye2Top = max(0.0, atmosHeight - eyeAltitude);
-		float lenEye2Horizon = sqrt(max(0.0, Rc2 - Rs2));
+		float lenEye2Horizon = sqrt(max(0.0, Rc2 - Rg2));
 		float lenAtmosHorizon = lenEye2Horizon + lenHorizonMax;
 			
 		inscattering = Texture4D(vec4(
@@ -163,7 +155,7 @@ void main()
 			coordYaw,
 			min(1, sqrt(eyeAltitude / atmosHeight))));
 	}
-	else
+	else // out of atmosphere
 	{
 		vec3 viewCorePos = -viewUp*Rc;
 		vec3 viewCore2Mid = viewMidPos - viewCorePos;
@@ -186,10 +178,10 @@ void main()
 		float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
 
 		inscattering = Texture4D(vec4(
-			GetSkyCoordPitch(2*lenMid2Near, 0, 2*lenHorizonMax),
+			GetSkyCoordPitch(2*lenMid2Near, 0.0, 2*lenHorizonMax),
 			GetCoordUL(cosNUL),
 			coordYaw,
-			1));
+			1.0));
 	}
 
 	float dotVS = dot(viewDir, viewLight);

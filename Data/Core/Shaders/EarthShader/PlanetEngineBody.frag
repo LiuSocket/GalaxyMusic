@@ -30,7 +30,7 @@ void main()
 
 	// radius of sealevel at the vertex point
 	float Rg = gl_TexCoord[0].w; // meter
-	color.rgb += AtmosColor(vertAlt, viewDir, viewEngineUp, lenV, Rg);
+	color.rgb += AtmosColor(vertAlt, viewDir, viewEngineUp, Rg);
 
 	if((wanderProgress > PROGRESS_3_1) && (unit > 1e6))
 	{

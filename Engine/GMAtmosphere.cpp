@@ -149,8 +149,6 @@ void CGMAtmosphere::_MakeAtmosTransmittance()
 			parallel_for(int(0), int(TRANS_ALT_NUM), [&](int t) // 多线程
 			//for (int t = 0; t < TRANS_ALT_NUM; t++) // 海拔高度
 			{
-				// 地平线最远距离
-				//double fHorizonDisMax = sqrt(fAtmosThick * fAtmosThick + 2 * fAtmosThick * fSphereR);
 				// 根据海拔高度平均分段		
 				double fEyeR = CGMKit::Mix(fSphereR + 1, fTopR - 1, t / double(TRANS_ALT_NUM));
 				// 眼睛位置点
@@ -194,7 +192,7 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 	const int iSurfaceNum = 512;	// 地表总采样数量
 	const int iPitchNum = 256;		// 大气采样俯仰方向数量
 	const int iYawNum = 32;			// 大气采样偏航方向数量
-	const double fStepUnit = 500;	// 采样步长，单位：米
+	const double fStepUnit = 100;	// 采样步长，单位：米
 	const int iW = IRRA_UP_NUM;
 	const int iH = IRRA_ALT_NUM;
 	const int iIrradianceBytes = iW * iH * sizeof(float) * 3;
@@ -344,7 +342,7 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 								fLenMax = fLenEG;
 							}
 
-							fLenMax = min(5e3, fLenMax);
+							fLenMax = min(1e3, fLenMax);
 							double fSampleNum = fLenMax / fStepUnit;
 							for (int c = 0; c < int(fSampleNum + 1); c++)
 							{
@@ -426,7 +424,7 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 							}
 						}
 					}
-					vIrradiance *= 2e6 / double(iPitchNum * iYawNum);
+					vIrradiance *= 1.5e6 / double(iPitchNum * iYawNum);
 
 					osg::Vec3d vSumColor = (vAlbedo + vIrradiance) * fmin(1.0, fDensAtmosBottom);
 					int iAddress = IRRA_UP_NUM * t + s;
@@ -463,14 +461,14 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 	std::string strTransmittancePath = m_pConfigData->strCorePath + "Textures/Sphere/Transmittance/Transmittance_";
 	std::string strIrradiancePath = m_pConfigData->strCorePath + "Textures/Sphere/Irradiance/Irradiance_";
 
-	int h = 2; //大气厚度
-	//for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
+	//int h = 2; //大气厚度
+	for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
 	{
 		double fAtmosThick = ATMOS_MIN * 1e3 * exp2(h);				// 大气厚度，单位：米
 		double fDensAtmosBottom = _GetAtmosBottomDens(fAtmosThick);		// 星球表面大气密度
 
-		for (int r = 1; r < 2; r++) //  星球半径
-		//for (int r = 0; r < RADIUS_NUM; r++) //星球半径
+		//for (int r = 1; r < 2; r++) //  星球半径
+		for (int r = 0; r < RADIUS_NUM; r++) //星球半径
 		{
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
 			double fTopR = fSphereR + fAtmosThick;
@@ -478,8 +476,12 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 			double fTopR2 = fTopR * fTopR;
 			double fMinDotUL = GetMinDotUL(fAtmosThick, fSphereR);
 
+			//osg::ref_ptr<osg::Image> pTransImg = osgDB::readImageFile(strTransmittancePath
+			//	+ std::to_string(int(fAtmosThick*1e-3)) + "_" + std::to_string(int(fSphereR*1e-3)) + ".tif");
+			//if (!pTransImg.valid()) break;
+
 			osg::ref_ptr<osg::Image> pIrraImg = osgDB::readImageFile(strIrradiancePath
-				+ std::to_string(int(fAtmosThick*1e-3)) + "_" + std::to_string(int(fSphereR*1e-3)) + ".tif");
+				+ std::to_string(int(fAtmosThick * 1e-3)) + "_" + std::to_string(int(fSphereR * 1e-3)) + ".tif");
 			if (!pIrraImg.valid()) break;
 
 			// 计算内散射值

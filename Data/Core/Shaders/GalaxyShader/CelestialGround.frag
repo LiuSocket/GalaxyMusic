@@ -116,9 +116,10 @@ void main()
 #endif // EARTH
 
 #ifdef ATMOS
+	vec3 ECEFPos = (view2ECEFMatrix*vec4(viewPos.xyz, 1.0)).xyz;
 	// radius of sealevel ground at the vertex point, meter
-	float Rg = mix(planetRadius.x, planetRadius.y, clamp(abs(texCoord_0.y*2-1), 0, 1))*unit;
-	color += AtmosColor(vertAlt, viewDir, viewVertUp, lenV, Rg);
+	float Rg = GeoRadius(planetRadius.x, planetRadius.y, abs(normalize(ECEFPos).z))*unit;
+	color += AtmosColor(vertAlt, viewDir, viewVertUp, Rg);
 #endif // ATMOS
 
 #ifdef EARTH

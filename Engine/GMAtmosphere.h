@@ -86,7 +86,7 @@ namespace GM
 		};
 
 		/**
-		* @brief 根据“大气总厚度”和“星球半径”，计算有光区域的"DotUL"最小值，dot(upDir, lightDir)
+		* @brief 根据“大气总厚度”和“星球半径”，计算有光区域的"DotUL"最小值，比dot(upDir, lightDir)小一些
 		* @param fAtmosThick:		大气总厚度，单位：米
 		* @param fRadius:			星球半径，单位：米
 		* @return float:			有光区域的"DotUL"最小值,范围：(-1.0f, 0.0f)
@@ -94,7 +94,7 @@ namespace GM
 		inline float GetMinDotUL(const double& fAtmosThick, const double& fRadius) const
 		{
 			float fSinUL = fRadius / (fAtmosThick + fRadius);
-			return -sqrt(std::fmax(0.0f, 1.0f - fSinUL * fSinUL));
+			return -sqrt(std::fmax(0.0f, 1.0f - fSinUL * fSinUL))-0.1f;
 		};
 
 	private:
