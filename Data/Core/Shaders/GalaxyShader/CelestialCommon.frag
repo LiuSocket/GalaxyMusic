@@ -128,13 +128,15 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float Rg)
 	// cosVertUL = the cos of vertex Up dir & light source dir
 	float cosVertUL = dot(viewVertUp, viewLight);
 	// length of vert to mid point
-	float lenVert2Mid = Rv*abs(cosVertUV);
+	float lenVert2Mid = -Rv*cosVertUV;
 	// length2 of core to mid point
 	float lenCore2Mid2 = Rv2*sinVertUV2;
 	// length of atmos top to mid point
 	float lenAtmos2Mid = sqrt(max(0.0, Rt2 - lenCore2Mid2));
 	// length of atmos top to mid point
-	float lenGround2Mid = sqrt(max(0.0, Rg2 - lenCore2Mid2));
+	float lenEyeGround2Mid = sqrt(max(0.0, Rg2 - lenCore2Mid2));
+	// length of atmos top to mid point
+	float lenVertGround2Mid = sqrt(max(0.0, Rg2 - lenCore2Mid2));
 
 	vec3 viewLightRightDir = normalize(cross(viewLight, viewVertUp));
 	vec3 viewLightFrontDir = normalize(cross(viewVertUp, viewLightRightDir));
@@ -169,12 +171,12 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float Rg)
 		float cosEyeHoriz = -sqrt(1.0 - sinEyeHoriz * sinEyeHoriz); // it must < 0
 		bool isEyeToSky = (-cosUV) > cosEyeHoriz;
 		// sin & cos of vert pos horizon
-		// float sinVertHoriz = min(1.0, Rg / Rv); // it must < 1
-		// float cosVertHoriz = -sqrt(1.0 - sinVertHoriz * sinVertHoriz); // it must < 0
-		// bool isVertToSky = (-cosVertUV) > cosVertHoriz;
+		float sinVertHoriz = min(1.0, Rg / Rv); // it must < 1
+		float cosVertHoriz = -sqrt(1.0 - sinVertHoriz * sinVertHoriz); // it must < 0
+		bool isVertToSky = (-cosVertUV) > cosVertHoriz;
 
 		float lenEye2Atmos = lenAtmos2Mid - lenEye2Mid; // meter
-		float lenEye2Ground = lenEye2Mid - lenGround2Mid; // meter
+		float lenEye2Ground = lenEye2Mid - lenEyeGround2Mid; // meter
 		float lenEye2Top = max(0.0, atmosHeight - eyeAltitude)*unit; // meter
 		float lenEye2Horizon = sqrt(max(0.0, Rc2 - Rg2)); // meter
 		float lenAtmosHorizon = lenEye2Horizon + lenHorizonMax; // meter
@@ -188,7 +190,7 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float Rg)
 			sqrt(max(0.0, eyeAltitude / atmosHeight))));
 
 		float lenVert2Atmos = lenAtmos2Mid - lenVert2Mid; // meter
-		float lenVert2Ground = lenVert2Mid - lenGround2Mid; // meter
+		float lenVert2Ground = abs(lenVert2Mid) - lenVertGround2Mid; // meter
 		float vertSkyCoordPitch = GetSkyCoordPitch(lenVert2Atmos, lenVert2Top, lenVertAtmosHorizon);
 		float vertGroundCoordPitch = GetGroundCoordPitch(lenVert2Ground, elev, lenVertHorizon);
 
@@ -198,9 +200,9 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float Rg)
 			coordYaw,
 			elevCoord));
 
-		inscattering = abs(inscatterVert-inscatterEye);
+		inscattering = inscatterVert-inscatterEye;
 
-		//inscattering = vec4(0, mix(float(isVertToSky),float(isEyeToSky), float(gl_FragCoord.x<960)),0,0);
+		//inscattering = mix(inscattering, vec4(0, float(isEyeToSky),0,0), float(gl_FragCoord.x<960));
 	}
 	else
 	{
