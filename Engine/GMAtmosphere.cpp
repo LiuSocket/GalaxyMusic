@@ -155,19 +155,23 @@ void CGMAtmosphere::_MakeAtmosTransmittance()
 				osg::Vec2d vEyePos = osg::Vec2d(0, fEyeR);
 				for (int s = 0; s < TRANS_PITCH_NUM; s++) // 上方向与太阳方向夹角余弦值
 				{
+					// 上方向与太阳方向夹角余弦，在-1.0与1.0之间的比例
+					double fCosUL = CGMKit::Mix(-1.0, 1.0, double(s+0.5) / double(TRANS_PITCH_NUM));
+					double fSinUL = sqrt(1 - fCosUL * fCosUL);
+
 					// 计算地平线的正弦值
 					double fSinHoriz = fSphereR / fEyeR;
 					// 计算地平线的余弦值
 					double fCosHoriz = -sqrt(max(0, 1 - fSinHoriz * fSinHoriz));
-					// 上方向与太阳方向夹角余弦，在地平线余弦值与1.0之间的比例
-					double fCosUL = CGMKit::Mix(fCosHoriz, 1.0, double(s) / double(TRANS_PITCH_NUM));
-					double fSinUL = sqrt(1 - fCosUL * fCosUL);
 
 					double fTmp = fEyeR * fSinUL;
 					// vEyePos到vTopPos的距离
 					double fLen = sqrt(fTopR * fTopR - fTmp * fTmp) - fEyeR * fCosUL;
 					// 大气层顶部位置点
 					osg::Vec2d vTopPos = osg::Vec2d(fLen * fSinUL, fEyeR + fLen * fCosUL);
+					// 地面位置点
+					osg::Vec2d vGroundPos = osg::Vec2d(fLen * fSinUL, fEyeR + fLen * fCosUL); // to do
+
 					// 计算直射光的透过率
 					osg::Vec3d vTransmittance = _Transmittance(fDensAtmosBottom, fSphereR, fAtmosThick, vEyePos, vTopPos);
 					int iAddress = TRANS_PITCH_NUM * t + s;
@@ -200,14 +204,14 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 	// 假设到达地球的太阳光单位面积上能量为 1
 	// 也就是说底面积为1，长度为大气厚度(H)的圆柱体上，每个单位体积内分配的能量只有（1/ H）
 
-	//int h = 2; //大气厚度
-	for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
+	int h = 2; //大气厚度
+	//for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
 	{
 		double fAtmosThick = ATMOS_MIN * 1e3 * exp2(h);				// 大气厚度，单位：米
 		double fDensAtmosBottom = _GetAtmosBottomDens(fAtmosThick);		// 星球表面大气密度
 
-		//for (int r = 1; r < 2; r++) //星球半径
-		for (int r = 0; r < RADIUS_NUM; r++) //星球半径
+		for (int r = 1; r < 2; r++) //星球半径
+		//for (int r = 0; r < RADIUS_NUM; r++) //星球半径
 		{
 			float* data = new float[iIrradianceBytes];
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
@@ -438,15 +442,15 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 	//std::string strTransmittancePath = m_pConfigData->strCorePath + "Textures/Sphere/Transmittance/Transmittance_";
 	std::string strIrradiancePath = m_pConfigData->strCorePath + "Textures/Sphere/Irradiance/Irradiance_";
 
-	//int h = 2; //大气厚度
-	for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
+	int h = 2; //大气厚度
+	//for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
 	{
 		double fAtmosThick = ATMOS_MIN * 1e3 * exp2(h);				// 大气厚度，单位：米
 		double fDensAtmosBottom = _GetAtmosBottomDens(fAtmosThick);		// 星球表面大气密度
 		double STEP_UNIT = 20 * exp2(h); // 采样步长
 
-		//for (int r = 1; r < 2; r++) //  星球半径
-		for (int r = 0; r < RADIUS_NUM; r++) //星球半径
+		for (int r = 1; r < 2; r++) //  星球半径
+		//for (int r = 0; r < RADIUS_NUM; r++) //星球半径
 		{
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
 			double fTopR = fSphereR + fAtmosThick;

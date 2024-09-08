@@ -198,15 +198,13 @@ namespace GM
 					// 行星发动机直径分两种，大的30000米，小的21000米
 					float fScale = (vData.w() > 1e4) ? 1.0f : 0.7f;
 					float fScaleHie = fScale / _fUnit;
-					// 发动机所在位置的地球半径，单位：米
-					float fRadius = vBottomPos.length() * _fUnit;
 
 					// 绘制发动机主体
 					for (int j = 0; j < iVertPerEngine; j++)
 					{
-						// xy = UV, z = vertex altitude(meter), w = earth radius at the vertex point(meter)
+						// xy = UV, z = vertex altitude(meter), w = DEM(meter)
 						osg::Vec4 vCoord = osg::Vec4(pCoordOld->at(j).x(), pCoordOld->at(j).y(),
-							pVertOld->at(j).z() * fScale, fRadius);
+							pVertOld->at(j).z() * fScale, vData.z());
 
 						pVerts->push_back(mModelMatrix.preMult(pVertOld->at(j) * fScaleHie));
 						pCoords->push_back(vCoord);

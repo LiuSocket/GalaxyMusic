@@ -9,6 +9,7 @@ in float diffuse;
 in vec3 viewPos;
 in vec3 viewVertUp;
 in float engineIntensity;
+in float Rg;
 
 void main()
 {
@@ -18,18 +19,18 @@ void main()
 
 	vec3 viewDir = normalize(viewPos);
 	vec3 viewEngineUp = normalize(viewVertUp);
-	float vertAlt = max(0, gl_TexCoord[0].z); // meter
+	float alt2Bottom = max(0, gl_TexCoord[0].z); // meter
+	float bottomAlt = gl_TexCoord[0].w; // meter
+	float vertAlt = alt2Bottom + bottomAlt; // meter
 
-	float illumAlt = clamp(vertAlt*1e-4,0,1);
+	float illumAlt = clamp(alt2Bottom*1e-4,0,1);
 	vec3 streamLight = vec3(0.0,0.4,0.6)*(illumAlt*engineIntensity);
 	vec4 baseColor = texture(baseColorTex, gl_TexCoord[0].xy);
 	vec4 color = vec4(max(streamLight,vec3(diffuse))*baseColor.rgb, baseColor.a);
 	color.a -= clamp(1-(maxDistance-lenV)/(0.9*maxDistance), 0, 1);
 	// building progress
 	color.a *= step(0, wanderProgress*10-vertAlt*1e-4);
-
-	// radius of sealevel at the vertex point
-	float Rg = gl_TexCoord[0].w; // meter
+	// atmosphere
 	color.rgb += AtmosColor(vertAlt, viewDir, viewEngineUp, Rg);
 
 	if((wanderProgress > PROGRESS_3_1) && (unit > 1e6))
