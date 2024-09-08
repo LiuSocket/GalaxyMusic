@@ -58,9 +58,9 @@ vec3 ToneMapping(vec3 color)
 // d0 = distance of point to the sky
 // dV = distance of point to the ground point vertical above
 // dH = distance of atmos top behind horizon
-float GetSkyCoordPitch(float d0, float dV, float dH)
+float GetCoordPitch(float d0, float dV, float dH)
 {
-	return 1.0 - 0.5 * clamp((d0 - dV) / (dH - dV), 0.0, 1.0);
+	return clamp((d0 - dV) / (dH - dV), 0.0, 1.0);
 }
 
 // get coord of cosUL (the cos of local Up dir & light source dir)
@@ -150,7 +150,7 @@ void main()
 		float lenAtmosHorizon = lenEye2Horizon + lenHorizonMax;
 			
 		inscattering = Texture4D(vec4(
-			GetSkyCoordPitch(lenEye2Atmos, lenEye2Top, lenAtmosHorizon),
+			GetCoordPitch(lenEye2Atmos, lenEye2Top, lenAtmosHorizon),
 			GetCoordUL(cosUL),
 			coordYaw,
 			min(1, sqrt(eyeAltitude / atmosHeight))));
@@ -178,7 +178,7 @@ void main()
 		float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
 
 		inscattering = Texture4D(vec4(
-			GetSkyCoordPitch(2*lenMid2Near, 0.0, 2*lenHorizonMax),
+			GetCoordPitch(2*lenMid2Near, 0.0, 2*lenHorizonMax),
 			GetCoordUL(cosNUL),
 			coordYaw,
 			1.0));
@@ -193,7 +193,7 @@ void main()
 	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;
 #endif // EARTH
 	vec3 color = ToneMapping(atmosSum * (1 - shadow));
-	float alpha = 1-exp2(-(atmosSum.r+atmosSum.g+atmosSum.b)*9);
+	float alpha = 1-exp2(-(atmosSum.r+atmosSum.g+atmosSum.b)*20);
 	alpha *= 1 - shadow;
 	gl_FragColor = vec4(color, alpha);
 }

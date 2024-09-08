@@ -3,7 +3,6 @@
 #pragma import_defines(ATMOS, EARTH, WANDERING)
 
 const float M_PI = 3.141592654;
-const float HORIZON_OFFSET = 0.004; // to solve the bug of discontinuous at the horizon
 
 const float PROGRESS_0 =	0.005;
 const float PROGRESS_1 =	0.03; // end of brake time
@@ -71,17 +70,9 @@ float GeoRadius(float rE, float rP, float cosTheta)
 // d0 = distance of point to the sky
 // dV = distance of point to the ground point vertical above
 // dH = distance of atmos top behind horizon
-float GetSkyCoordPitch(float d0, float dV, float dH)
+float GetCoordPitch(float d0, float dV, float dH)
 {
-	return 1.0 - (0.5-HORIZON_OFFSET) * clamp((d0 - dV) / (dH - dV), 0, 1);
-}
-// get ground coord of pitch (d0/dh)
-// d0 = distance of point to the ground
-// dv = distance of point to the ground point vertical below
-// dh = distance of horizon
-float GetGroundCoordPitch(float d0, float dv, float dh)
-{
-	return (0.5-HORIZON_OFFSET) * clamp((d0 - dv) / (dh - dv), 0, 1);
+	return clamp((d0 - dV) / (dH - dV), 0, 1);
 }
 
 // get coord of cosUL (the cos of local Up dir & light source dir)
@@ -133,10 +124,6 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float Rg)
 	float lenCore2Mid2 = Rv2*sinVertUV2;
 	// length of atmos top to mid point
 	float lenAtmos2Mid = sqrt(max(0.0, Rt2 - lenCore2Mid2));
-	// length of atmos top to mid point
-	float lenEyeGround2Mid = sqrt(max(0.0, Rg2 - lenCore2Mid2));
-	// length of atmos top to mid point
-	float lenVertGround2Mid = sqrt(max(0.0, Rg2 - lenCore2Mid2));
 
 	vec3 viewLightRightDir = normalize(cross(viewLight, viewVertUp));
 	vec3 viewLightFrontDir = normalize(cross(viewVertUp, viewLightRightDir));
@@ -153,7 +140,7 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float Rg)
 	float lenVertAtmosHorizon = lenVertHorizon + lenHorizonMax; // meter
 	float lenVert2Top = max(0.0, atmosH_meter - elev); // meter
 
-	float elevCoord = min(1.0, sqrt(elev / atmosH_meter));
+	float elevCoord = sqrt(elev / atmosH_meter);
 	vec4 inscattering = vec4(0);
 	if(eyeAltitude < atmosHeight)
 	{
@@ -164,50 +151,38 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float Rg)
 		// cosUL = the cos of local Up dir & light source dir
 		float cosUL = dot(viewUp, viewLight);
 		// length of eye to mid point
-		float lenEye2Mid = Rc*abs(cosUV);
+		float lenEye2Mid = -Rc*cosUV;
 
-		// sin & cos of eye pos horizon
-		float sinEyeHoriz = min(1.0, Rg / Rc); // it must < 1
-		float cosEyeHoriz = -sqrt(1.0 - sinEyeHoriz * sinEyeHoriz); // it must < 0
-		bool isEyeToSky = (-cosUV) > cosEyeHoriz;
-		// sin & cos of vert pos horizon
-		float sinVertHoriz = min(1.0, Rg / Rv); // it must < 1
-		float cosVertHoriz = -sqrt(1.0 - sinVertHoriz * sinVertHoriz); // it must < 0
-		bool isVertToSky = (-cosVertUV) > cosVertHoriz;
+		float isUp = float(cosUV>0);
+		coordYaw = mix(coordYaw, 1-coordYaw, isUp);
 
-		float lenEye2Atmos = lenAtmos2Mid - lenEye2Mid; // meter
-		float lenEye2Ground = lenEye2Mid - lenEyeGround2Mid; // meter
+		float lenEye2Atmos = lenAtmos2Mid - mix(lenEye2Mid, abs(lenEye2Mid), isUp); // meter
 		float lenEye2Top = max(0.0, atmosHeight - eyeAltitude)*unit; // meter
 		float lenEye2Horizon = sqrt(max(0.0, Rc2 - Rg2)); // meter
 		float lenAtmosHorizon = lenEye2Horizon + lenHorizonMax; // meter
-		float eyeSkyCoordPitch = GetSkyCoordPitch(lenEye2Atmos, lenEye2Top, lenAtmosHorizon);
-		float eyeGroundCoordPitch = GetGroundCoordPitch(lenEye2Ground, eyeAltitude*unit, lenEye2Horizon);
+		float eyeCoordPitch = GetCoordPitch(lenEye2Atmos, lenEye2Top, lenAtmosHorizon);
 
 		vec4 inscatterEye = Texture4D(vec4(
-			isEyeToSky ? eyeSkyCoordPitch : eyeGroundCoordPitch,
+			eyeCoordPitch,
 			GetCoordUL(cosUL),
 			coordYaw,
 			sqrt(max(0.0, eyeAltitude / atmosHeight))));
 
-		float lenVert2Atmos = lenAtmos2Mid - lenVert2Mid; // meter
-		float lenVert2Ground = abs(lenVert2Mid) - lenVertGround2Mid; // meter
-		float vertSkyCoordPitch = GetSkyCoordPitch(lenVert2Atmos, lenVert2Top, lenVertAtmosHorizon);
-		float vertGroundCoordPitch = GetGroundCoordPitch(lenVert2Ground, elev, lenVertHorizon);
+		float lenVert2Atmos = lenAtmos2Mid - mix(lenVert2Mid, abs(lenVert2Mid), isUp); // meter
+		float vertCoordPitch = GetCoordPitch(lenVert2Atmos, lenVert2Top, lenVertAtmosHorizon);
 
 		vec4 inscatterVert = Texture4D(vec4(
-			isEyeToSky ? vertSkyCoordPitch : vertGroundCoordPitch,
+			vertCoordPitch,
 			GetCoordUL(cosVertUL),
 			coordYaw,
 			elevCoord));
 
-		inscattering = inscatterVert-inscatterEye;
-
-		//inscattering = mix(inscattering, vec4(0, float(isEyeToSky),0,0), float(gl_FragCoord.x<960));
+		inscattering = abs(inscatterVert-inscatterEye);
 	}
 	else
 	{
 		float lenVert2Atmos = lenAtmos2Mid - lenVert2Mid; // meter
-		float skyCoordPitch = GetSkyCoordPitch(lenVert2Atmos, lenVert2Top, lenVertAtmosHorizon);
+		float skyCoordPitch = GetCoordPitch(lenVert2Atmos, lenVert2Top, lenVertAtmosHorizon);
 
 		inscattering = Texture4D(vec4(
 			skyCoordPitch,

@@ -34,8 +34,8 @@ namespace GM
 	constexpr double ATMOS_FADE_G = 1.3558e-5; 		// 大气的绿光散射系数
 	constexpr double ATMOS_FADE_B = 3.31e-5; 		// 大气的蓝光散射系数
 
-	constexpr double ATMOS_RAYLEIGH_H = 0.132; 		// 大气的瑞丽散射标高比例
-	constexpr double ATMOS_MIE_H = 0.019; 			// 大气的米氏散射标高比例
+	constexpr double ATMOS_RAYLEIGH_H = 0.14; 		// 大气的瑞丽散射标高比例
+	constexpr double ATMOS_MIE_H = 0.02; 			// 大气的米氏散射标高比例
 	constexpr int ATMOS_MIN = 16;					// 最小的大气厚度，单位：km
 
 	/*************************************************************************
@@ -86,7 +86,7 @@ namespace GM
 		};
 
 		/**
-		* @brief 根据“大气总厚度”和“星球半径”，计算有光区域的"DotUL"最小值，比dot(upDir, lightDir)小一些
+		* @brief 根据“大气总厚度”和“星球半径”，计算有光区域的"DotUL"最小值，必须比dot(upDir, lightDir)小
 		* @param fAtmosThick:		大气总厚度，单位：米
 		* @param fRadius:			星球半径，单位：米
 		* @return float:			有光区域的"DotUL"最小值,范围：(-1.0f, 0.0f)
@@ -94,7 +94,7 @@ namespace GM
 		inline float GetMinDotUL(const double& fAtmosThick, const double& fRadius) const
 		{
 			float fSinUL = fRadius / (fAtmosThick + fRadius);
-			return -sqrt(std::fmax(0.0f, 1.0f - fSinUL * fSinUL))-0.1f;
+			return -sqrt(std::fmax(0.0f, 1.0f - fSinUL * fSinUL))*2;
 		};
 
 	private:
@@ -175,14 +175,13 @@ namespace GM
 		* @brief 米氏散射导致的吸收
 		* @param fAlt:				海拔高度，单位：米
 		* @param fAtmosThick:		大气总厚度，单位：米
-		* @return osg::Vec3d:		米氏散射导致的吸收比例
+		* @return double:			米氏散射导致的吸收比例
 		*/
-		inline osg::Vec3d _MieAbsorption(const double& fAlt, const double& fAtmosThick) const
+		inline double _MieAbsorption(const double& fAlt, const double& fAtmosThick) const
 		{
 			// 大气密度随高度衰减，其中地球大气米氏散射的标高：1200m
 			double fEarthH = fAtmosThick * ATMOS_MIE_H;
-			double fMie = 4.4e-6 * exp2(-std::fmax(0, fAlt) / fEarthH);
-			return osg::Vec3d(fMie, fMie, fMie);
+			return 4.4e-6 * exp2(-std::fmax(0, fAlt) / fEarthH);
 		};
 		/**
 		* @brief 臭氧层的吸收
