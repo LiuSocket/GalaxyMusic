@@ -30,9 +30,10 @@ namespace GM
 	constexpr
 	*************************************************************************/
 
-	constexpr double ATMOS_FADE_R = 5.802e-6;		// 大气的红光散射系数
-	constexpr double ATMOS_FADE_G = 1.3558e-5; 		// 大气的绿光散射系数
-	constexpr double ATMOS_FADE_B = 3.31e-5; 		// 大气的蓝光散射系数
+	constexpr double ATMOS_BETA_R = 5.802e-6;		// 大气的红光散射系数
+	constexpr double ATMOS_BETA_G = 1.3558e-5; 		// 大气的绿光散射系数
+	constexpr double ATMOS_BETA_B = 3.31e-5; 		// 大气的蓝光散射系数
+	constexpr double ATMOS_BETA_MIE = 4e-6; 		// 大气的米氏散射系数
 
 	constexpr double ATMOS_RAYLEIGH_H = 0.14; 		// 大气的瑞丽散射标高比例
 	constexpr double ATMOS_MIE_H = 0.02; 			// 大气的米氏散射标高比例
@@ -94,7 +95,7 @@ namespace GM
 		inline float GetMinDotUL(const double& fAtmosThick, const double& fRadius) const
 		{
 			float fSinUL = fRadius / (fAtmosThick + fRadius);
-			return -sqrt(std::fmax(0.0f, 1.0f - fSinUL * fSinUL))*2;
+			return -sqrt(std::fmax(0.0f, 1.0f - fSinUL * fSinUL))*1.9;// 1.9是一个经验值，必须大于1.5
 		};
 
 	private:
@@ -131,7 +132,7 @@ namespace GM
 		{
 			// 大气密度随高度衰减，其中地球大气瑞丽散射的标高：8500m
 			double fEarthH = fAtmosThick * ATMOS_RAYLEIGH_H;
-			return osg::Vec3d(ATMOS_FADE_R, ATMOS_FADE_G, ATMOS_FADE_B) * exp2(-std::fmax(0, fAlt) / fEarthH);
+			return osg::Vec3d(ATMOS_BETA_R, ATMOS_BETA_G, ATMOS_BETA_B) * exp(-std::fmax(0, fAlt) / fEarthH);
 		};
 		/**
 		* @brief 根据“海拔高度”和“大气总厚度”，计算该位置的米氏散射系数
@@ -143,7 +144,7 @@ namespace GM
 		{
 			// 大气密度随高度衰减，其中地球大气米氏散射的标高：1200m
 			double fEarthH = fAtmosThick * ATMOS_MIE_H;
-			return 3.996e-6 * exp2(-std::fmax(0, fAlt) / fEarthH);
+			return ATMOS_BETA_MIE * exp(-std::fmax(0, fAlt) / fEarthH);
 		};
 
 		/**
@@ -181,7 +182,7 @@ namespace GM
 		{
 			// 大气密度随高度衰减，其中地球大气米氏散射的标高：1200m
 			double fEarthH = fAtmosThick * ATMOS_MIE_H;
-			return 4.4e-6 * exp2(-std::fmax(0, fAlt) / fEarthH);
+			return 4.4e-6 * exp(-std::fmax(0, fAlt) / fEarthH);
 		};
 		/**
 		* @brief 臭氧层的吸收

@@ -25,10 +25,10 @@ using namespace GM;
 Macro Defines
 *************************************************************************/
 
-#define TRANS_ALT_NUM			(128)			// 透过率图的高度采样数 [0,fAtmosThick]m
-#define TRANS_PITCH_NUM			(256)			// 透过率图的太阳俯仰角余弦值采样数 [地平线余弦值,1]
+#define TRANS_ALT_NUM			(512)			// 透过率图的高度采样数 [0,fAtmosThick]m
+#define TRANS_PITCH_NUM			(512)			// 透过率图的太阳俯仰角余弦值采样数 [地平线余弦值,1]
 
-#define IRRA_ALT_NUM			(128)			// 辐照度的高度采样数 [0,fAtmosThick]m
+#define IRRA_ALT_NUM			(256)			// 辐照度的高度采样数 [0,fAtmosThick]m
 #define IRRA_UP_NUM				(256)			// 辐照度的太阳方向与上方向的点乘采样数 [-1,1]
 
 /*************************************************************************
@@ -133,13 +133,13 @@ void CGMAtmosphere::_MakeAtmosTransmittance()
 	const int iH = TRANS_ALT_NUM;
 	const int iTransmittanceBytes = iW * iH * sizeof(float) * 3;
 
-	//int h = 3; //大气厚度
+	//int h = 2; //大气厚度
 	for (int h = 0; h < ATMOS_NUM; h++) //大气厚度	
 	{
 		double fAtmosThick = ATMOS_MIN * 1e3 * exp2(h); // 大气厚度，单位：米
 		double fDensAtmosBottom = _GetAtmosBottomDens(fAtmosThick); // 星球表面大气相对密度
 
-		//int r = 0; //星球半径
+		//int r = 1; //星球半径
 		for (int r = 0; r < RADIUS_NUM; r++) //星球半径
 		{
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
@@ -149,31 +149,32 @@ void CGMAtmosphere::_MakeAtmosTransmittance()
 			parallel_for(int(0), int(TRANS_ALT_NUM), [&](int t) // 多线程
 			//for (int t = 0; t < TRANS_ALT_NUM; t++) // 海拔高度
 			{
-				// 根据海拔高度平均分段		
-				double fEyeR = CGMKit::Mix(fSphereR + 1, fTopR - 1, t / double(TRANS_ALT_NUM));
+				// 根据海拔高度平均分段
+				double fEyeR = CGMKit::Mix(fSphereR + 1, fTopR - 1, double(t) / double(TRANS_ALT_NUM));
 				// 眼睛位置点
 				osg::Vec2d vEyePos = osg::Vec2d(0, fEyeR);
+				// 计算地平线的正弦值
+				double fSinHoriz = fSphereR / fEyeR;
+				// 计算地平线的余弦值
+				double fCosHoriz = -sqrt(max(0.0, 1.0 - fSinHoriz * fSinHoriz));
 				for (int s = 0; s < TRANS_PITCH_NUM; s++) // 上方向与太阳方向夹角余弦值
 				{
 					// 上方向与太阳方向夹角余弦，在-1.0与1.0之间的比例
-					double fCosUL = CGMKit::Mix(-1.0, 1.0, double(s+0.5) / double(TRANS_PITCH_NUM));
-					double fSinUL = sqrt(1 - fCosUL * fCosUL);
+					double fCosUL = CGMKit::Mix(-1.0, 1.0, double(s + 0.5) / double(TRANS_PITCH_NUM));
+					double fSinUL = sqrt(1.0 - fCosUL * fCosUL);
 
-					// 计算地平线的正弦值
-					double fSinHoriz = fSphereR / fEyeR;
-					// 计算地平线的余弦值
-					double fCosHoriz = -sqrt(max(0, 1 - fSinHoriz * fSinHoriz));
-
-					double fTmp = fEyeR * fSinUL;
-					// vEyePos到vTopPos的距离
-					double fLen = sqrt(fTopR * fTopR - fTmp * fTmp) - fEyeR * fCosUL;
-					// 大气层顶部位置点
-					osg::Vec2d vTopPos = osg::Vec2d(fLen * fSinUL, fEyeR + fLen * fCosUL);
-					// 地面位置点
-					osg::Vec2d vGroundPos = osg::Vec2d(fLen * fSinUL, fEyeR + fLen * fCosUL); // to do
+					double fTmp = fEyeR * fEyeR * fSinUL * fSinUL;
+					// vEyePos到vTargetPos的距离，默认为大气顶部
+					double fLen = sqrt(max(0.0, fTopR * fTopR - fTmp)) - fEyeR * fCosUL;
+					if (fCosUL < fCosHoriz)// 如果目标点在地平线下方，则计算到地面的距离
+					{
+						fLen = -fEyeR * fCosUL - sqrt(max(0.0, fSphereR * fSphereR - fTmp));
+					}
+					// 大气层顶部、地面位置点
+					osg::Vec2d vTargetPos = osg::Vec2d(fLen * fSinUL, fEyeR + fLen * fCosUL);
 
 					// 计算直射光的透过率
-					osg::Vec3d vTransmittance = _Transmittance(fDensAtmosBottom, fSphereR, fAtmosThick, vEyePos, vTopPos);
+					osg::Vec3d vTransmittance = _Transmittance(fDensAtmosBottom, fSphereR, fAtmosThick, vEyePos, vTargetPos);
 					int iAddress = TRANS_PITCH_NUM * t + s;
 					data[3 * iAddress] = float(vTransmittance.x());
 					data[3 * iAddress + 1] = float(vTransmittance.y());
@@ -196,7 +197,7 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 	const int iSurfaceNum = 512;	// 地表总采样数量
 	const int iPitchNum = 128;		// 大气采样俯仰方向数量
 	const int iYawNum = 32;			// 大气采样偏航方向数量
-	const double fStepUnit = 50;	// 采样步长，单位：米
+	const double fStepUnit = 100;	// 采样步长，单位：米
 	const int iW = IRRA_UP_NUM;
 	const int iH = IRRA_ALT_NUM;
 	const int iIrradianceBytes = iW * iH * sizeof(float) * 3;
@@ -204,14 +205,14 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 	// 假设到达地球的太阳光单位面积上能量为 1
 	// 也就是说底面积为1，长度为大气厚度(H)的圆柱体上，每个单位体积内分配的能量只有（1/ H）
 
-	int h = 2; //大气厚度
-	//for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
+	//int h = 2; //大气厚度
+	for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
 	{
 		double fAtmosThick = ATMOS_MIN * 1e3 * exp2(h);				// 大气厚度，单位：米
 		double fDensAtmosBottom = _GetAtmosBottomDens(fAtmosThick);		// 星球表面大气密度
 
-		for (int r = 1; r < 2; r++) //星球半径
-		//for (int r = 0; r < RADIUS_NUM; r++) //星球半径
+		//for (int r = 1; r < 2; r++) //星球半径
+		for (int r = 0; r < RADIUS_NUM; r++) //星球半径
 		{
 			float* data = new float[iIrradianceBytes];
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
@@ -284,31 +285,21 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 						{
 							// 如果有漫反射，则获取地表的漫反射光强度
 							osg::Vec4d vD = CGMKit::GetImageColor(pTransImg.get(),
-								fCosNorm2Sun,
+								fCosNorm2Sun * 0.5 + 0.5,
 								0.0f,
 								true);
 							vD *= fCosNorm2Sun * (1 - fCosAngle);
 
 							// 眼点处的漫反射光线方向衰减
 							osg::Vec4 vEyeT = CGMKit::GetImageColor(pTransImg.get(),
-								(fCosAngle - fCosHoriz) / max(0, 1 - fCosHoriz),
+								0.5 - 0.5 * fCosAngle,
 								float(t) / IRRA_ALT_NUM,
 								true);
 
-							// 漫反射光方向
-							osg::Vec3d vDiffuseDir = osg::Vec3d(0, fSinAngle, fCosAngle);
-							// 漫反射光线与地面法线的余弦值
-							double fCosDiffuse2Norm = vDiffuseDir * vGroundNorm;
-							// 地表的漫反射光线方向衰减
-							osg::Vec4 vGroundT = CGMKit::GetImageColor(pTransImg.get(),
-								fCosDiffuse2Norm,
-								0.0f,
-								true);
-
 							// 漫反射光还会被大气再吸收
-							vD.x() *= vGroundT.x() / max(1e-20, vEyeT.x());
-							vD.y() *= vGroundT.y() / max(1e-20, vEyeT.y());
-							vD.z() *= vGroundT.z() / max(1e-20, vEyeT.z());
+							vD.x() *= vEyeT.x();
+							vD.y() *= vEyeT.y();
+							vD.z() *= vEyeT.z();
 							vAlbedo += osg::Vec3(vD.x(), vD.y(), vD.z());
 						}
 					}
@@ -369,11 +360,13 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 								double fSinHoriz_Source = fSphereR / fIrraR;
 								// 散射点看到的地平线的余弦值
 								double fCosHoriz_Source = -sqrt(max(0, 1 - fSinHoriz_Source * fSinHoriz_Source));
+								double fCosIUL = vIrraUp * vSun;
 								// 在眼点周围随机采样太阳直射光
 								osg::Vec4d vSunLight = CGMKit::GetImageColor(pTransImg.get(),
-									(vIrraUp * vSun - fCosHoriz_Source) / max(0, 1 - fCosHoriz_Source),
+									fCosIUL * 0.5 + 0.5,
 									fIrraAltCoord,
 									true);
+								if(fCosHoriz_Source > fCosIUL) vSunLight = osg::Vec4d(0, 0, 0, 0);
 
 								double fCosIL = vIrraDir * vSun;
 								double fMieCoef = _MieCoefficient(fIrraAlt, fAtmosThick);
@@ -390,11 +383,10 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 								double fAA = fSampleNum / int(fSampleNum + 1);
 								vIrraTmp += vI * fAA;
 							}
-							// 眼点接收到的散射光方向的余弦
-							double fIrraCos_Eye = vIrraDir.z();
+
 							// 眼点的散射光方向衰减
 							osg::Vec4d vEyeT = CGMKit::GetImageColor(pTransImg.get(),
-								max(0, fIrraCos_Eye - fCosHoriz) / (1 - fCosHoriz),
+								0.5 - 0.5 * vIrraDir.z(),
 								float(t) / IRRA_ALT_NUM,
 								true);
 							// 多重散射的光传播到眼点，会被大气再吸收
@@ -407,7 +399,7 @@ void CGMAtmosphere::_MakeAtmosIrradiance()
 					}
 					vIrradiance /= double(iPitchNum * iYawNum);
 
-					osg::Vec3d vSumColor = (vAlbedo + vIrradiance) * 1.5e7 * fmin(1.0, fDensAtmosBottom);
+					osg::Vec3d vSumColor = (vAlbedo + vIrradiance) * 4.5e6 * fmin(1.0, fDensAtmosBottom);
 					int iAddress = IRRA_UP_NUM * t + s;
 					data[3 * iAddress] = float(vSumColor.x());
 					data[3 * iAddress + 1] = float(vSumColor.y());
@@ -435,22 +427,21 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 
 		从眼点向四周发射光线，计算大气内的光线传播情况，得到内散射值
 	*/
-
 	const int iAtmosImageBytes = 4 * sizeof(float)
 		* SCAT_PITCH_NUM * SCAT_LIGHT_NUM * SCAT_COS_NUM * SCAT_ALT_NUM;
 
-	//std::string strTransmittancePath = m_pConfigData->strCorePath + "Textures/Sphere/Transmittance/Transmittance_";
+	std::string strTransmittancePath = m_pConfigData->strCorePath + "Textures/Sphere/Transmittance/Transmittance_";
 	std::string strIrradiancePath = m_pConfigData->strCorePath + "Textures/Sphere/Irradiance/Irradiance_";
 
-	int h = 2; //大气厚度
-	//for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
+	//int h = 2; //大气厚度
+	for (int h = 0; h < ATMOS_NUM; h++) //大气厚度
 	{
 		double fAtmosThick = ATMOS_MIN * 1e3 * exp2(h);				// 大气厚度，单位：米
 		double fDensAtmosBottom = _GetAtmosBottomDens(fAtmosThick);		// 星球表面大气密度
-		double STEP_UNIT = 20 * exp2(h); // 采样步长
+		double STEP_UNIT = 5 * exp2(h); // 采样步长，单位：米，5是一个经验值，可以调整，在20以内效果没啥变化
 
-		for (int r = 1; r < 2; r++) //  星球半径
-		//for (int r = 0; r < RADIUS_NUM; r++) //星球半径
+		//for (int r = 1; r < 2; r++) //  星球半径
+		for (int r = 0; r < RADIUS_NUM; r++) //星球半径
 		{
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
 			double fTopR = fSphereR + fAtmosThick;
@@ -458,9 +449,9 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 			double fTopR2 = fTopR * fTopR;
 			double fMinDotUL = GetMinDotUL(fAtmosThick, fSphereR);
 
-			//osg::ref_ptr<osg::Image> pTransImg = osgDB::readImageFile(strTransmittancePath
-			//	+ std::to_string(int(fAtmosThick*1e-3)) + "_" + std::to_string(int(fSphereR*1e-3)) + ".tif");
-			//if (!pTransImg.valid()) break;
+			osg::ref_ptr<osg::Image> pTransImg = osgDB::readImageFile(strTransmittancePath
+				+ std::to_string(int(fAtmosThick*1e-3)) + "_" + std::to_string(int(fSphereR*1e-3)) + ".tif");
+			if (!pTransImg.valid()) break;
 
 			osg::ref_ptr<osg::Image> pIrraImg = osgDB::readImageFile(strIrradiancePath
 				+ std::to_string(int(fAtmosThick * 1e-3)) + "_" + std::to_string(int(fSphereR * 1e-3)) + ".tif");
@@ -488,7 +479,8 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 					// fRatioS 代表 d0/dH
 					double fRatioS = 1 - double(s) / double(SCAT_PITCH_NUM - 1);
 					// 必须取到比1.0小一点点的值，保证天顶位置不突变
-					fRatioS = min(fRatioS, 0.99999);
+					fRatioS = osg::clampTo(fRatioS, 0.0, 0.99999);
+
 					// 计算地平线（或者地平线后面天空的）最远距离
 					// Eye到地平线的距离
 					double fDisEye2Horizon = sqrt(fEyeR2 - fSphereR2);
@@ -497,13 +489,6 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 					// Eye到地平线后面的大气顶端的距离
 					double fDisEye2Top = fDisEye2Horizon + fDisHorizon2Top;
 
-					// 光线末端距离（大气顶部）
-					double fDisMax = CGMKit::Mix(fDisEye2Top, max(0.0, fTopR - fEyeR), fRatioS);
-					// 光线与上方向夹角余弦值（射向大气）
-					double fCosUV = -(fEyeR2 + fDisMax * fDisMax - fTopR2) / (2 * fEyeR * fDisMax);
-					double fSinUV = sqrt(1 - fCosUV * fCosUV);
-					double fSampleNum = fDisMax / STEP_UNIT;
-
 					for (int y = 0; y < SCAT_LIGHT_NUM; y++) // 上方向与太阳方向夹角余弦值
 					{
 						// 小于 fMinDotUL 就不计算，提高纹理利用率
@@ -511,6 +496,13 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 						double fSinUL = sqrt(1 - fCosUL * fCosUL);
 						for (int x = 0; x < SCAT_COS_NUM; x++) // 光线与太阳夹角的余弦值
 						{
+							// 光线末端距离（大气顶部）
+							double fDisMax = CGMKit::Mix(fDisEye2Top, max(0.0, fTopR - fEyeR), fRatioS);
+							// 光线与上方向夹角余弦值（射向大气）
+							double fCosUV = -(fEyeR2 + fDisMax * fDisMax - fTopR2) / (2 * fEyeR * fDisMax);
+							double fSinUV = sqrt(1 - fCosUV * fCosUV);
+							double fSampleNum = fDisMax / STEP_UNIT;
+
 							// 首先定义local坐标系：
 							// 人朝着太阳站在地平面上，脸正面是Y轴，右手是X轴，头顶是Z轴，地心是原点
 
@@ -549,16 +541,15 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 									fStepAltCoord,
 									true);
 
-								//// 计算地平线的正弦值
-								//double fSinHoriz = fSphereR / fStepR;
-								//// 地平线的余弦值
-								//double fCosHoriz = -sqrt(max(0, 1 - fSinHoriz * fSinHoriz));
-								//// 每一步的透射率
-								//osg::Vec4d vTrans = CGMKit::GetImageColor(pTransImg.get(),
-								//	max(0.0, fStepCosUL - fCosHoriz) / max(0.0, 1.0 - fCosHoriz),
-								//	fStepAltCoord,
-								//	true);
-
+								// 每一步的透射率
+								osg::Vec4d vTrans = CGMKit::GetImageColor(pTransImg.get(),
+									fStepCosUL * 0.5 + 0.5,
+									fStepAltCoord,
+									true);
+								vI.x() *= vTrans.x();
+								vI.y() *= vTrans.y();
+								vI.z() *= vTrans.z();
+								
 								// 避免锯齿
 								vStepCoef *= fSampleNum / int(fSampleNum + 1);
 
@@ -599,7 +590,7 @@ osg::Vec3d CGMAtmosphere::_Transmittance(const double& fAtmosDens,
 	const int iLoop = 1024;
 	osg::Vec2d vDir = vP1 - vP0;
 	double fLen = vDir.normalize();
-	double fStepLen = fLen / iLoop;
+	double fStepLen = fLen / double(iLoop);
 	osg::Vec3d vSum = osg::Vec3d(0, 0, 0);
 	osg::Vec2d vStepPos = vP0 + vDir * fStepLen * 0.5;
 
@@ -612,9 +603,9 @@ osg::Vec3d CGMAtmosphere::_Transmittance(const double& fAtmosDens,
 		osg::Vec3d vAbsorption = _OzoneAbsorption(fAlt, fAtmosThick) + osg::Vec3d(fMieAbsorp, fMieAbsorp, fMieAbsorp);
 		osg::Vec3d vExtinction = vScattering + vAbsorption;
 
-		vSum += vExtinction * fStepLen;
+		vSum += vExtinction;
 		vStepPos += vDir * fStepLen;
 	}
-	vSum *= fAtmosDens;
+	vSum *= fAtmosDens * fStepLen;
 	return osg::Vec3d(std::exp(-vSum.x()), std::exp(-vSum.y()), std::exp(-vSum.z()));
 }

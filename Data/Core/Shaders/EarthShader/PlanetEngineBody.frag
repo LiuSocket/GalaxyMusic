@@ -24,8 +24,9 @@ void main()
 	float vertAlt = alt2Bottom + bottomAlt; // meter
 
 	float illumAlt = clamp(alt2Bottom*1e-4,0,1);
-	vec3 streamLight = vec3(0.0,0.4,0.6)*(illumAlt*engineIntensity);
+	vec3 streamLight = vec3(0.0,0.08,0.16)*(illumAlt*engineIntensity);
 	vec4 baseColor = texture(baseColorTex, gl_TexCoord[0].xy);
+	baseColor.rgb *= baseColor.rgb;
 	vec4 color = vec4(max(streamLight,vec3(diffuse))*baseColor.rgb, baseColor.a);
 	color.a -= clamp(1-(maxDistance-lenV)/(0.9*maxDistance), 0, 1);
 	// building progress
@@ -39,6 +40,7 @@ void main()
 		color.rgb = mix(color.rgb, tailColor.rgb, tailColor.a);
 	}
 
-	gl_FragColor = vec4(ToneMapping(color.rgb), color.a);
+	color.rgb = ToneMapping(color.rgb);
+	gl_FragColor = vec4(pow(color.rgb,vec3(1.0/2.2)), color.a);
 }
 #endif // EARTH

@@ -185,15 +185,14 @@ void main()
 	}
 
 	float dotVS = dot(viewDir, viewLight);
-	const vec3 sunColor = vec3(1.0,0.8,0.6);
-	vec3 atmosSum = (inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS))*sunColor;
+	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS);
 
 #ifdef EARTH
 #else // not EARTH
 	atmosSum = (atmosColorMatrix*vec4(atmosSum,1)).rgb;
 #endif // EARTH
 	vec3 color = ToneMapping(atmosSum * (1 - shadow));
-	float alpha = 1-exp2(-(atmosSum.r+atmosSum.g+atmosSum.b)*20);
+	float alpha = 1-exp2(-(atmosSum.r+atmosSum.g+atmosSum.b)*60);
 	alpha *= 1 - shadow;
-	gl_FragColor = vec4(color, alpha);
+	gl_FragColor = vec4(pow(color,vec3(1.0/2.2)), alpha);
 }

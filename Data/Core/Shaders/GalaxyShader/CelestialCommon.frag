@@ -192,8 +192,7 @@ vec3 AtmosColor(float vertAlt, vec3 viewDir, vec3 viewVertUp, float Rg)
 	}
 
 	float dotVS = dot(viewDir, viewLight);
-	const vec3 sunColor = vec3(1.0,0.8,0.6);
-	vec3 atmosSum = (inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS))*sunColor;
+	vec3 atmosSum = inscattering.rgb*RayleighPhase(dotVS) + inscattering.a*MiePhase(dotVS);
 
 #ifdef EARTH
 #else // not EARTH

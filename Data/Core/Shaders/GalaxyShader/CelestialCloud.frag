@@ -45,6 +45,7 @@ void main()
 	cloudCoord.xy = (cloudCoord.xy - 0.5)*celestialCoordScale.y + 0.5;
 	
 	vec4 baseColor = texture(cloudTex, cloudCoord);
+	baseColor.rgb *= baseColor.rgb;
 #ifdef EARTH
 #ifdef WANDERING
 	vec3 illumCoord = texCoord_1;
@@ -56,7 +57,7 @@ void main()
 	vec4 wanderingColor = texture(cloudTex, wanderingCloudCoord);
 	float wanderingCloud = max(0, min(wanderingColor.a, 1-illum.a*illum.a*1.5));
 
-	float torqueArea = clamp((0.3-abs(texCoord_0.y*2-1))*4,0,1); torqueArea *= torqueArea;
+	float torqueArea = clamp((0.3-abs(texCoord_0.y*2-1))*2,0,1); torqueArea *= torqueArea;
 	// for start
 	float lon = abs(fract(texCoord_0.x-0.25)*2-1);
 	lon = (engineStartRatio.z > 0.5) ? lon : 1-lon;
@@ -89,7 +90,7 @@ void main()
 	const float minFact = 1e-8;
 	float dotVUL = dot(viewVertUp, viewLight);
 	vec3 diffuse = vec3(max(dotVUL+0.01,minFact));
-	vec3 color = baseColor.rgb * (0.03+diffuse);
+	vec3 color = baseColor.rgb * (0.001+diffuse);
 
 	float shadow = 0;
 #ifdef SATURN
@@ -103,10 +104,10 @@ void main()
 #endif // SATURN
 
 #ifdef EARTH
-	color = 0.05 + diffuse;
+	color = 0.002 + diffuse;
 #ifdef WANDERING
-	vec3 ambient = vec3(0.07,0.11,0.15)*allEngineStart;
-	color = 0.05 + ambient + diffuse;
+	vec3 ambient = vec3(0.04,0.05,0.07)*allEngineStart;
+	color = 0.002 + ambient + diffuse;
 	vec3 illumEngine = allEngineStart*(1-exp2(-illum.a*vec3(0.1,0.2,0.3)));
 	color += illumEngine;
 #endif // WANDERING
@@ -129,5 +130,5 @@ void main()
 	}
 #endif // WANDERING
 #endif // EARTH
-	gl_FragColor = vec4(color, alpha);
+	gl_FragColor = vec4(pow(color,vec3(1.0/2.2)), alpha);
 }

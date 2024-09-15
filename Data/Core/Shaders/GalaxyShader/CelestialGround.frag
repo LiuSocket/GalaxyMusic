@@ -51,13 +51,14 @@ void main()
 	baseCoord.xy = (baseCoord.xy - 0.5)*celestialCoordScale.x + 0.5;
 
 	vec4 baseColor = texture(baseTex, baseCoord);
+	baseColor.rgb *= baseColor.rgb;
 	vec3 viewVertUp = normalize(viewNormal);
 	vec3 viewDir = normalize(viewPos.xyz);
 
 	const float minFact = 1e-8;
 	float dotVUL = dot(viewVertUp, viewLight);
 	vec3 diffuse = vec3(max(dotVUL,minFact));
-	vec3 color = baseColor.rgb * (0.02+diffuse);
+	vec3 color = baseColor.rgb * (0.002+diffuse);
 
 	float vertAlt = 0.0; // meter
 
@@ -65,7 +66,7 @@ void main()
 	vec3 illumCoord = texCoord_1;
 	illumCoord.xy = (illumCoord.xy - 0.5)*celestialCoordScale.z + 0.5;
 	vec4 illum = texture(illumTex, illumCoord);
-	vec3 darkness = 1-smoothstep(0.0, 0.1, diffuse);
+	vec3 darkness = 0.05*(1-smoothstep(0.0, 0.1, diffuse));
 	vec3 illumCity = illum.rgb*darkness;
 	float rockMask = 1 - baseColor.a;
 
@@ -92,7 +93,7 @@ void main()
 	float engineStart = max(
 		smoothstep(0.0, 0.2, (texCoord_0.y-1)*2+engineStartRatio.y)*exp2(min(0,texCoord_0.y-0.67)*40),
 		smoothstep(0.0, 0.2, clamp(2*engineStartRatio.x-lon,0,1)*torqueArea)*exp2(-abs(texCoord_0.y-0.5)*25));
-	vec3 ambient = vec3(0.07,0.11,0.15)*engineStart;
+	vec3 ambient = vec3(0.04,0.05,0.07)*engineStart;
 
 	float latCoord = texCoord_0.y*2-1;
 	float seaLevel = SeaLevel(latCoord, seaLevelAddProgress);
@@ -102,15 +103,16 @@ void main()
 	illumCity = max((0.2+0.04*baseColor.rgb)*darkness*engineMask,
 		rockMask*(illumCity - seaLevelAddProgress));
 
-	color = mix(vec3(0.0,0.1,0.0), baseColor.rgb, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));
-	color *= 0.05 + ambient + diffuse;
+	color = baseColor.rgb*clamp(elev2Sea*0.01, 1-0.7*seaLevelAddProgress, 1.0);
+	color = mix(vec3(0.0,0.1,0.0), color, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));
+	color *= 0.01 + ambient + diffuse;
 
 	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-elev2Sea*0.015, 0)))*clamp(-elev2Sea*0.01, 0, 1);
-	vec3 oceanColor = mix(vec3(0.06,0.13,0.2), vec3(0.2,0.3,0.3), seaLevelAddProgress*exp2(min(0, elev2Sea)*0.01));
+	vec3 oceanColor = mix(vec3(0.01,0.03,0.06), vec3(0.05,0.15,0.15), seaLevelAddProgress*exp2(min(0, elev2Sea)*0.01));
 	oceanColor = oceanColor*(ambient + diffuse) + specualr;
 #else // not WANDERING
 	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-vertAlt*0.015, 0)));
-	vec3 oceanColor = vec3(0.1,0.14,0.3)*diffuse + specualr;
+	vec3 oceanColor = vec3(0.01,0.03,0.06)*diffuse + specualr;
 #endif // WANDERING	or not
 	color = mix(oceanColor, color, rockMask);
 #endif // EARTH
@@ -143,5 +145,5 @@ void main()
 #endif // WANDERING
 #endif // EARTH
 
-	gl_FragColor = vec4(color, 1);
+	gl_FragColor = vec4(pow(color,vec3(1.0/2.2)), 1);
 }
