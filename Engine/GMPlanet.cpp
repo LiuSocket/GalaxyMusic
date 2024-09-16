@@ -25,17 +25,6 @@ using namespace GM;
 Macro Defines
 *************************************************************************/
 
-#define TRANS_ALT_NUM			(128)			// 透过率图的高度采样数 [0,fAtmosThick]m
-#define TRANS_PITCH_NUM			(256)			// 透过率图的太阳俯仰角余弦值采样数 [地平线余弦值,1]
-
-#define IRRA_ALT_NUM			(128)			// 辐照度的高度采样数 [0,fAtmosThick]m
-#define IRRA_UP_NUM				(128)			// 辐照度的太阳方向与上方向的点乘采样数 [-1,1]
-
-#define SCAT_COS_NUM			(32)			// 散射图的太阳方向与视线方向的点乘采样数 [-1,1]
-#define SCAT_LIGHT_NUM			(16)			// 散射图的太阳方向与上方向的点乘采样数 [-1,1]
-#define SCAT_PITCH_NUM			(256)			// 散射图的俯仰方向与上方向的点乘采样数 [-1,1]
-#define SCAT_ALT_NUM			(16)			// 散射图的大气点高度采样数 [0,fAtmosThick]m
-
 /*************************************************************************
 CGMPlanet Methods
 *************************************************************************/

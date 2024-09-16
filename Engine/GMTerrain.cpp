@@ -31,11 +31,7 @@ CGMTerrain Methods
 *************************************************************************/
 
 /** @brief 构造 */
-CGMTerrain::CGMTerrain() :
-	m_pKernelData(nullptr), m_pConfigData(nullptr), m_pCommonUniform(nullptr),
-	m_strGalaxyShaderPath("Shaders/GalaxyShader/"),
-	m_strTerrainShaderPath("Shaders/TerrainShader/"),
-	m_pCelestialScaleVisitor(nullptr)
+CGMTerrain::CGMTerrain()
 {
 	m_pCelestialScaleVisitor = new CGMCelestialScaleVisitor();
 }
@@ -179,7 +175,8 @@ bool CGMTerrain::_CreateTerrain_1()
 {
 	for (int j = 0; j < 2; j++)
 	{
-		// 0: 赤道，1: 极地
+		// 0: 赤道，1: 极地，每个地形块分为4个四分之一地形块，总共需要4个赤道和4个极地
+		// 同时看到的地形块最多4个，可以有三种组合：4赤道，2赤道+2极地，4极地
 		bool bPolar = (1 == j);
 		for (int i = 0; i < 4; i++)
 		{
@@ -253,7 +250,7 @@ osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int 
 			float fLat = asin(vDir.z());// 弧度 [-PI/2, PI/2]
 
 			verts->push_back(vDir);
-			// 0层纹理单元 xy = 六面体贴图UV，[0.0, 1.0];
+			// 0层纹理单元 xy = 六面体贴图UV，[0.0, 1.0]；z= 纬度，[-PI/2, PI/2];
 			coords0->push_back(osg::Vec3(float(x) / float(iSegment), float(y) / float(iSegment), fLat));
 			normals->push_back(vDir);
 			if (x < iSegment && y < iSegment)

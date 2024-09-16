@@ -25,19 +25,13 @@ using namespace GM;
 Macro Defines
 *************************************************************************/
 
-#define TRANS_ALT_NUM			(512)			// 透过率图的高度采样数 [0,fAtmosThick]m
-#define TRANS_PITCH_NUM			(512)			// 透过率图的太阳俯仰角余弦值采样数 [地平线余弦值,1]
-
-#define IRRA_ALT_NUM			(256)			// 辐照度的高度采样数 [0,fAtmosThick]m
-#define IRRA_UP_NUM				(256)			// 辐照度的太阳方向与上方向的点乘采样数 [-1,1]
-
 /*************************************************************************
 constexpr
 *************************************************************************/
 
 constexpr int ATMOS_NUM = 4;					// 大气厚度分类数
 constexpr int RADIUS_NUM = 4;					// 星球半径分类数
-constexpr double ATMOS_2_RADIUS = 0.02;			// 大气厚度转星球半径时的转换系数
+constexpr double ATMOS_2_RADIUS = 0.01875;		// 大气厚度转星球半径时的转换系数
 
 /*************************************************************************
 Class
@@ -144,13 +138,14 @@ void CGMAtmosphere::_MakeAtmosTransmittance()
 		{
 			double fSphereR = (fAtmosThick / ATMOS_2_RADIUS) * exp2(r); //星球半径，单位：米
 			double fTopR = fSphereR + fAtmosThick;
+			double fTopRL = fTopR + 1000;
 			float* data = new float[iTransmittanceBytes];
 
 			parallel_for(int(0), int(TRANS_ALT_NUM), [&](int t) // 多线程
 			//for (int t = 0; t < TRANS_ALT_NUM; t++) // 海拔高度
 			{
 				// 根据海拔高度平均分段
-				double fEyeR = CGMKit::Mix(fSphereR + 1, fTopR - 1, double(t) / double(TRANS_ALT_NUM));
+				double fEyeR = CGMKit::Mix(fSphereR + 1, fTopR, double(t) / double(TRANS_ALT_NUM));
 				// 眼睛位置点
 				osg::Vec2d vEyePos = osg::Vec2d(0, fEyeR);
 				// 计算地平线的正弦值
@@ -165,7 +160,7 @@ void CGMAtmosphere::_MakeAtmosTransmittance()
 
 					double fTmp = fEyeR * fEyeR * fSinUL * fSinUL;
 					// vEyePos到vTargetPos的距离，默认为大气顶部
-					double fLen = sqrt(max(0.0, fTopR * fTopR - fTmp)) - fEyeR * fCosUL;
+					double fLen = sqrt(max(0.0, fTopRL * fTopRL - fTmp)) - fEyeR * fCosUL;
 					if (fCosUL < fCosHoriz)// 如果目标点在地平线下方，则计算到地面的距离
 					{
 						fLen = -fEyeR * fCosUL - sqrt(max(0.0, fSphereR * fSphereR - fTmp));
@@ -438,7 +433,7 @@ void CGMAtmosphere::_MakeAtmosInscattering()
 	{
 		double fAtmosThick = ATMOS_MIN * 1e3 * exp2(h);				// 大气厚度，单位：米
 		double fDensAtmosBottom = _GetAtmosBottomDens(fAtmosThick);		// 星球表面大气密度
-		double STEP_UNIT = 5 * exp2(h); // 采样步长，单位：米，5是一个经验值，可以调整，在20以内效果没啥变化
+		double STEP_UNIT = 20 * exp2(h); // 采样步长，单位：米，20是一个经验值，可以调整，在20以内效果没啥变化
 
 		//for (int r = 1; r < 2; r++) //  星球半径
 		for (int r = 0; r < RADIUS_NUM; r++) //星球半径

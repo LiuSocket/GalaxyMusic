@@ -87,13 +87,12 @@ vec4 Texture4D(vec4 coord)
 	const float ALT_NUM = 32.0;
 	const float MIN_Z = 0.5/8.0;
 	float coordYaw = clamp(coord.z, MIN_Z, 1-MIN_Z);
-	float altI = coord.w*ALT_NUM;
-	vec3 UVW_0 = vec3(coord.xy, (min(floor(altI), ALT_NUM - 1) + coordYaw)/ALT_NUM);
-	vec3 UVW_1 = vec3(coord.xy, (min(ceil(altI), ALT_NUM - 1) + coordYaw)/ALT_NUM);
-	vec4 color_0 = texture(inscatteringTex, UVW_0);
-	vec4 color_1 = texture(inscatteringTex, UVW_1);
-
-	return mix(color_0, color_1, fract(altI));
+	float altI = coord.w*(ALT_NUM - 1);
+	float altFloorI = floor(altI);
+	vec4 color_0 = texture(inscatteringTex, vec3(coord.xy, (min(altFloorI, ALT_NUM - 1) + coordYaw)/ALT_NUM));
+	vec4 color_1 = texture(inscatteringTex, vec3(coord.xy, (min(altFloorI+1, ALT_NUM - 1) + coordYaw)/ALT_NUM));
+	
+	return mix(color_0, color_1, altI-altFloorI);
 }
 
 // vertAlt, and Rg are all in meter

@@ -38,7 +38,7 @@ namespace GM
 
 			osg::Vec2Array* pV2Coord0 = dynamic_cast<osg::Vec2Array*>(geom.getTexCoordArray(0));
 			osg::Vec3Array* pV3Coord0 = nullptr;
-			bool bQuator = false;// 默认不是四分之一地形块
+			bool bQuator = false;// 默认不是四分之一地形块，而是全球地形块
 			if (!pV2Coord0)
 			{
 				// 如果0号纹理单元不是二维纹理坐标，那么就是三维纹理坐标
@@ -52,12 +52,15 @@ namespace GM
 			{
 				// 原始球面上的位置转经纬度
 				double fLat,fLon;
-				if (bQuator) // to do
+				if (bQuator) // 四分之一地形块，分为极地和赤道两种情况
 				{
-					fLat = asin(pV3Coord0->at(i).z());
-					fLon = atan2(pV3Coord0->at(i).y(), pV3Coord0->at(i).x());
+					// 0层纹理单元 xy = 六面体贴图UV，[0.0, 1.0]；z= 纬度，[-PI/2, PI/2];
+					fLat = pV3Coord0->at(i).z();
+					osg::Vec2d v2 = osg::Vec2d(pV3Coord0->at(i).x(), pV3Coord0->at(i).y());
+					v2.normalize();
+					fLon = atan2(v2.y(), v2.x());
 				}
-				else
+				else // 全球地形块
 				{
 					fLat = (pV2Coord0->at(i).y() - 0.5) * osg::PI;
 					fLon = (pV2Coord0->at(i).x() - 0.5) * osg::PI * 2;

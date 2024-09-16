@@ -102,16 +102,17 @@ namespace GM
 
 		// 变量
 	private:
-		SGMKernelData*								m_pKernelData;					//!< 内核数据
-		SGMConfigData*								m_pConfigData;					//!< 配置数据
-		CGMCommonUniform*							m_pCommonUniform;				//!< 公共Uniform
+		SGMKernelData*		m_pKernelData = nullptr;		//!< 内核数据
+		SGMConfigData*		m_pConfigData = nullptr;		//!< 配置数据
+		CGMCommonUniform*	m_pCommonUniform = nullptr;		//!< 公共Uniform
+
+		std::string m_strGalaxyShaderPath = "Shaders/GalaxyShader/";			//!< galaxy shader 路径
+		std::string m_strTerrainShaderPath = "Shaders/TerrainShader/";			//!< Terrain shader 路径
+
 		std::vector<osg::ref_ptr<osg::Group>>		m_pHieTerrainRootVector;		//!< 01空间层级的根节点
-
-		std::string									m_strGalaxyShaderPath;			//!< galaxy shader 路径
-		std::string									m_strTerrainShaderPath;			//!< Terrain shader 路径
-
 		std::vector<osg::ref_ptr<osg::Transform>>	m_pTerrainPolarTransVec;		//!< 四分之一面的极地节点vector
 		std::vector<osg::ref_ptr<osg::Transform>>	m_pTerrainEquatorTransVec;		//!< 四分之一面的赤道节点vector
-		CGMCelestialScaleVisitor*					m_pCelestialScaleVisitor;		//!< 用于控制天体大小
+
+		CGMCelestialScaleVisitor*	m_pCelestialScaleVisitor = nullptr;		//!< 用于控制天体大小
 	};
 }	// GM

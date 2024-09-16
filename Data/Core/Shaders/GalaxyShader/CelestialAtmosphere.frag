@@ -75,13 +75,12 @@ vec4 Texture4D(vec4 coord)
 	const float ALT_NUM = 32.0;
 	const float MIN_Z = 0.5/8.0;
 	float coordYaw = clamp(coord.z, MIN_Z, 1-MIN_Z);
-	float altI = coord.w*ALT_NUM;
-	vec3 UVW_0 = vec3(coord.xy, (min(floor(altI), ALT_NUM - 1) + coordYaw)/ALT_NUM);
-	vec3 UVW_1 = vec3(coord.xy, (min(ceil(altI), ALT_NUM - 1) + coordYaw)/ALT_NUM);
-	vec4 color_0 = texture(inscatteringTex, UVW_0);
-	vec4 color_1 = texture(inscatteringTex, UVW_1);
+	float altI = coord.w*(ALT_NUM - 1);
+	float altFloorI = floor(altI);
+	vec4 color_0 = texture(inscatteringTex, vec3(coord.xy, (min(altFloorI, ALT_NUM - 1) + coordYaw)/ALT_NUM));
+	vec4 color_1 = texture(inscatteringTex, vec3(coord.xy, (min(altFloorI+1, ALT_NUM - 1) + coordYaw)/ALT_NUM));
 	
-	return mix(color_0, color_1, fract(altI));
+	return mix(color_0, color_1, altI-altFloorI);
 }
 
 // rE = radius of Equator
@@ -125,6 +124,16 @@ void main()
 	float Rt2 = Rt*Rt;
 	float lenHorizonMax = sqrt(Rt2 - Rg2);
 
+	vec3 viewLightRightDir = normalize(cross(viewLight, viewUp));
+	vec3 viewLightFrontDir = normalize(cross(viewUp, viewLightRightDir));
+	mat3 localLight2ViewMatrix = mat3(
+		viewLightRightDir.x,	viewLightRightDir.y,	viewLightRightDir.z,
+		viewLightFrontDir.x,	viewLightFrontDir.y,	viewLightFrontDir.z,
+		viewUp.x,				viewUp.y,				viewUp.z);
+	mat3 view2LocalLightMatrix = inverse(localLight2ViewMatrix);
+	vec3 localLightSpaceViewDir = view2LocalLightMatrix*viewDir;
+	float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
+
 	vec4 inscattering = vec4(0);
 	if(eyeAltitude < atmosHeight)
 	{
@@ -133,16 +142,6 @@ void main()
 		float sinUV2 = max(0, 1-cosUV*cosUV);
 		// cosUL = cos of viewUp & light
 		float cosUL = dot(viewUp, viewLight);
-
-		vec3 viewLightRightDir = normalize(cross(viewLight, viewUp));
-		vec3 viewLightFrontDir = normalize(cross(viewUp, viewLightRightDir));
-		mat3 localLight2ViewMatrix = mat3(
-			viewLightRightDir.x,	viewLightRightDir.y,	viewLightRightDir.z,
-			viewLightFrontDir.x,	viewLightFrontDir.y,	viewLightFrontDir.z,
-			viewUp.x,				viewUp.y,				viewUp.z);
-		mat3 view2LocalLightMatrix = inverse(localLight2ViewMatrix);
-		vec3 localLightSpaceViewDir = view2LocalLightMatrix*viewDir;
-		float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
 
 		float lenEye2Atmos = signDisEye2Mid + sqrt(max(0.0, Rt2 - Rc2*sinUV2));
 		float lenEye2Top = max(0.0, atmosHeight - eyeAltitude);
@@ -166,16 +165,6 @@ void main()
 		vec3 viewNearUp = normalize(viewCore2NearPos);
 		// cosNUL = viewUp at near atmosphere pos & light
 		float cosNUL = dot(viewNearUp, viewLight);
-
-		vec3 viewLightRightDir = normalize(cross(viewLight, viewNearUp));
-		vec3 viewLightFrontDir = normalize(cross(viewNearUp, viewLightRightDir));
-		mat3 localLight2ViewMatrix = mat3(
-			viewLightRightDir.x,	viewLightRightDir.y,	viewLightRightDir.z,
-			viewLightFrontDir.x,	viewLightFrontDir.y,	viewLightFrontDir.z,
-			viewNearUp.x,			viewNearUp.y,			viewNearUp.z);
-		mat3 view2LocalLightMatrix = inverse(localLight2ViewMatrix);
-		vec3 localLightSpaceViewDir = view2LocalLightMatrix*viewDir;
-		float coordYaw = acos(localLightSpaceViewDir.y)/M_PI;
 
 		inscattering = Texture4D(vec4(
 			GetCoordPitch(2*lenMid2Near, 0.0, 2*lenHorizonMax),

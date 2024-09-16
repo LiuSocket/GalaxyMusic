@@ -121,7 +121,7 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 	// 云的细节纹理
 	m_pCloudDetailTex = _CreateDDSTexture(strVolumeTexPath + "CloudDetail.dds", osg::Texture::REPEAT, osg::Texture::REPEAT);
 	// 散射三维纹理
-	osg::ref_ptr <osg::Image> pImg = osgDB::readImageFile(strSphereTexPath + "Inscattering/Inscattering_64_6400.raw");
+	osg::ref_ptr <osg::Image> pImg = osgDB::readImageFile(strSphereTexPath + "Inscattering/Inscattering_60_6400.raw");
 	if (pImg.valid())
 	{
 		pImg->setImage(SCAT_PITCH_NUM, SCAT_LIGHT_NUM, SCAT_COS_NUM * SCAT_ALT_NUM,
