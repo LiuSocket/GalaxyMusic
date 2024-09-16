@@ -275,6 +275,19 @@ namespace GM
 		bool _CreatePlanetSystem_2();
 
 		/**
+		* @brief 创建地形、云层、大气的材质
+		* @param pSS: 状态集
+		*/
+		void _CreateTerrainMaterial(osg::StateSet* pSS) const;
+		void _CreateCloudMaterial(osg::StateSet* pSS) const;
+		void _CreateAtmosphereMaterial(osg::StateSet* pSS) const;
+		/**
+		* @brief 创建行星环的材质
+		* @param pGeode: 几何体节点
+		*/
+		void _CreateRingMaterial(osg::Geode* pGeode);
+
+		/**
 		* @brief 创建正方形
 		* @param fWidth：			正方形边长
 		* @param bCorner：			正方形中心点是否在角上，true == 在角上，false == 在中心
@@ -398,6 +411,7 @@ namespace GM
 		osg::ref_ptr<osg::Transform>					m_pStar_2_Transform;			//!< 第2层级中心恒星、行星变换结点
 		osg::ref_ptr<osg::Transform>					m_pPlanet_1_Transform;			//!< 第1层级当前行星变换结点
 		osg::ref_ptr<osg::Transform>					m_pPlanet_2_Transform;			//!< 第2层级当前行星变换结点
+		osg::ref_ptr<osg::Transform>					m_pRing_1_Transform;			//!< 第1层级行星光环变换结点
 		osg::ref_ptr<osg::Transform>					m_pRing_2_Transform;			//!< 第2层级行星光环变换结点
 		osg::ref_ptr<osg::Transform>					m_pPlanetTailTransform;			//!< 行星尾迹的变换结点
 		osg::ref_ptr<osg::AutoTransform>				m_pSunBloomTransform;			//!< 太阳辉光的变换结点
@@ -418,7 +432,6 @@ namespace GM
 		osg::ref_ptr<osg::Geometry>						m_pPlanetGeom_1;				//!< 第1层级行星共用球体
 		osg::ref_ptr<osg::Geometry>						m_pPlanetGeom_2;				//!< 第2层级行星共用球体
 		osg::ref_ptr<osg::Geode>						m_pGeodeSun_2;					//!< 第2层级太阳Geode
-		osg::ref_ptr<osg::Geode>						m_pRingGeode_2;					//!< 第2层级行星光环Geode
 		osg::ref_ptr<osg::Geode>						m_pGeodeAsteroid_2;				//!< 第2层级小行星带点精灵Geode
 		osg::ref_ptr<osg::Geode>						m_pGeodePlanets_2;				//!< 第2层级行星点精灵Geode
 		osg::ref_ptr<osg::Geode>						m_pGeodePlanetsLine_2;			//!< 第2层级行星轨道线Geode
@@ -427,12 +440,21 @@ namespace GM
 		osg::ref_ptr<osg::Geode>						m_pGeodePlanetsLine_3;			//!< 第3层级行星轨道线Geode
 		osg::ref_ptr<osg::Geode>						m_pGeodeSupernovaX;				//!< 前景超新星的十字结点
 		osg::ref_ptr<osg::Geode>						m_pGeodeSupernovaBloom;			//!< 前景超新星的辉光结点
-		osg::ref_ptr<osg::Geode>						m_pGroundRoot;					//!< 行星地面的根节点
-		osg::ref_ptr<osg::Geode>						m_pCloudRoot;					//!< 行星云层的根节点
-		osg::ref_ptr<osg::Geode>						m_pAtmosRoot;					//!< 行星大气的根节点
-		osg::ref_ptr<osg::StateSet>						m_pSSPlanetGround;				//!< 行星地面的状态集
-		osg::ref_ptr<osg::StateSet>						m_pSSPlanetCloud;				//!< 行星云层的状态集
-		osg::ref_ptr<osg::StateSet>						m_pSSPlanetAtmos;				//!< 行星大气的状态集
+		osg::ref_ptr<osg::Geode>						m_pGroundRoot_1;				//!< 第1层级行星地面根节点
+		osg::ref_ptr<osg::Geode>						m_pGroundRoot_2;				//!< 第2层级行星地面根节点
+		osg::ref_ptr<osg::Geode>						m_pCloudRoot_1;					//!< 第1层级行星云层根节点
+		osg::ref_ptr<osg::Geode>						m_pCloudRoot_2;					//!< 第2层级行星云层根节点
+		osg::ref_ptr<osg::Geode>						m_pAtmosRoot_1;					//!< 第1层级行星大气根节点
+		osg::ref_ptr<osg::Geode>						m_pAtmosRoot_2;					//!< 第2层级行星大气根节点
+		osg::ref_ptr<osg::Geode>						m_pRingGeode_1;					//!< 第1层级行星光环Geode
+		osg::ref_ptr<osg::Geode>						m_pRingGeode_2;					//!< 第2层级行星光环Geode
+		osg::ref_ptr<osg::StateSet>						m_pSSPlanetGround_1;			//!< 第1层级行星地面状态集
+		osg::ref_ptr<osg::StateSet>						m_pSSPlanetGround_2;			//!< 第2层级行星地面状态集
+		osg::ref_ptr<osg::StateSet>						m_pSSPlanetCloud_1;				//!< 第1层级行星云层状态集
+		osg::ref_ptr<osg::StateSet>						m_pSSPlanetCloud_2;				//!< 第2层级行星云层状态集
+		osg::ref_ptr<osg::StateSet>						m_pSSPlanetAtmos_1;				//!< 第1层级行星大气状态集
+		osg::ref_ptr<osg::StateSet>						m_pSSPlanetAtmos_2;				//!< 第2层级行星大气状态集
+
 
 		osg::ref_ptr<osg::Uniform>						m_fBackgroundSunScaleUniform;	//!< 背景太阳缩放比例的Uniform
 		osg::ref_ptr<osg::Uniform>						m_fBackgroundSunAlphaUniform;	//!< 背景太阳alpha的Uniform

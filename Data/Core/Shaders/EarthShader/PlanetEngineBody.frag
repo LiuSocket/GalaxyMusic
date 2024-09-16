@@ -41,6 +41,8 @@ void main()
 	}
 
 	color.rgb = ToneMapping(color.rgb);
-	gl_FragColor = vec4(pow(color.rgb,vec3(1.0/2.2)), color.a);
+	color.rgb = pow(color.rgb,vec3(1.0/2.2));
+
+	gl_FragColor = color;
 }
 #endif // EARTH

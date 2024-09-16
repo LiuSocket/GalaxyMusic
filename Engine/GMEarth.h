@@ -164,6 +164,14 @@ namespace GM
 		bool _CreateWanderingEarth();
 
 		/**
+		* @brief 创建地形、云层、大气的材质
+		* @param pSS: 状态集
+		*/
+		void _CreateTerrainMaterial(osg::StateSet* pSS) const;
+		void _CreateCloudMaterial(osg::StateSet* pSS) const;
+		void _CreateAtmosphereMaterial(osg::StateSet* pSS) const;
+
+		/**
 		* @brief 加载2D纹理
 		* @param fileName: 图片文件路径
 		* @param iChannelNum: 1、2、3、4分别代表R、RG、RGB、RGBA

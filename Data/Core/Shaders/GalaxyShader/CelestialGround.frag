@@ -38,7 +38,7 @@ float SeaLevel(in float latCoord, in float seaLevelAddProgress)
 void main()
 {
 	float lenV = length(viewPos.xyz)*unit; // meter
-	//if(lenV < 2e6) discard;
+	if(lenV < 2e6) discard;
 
 	vec4 celestialCoordScale = vec4(1,1,1,1);
 #ifdef EARTH
@@ -66,7 +66,7 @@ void main()
 	vec3 illumCoord = texCoord_1;
 	illumCoord.xy = (illumCoord.xy - 0.5)*celestialCoordScale.z + 0.5;
 	vec4 illum = texture(illumTex, illumCoord);
-	vec3 darkness = 0.05*(1-smoothstep(0.0, 0.1, diffuse));
+	vec3 darkness = 1-smoothstep(0.0, 0.1, diffuse);
 	vec3 illumCity = illum.rgb*darkness;
 	float rockMask = 1 - baseColor.a;
 
@@ -100,8 +100,7 @@ void main()
 	float elev2Sea = vertAlt-seaLevel;
 	// [0.0,0.1] seaLevel + 66m
 	rockMask = mix(rockMask, smoothstep(-10.0, 0.0, elev2Sea), seaLevelAddProgress);
-	illumCity = max((0.2+0.04*baseColor.rgb)*darkness*engineMask,
-		rockMask*(illumCity - seaLevelAddProgress));
+	illumCity = max((0.2+0.04*baseColor.rgb)*darkness*engineMask, rockMask*(illumCity - seaLevelAddProgress));
 
 	color = baseColor.rgb*clamp(elev2Sea*0.01, 1-0.7*seaLevelAddProgress, 1.0);
 	color = mix(vec3(0.0,0.1,0.0), color, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));
@@ -131,6 +130,7 @@ void main()
 	color *= mix(vec3(1), mix(vec3(0.2,0.4,0.6), vec3(1), globalShadow), clamp((eyeAltitude-0.1*atmosHeight)/atmosHeight,0,1));
 #endif // EARTH
 	color = ToneMapping(color);
+	color = pow(color,vec3(1.0/2.2));
 
 #ifdef EARTH
 	color = mix(color, vec3(1), illumCity);
@@ -145,5 +145,5 @@ void main()
 #endif // WANDERING
 #endif // EARTH
 
-	gl_FragColor = vec4(pow(color,vec3(1.0/2.2)), 1);
+	gl_FragColor = vec4(color, 1);
 }

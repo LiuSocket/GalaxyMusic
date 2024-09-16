@@ -89,7 +89,7 @@ void main()
 	vec3 viewVertUp = normalize(viewNormal);
 	const float minFact = 1e-8;
 	float dotVUL = dot(viewVertUp, viewLight);
-	vec3 diffuse = vec3(max(dotVUL+0.01,minFact));
+	vec3 diffuse = vec3(max(dotVUL,minFact));
 	vec3 color = baseColor.rgb * (0.001+diffuse);
 
 	float shadow = 0;
@@ -104,6 +104,7 @@ void main()
 #endif // SATURN
 
 #ifdef EARTH
+	diffuse = vec3(max(dotVUL+0.01,minFact));
 	color = 0.002 + diffuse;
 #ifdef WANDERING
 	vec3 ambient = vec3(0.04,0.05,0.07)*allEngineStart;
@@ -119,6 +120,7 @@ void main()
 	float Rg = GeoRadius(planetRadius.x, planetRadius.y, abs(normalize(ECEFPos).z))*unit;
 	color += AtmosColor(cloudTop*unit, viewDir, viewVertUp, Rg);
 	color = ToneMapping(color*(1 - 0.9*shadow));
+	color = pow(color,vec3(1.0/2.2));
 
 #ifdef EARTH
 #ifdef WANDERING
@@ -130,5 +132,5 @@ void main()
 	}
 #endif // WANDERING
 #endif // EARTH
-	gl_FragColor = vec4(pow(color,vec3(1.0/2.2)), alpha);
+	gl_FragColor = vec4(color, alpha);
 }
