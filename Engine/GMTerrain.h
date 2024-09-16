@@ -45,6 +45,11 @@ namespace GM
 		* @param iH: 屏幕高度
 		*/
 		void ResizeScreen(const int iW, const int iH);
+		/**
+		* @brief 显示、隐藏行星
+		* @param bVisible: 是否可见
+		*/
+		void SetVisible(const bool bVisible);
 
 		/**
 		* @brief 获取指定层级的根节点，如果不存在，就返回空
@@ -61,9 +66,9 @@ namespace GM
 
 		/**
 		* @brief 由于空间层级变化而更新场景
-		* @param iHierarchy:		更新后的空间层级编号
+		* @param iHieNew:			更新后的空间层级编号
 		* @return bool:				成功true，失败false */
-		bool UpdateHierarchy(int iHierarchy);
+		bool UpdateHierarchy(int iHieNew);
 
 	private:
 
@@ -101,7 +106,7 @@ namespace GM
 		}
 
 		// 变量
-	private:
+	protected:
 		SGMKernelData*		m_pKernelData = nullptr;		//!< 内核数据
 		SGMConfigData*		m_pConfigData = nullptr;		//!< 配置数据
 		CGMCommonUniform*	m_pCommonUniform = nullptr;		//!< 公共Uniform

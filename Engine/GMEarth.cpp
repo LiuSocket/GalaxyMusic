@@ -342,6 +342,8 @@ osg::Node* CGMEarth::GetEarthRoot(const int iHie) const
 
 void CGMEarth::SetVisible(const bool bVisible)
 {
+	CGMPlanet::SetVisible(bVisible);
+
 	if (bVisible)
 	{
 		if (0 == m_pEarthRoot_1->getNodeMask())
@@ -413,6 +415,8 @@ bool CGMEarth::CreateEarth()
 
 bool CGMEarth::UpdateHierarchy(int iHieNew)
 {
+	CGMPlanet::UpdateHierarchy(iHieNew);
+
 	switch (iHieNew)
 	{
 	case 0:

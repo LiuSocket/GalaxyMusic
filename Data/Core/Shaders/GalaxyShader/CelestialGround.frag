@@ -66,6 +66,7 @@ void main()
 	vec3 illumCoord = texCoord_1;
 	illumCoord.xy = (illumCoord.xy - 0.5)*celestialCoordScale.z + 0.5;
 	vec4 illum = texture(illumTex, illumCoord);
+	illum.rgb *= illum.rgb;
 	vec3 darkness = 1-smoothstep(0.0, 0.1, diffuse);
 	vec3 illumCity = illum.rgb*darkness;
 	float rockMask = 1 - baseColor.a;
@@ -83,6 +84,7 @@ void main()
 	vec3 wanderingBaseCoord = baseCoord;
 	wanderingBaseCoord.z += 6;
 	vec4 wanderingColor = texture(baseTex, wanderingBaseCoord);
+	wanderingColor.rgb *= wanderingColor.rgb;
 	float engineMask = (1-wanderingColor.a)*seaLevelAddProgress;
 	baseColor.rgb = mix(baseColor.rgb, wanderingColor.rgb, seaLevelAddProgress);
 
@@ -102,8 +104,7 @@ void main()
 	rockMask = mix(rockMask, smoothstep(-10.0, 0.0, elev2Sea), seaLevelAddProgress);
 	illumCity = max((0.2+0.04*baseColor.rgb)*darkness*engineMask, rockMask*(illumCity - seaLevelAddProgress));
 
-	color = baseColor.rgb*clamp(elev2Sea*0.01, 1-0.7*seaLevelAddProgress, 1.0);
-	color = mix(vec3(0.0,0.1,0.0), color, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));
+	color = mix(vec3(0.0,0.1,0.0), baseColor.rgb, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));
 	color *= 0.01 + ambient + diffuse;
 
 	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-elev2Sea*0.015, 0)))*clamp(-elev2Sea*0.01, 0, 1);

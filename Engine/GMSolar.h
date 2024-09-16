@@ -78,7 +78,6 @@ namespace GM
 	/*************************************************************************
 	Class
 	*************************************************************************/
-	class CGMTerrain;
 	class CGMAtmosphere;
 	class CGMEarth;
 	class CGMPlanet;
@@ -522,7 +521,6 @@ namespace GM
 		CReadPixelFinishCallback*						m_pReadPixelFinishCallback;
 		CGMCelestialScaleVisitor*						m_pCelestialScaleVisitor;		//!< 用于控制天体大小
 
-		CGMTerrain*										m_pTerrain;						//!< 地形模块
 		CGMAtmosphere*									m_pAtmos;						//!< 大气模块
 		CGMEarth*										m_pEarth;						//!< 地球模块(单独成模块)
 		CGMPlanet*										m_pPlanet;						//!< 行星模块（还包括卫星）

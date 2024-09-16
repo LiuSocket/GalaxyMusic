@@ -109,9 +109,29 @@ void CGMTerrain::ResizeScreen(const int iW, const int iH)
 {
 }
 
+void CGMTerrain::SetVisible(const bool bVisible)
+{
+	if (bVisible)
+	{
+		if (0 == m_pHieTerrainRootVector.at(0)->getNodeMask())
+		{
+			m_pHieTerrainRootVector.at(0)->setNodeMask(~0);
+			m_pHieTerrainRootVector.at(1)->setNodeMask(~0);
+		}
+	}
+	else
+	{
+		if (0 != m_pHieTerrainRootVector.at(0)->getNodeMask())
+		{
+			m_pHieTerrainRootVector.at(0)->setNodeMask(0);
+			m_pHieTerrainRootVector.at(1)->setNodeMask(0);
+		}
+	}
+}
+
 osg::Node* CGMTerrain::GetTerrainRoot(const int iHie) const
 {
-	if (2 > iHie)
+	if (1 >= iHie)
 	{
 		return m_pHieTerrainRootVector.at(iHie);
 	}
@@ -149,13 +169,21 @@ bool CGMTerrain::UpdateHierarchy(int iHieNew)
 	break;
 	case 1:
 	{
+		if (GM_Root->containsNode(m_pHieTerrainRootVector.at(0)))
+		{
+			GM_Root->removeChild(m_pHieTerrainRootVector.at(0));
+		}
 		if (!(GM_Root->containsNode(m_pHieTerrainRootVector.at(1))))
 		{
 			GM_Root->addChild(m_pHieTerrainRootVector.at(1));
 		}
-		if (GM_Root->containsNode(m_pHieTerrainRootVector.at(0)))
+	}
+	break;
+	case 2:
+	{
+		if (GM_Root->containsNode(m_pHieTerrainRootVector.at(1)))
 		{
-			GM_Root->removeChild(m_pHieTerrainRootVector.at(0));
+			GM_Root->removeChild(m_pHieTerrainRootVector.at(1));
 		}
 	}
 	break;

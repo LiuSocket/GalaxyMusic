@@ -13,21 +13,19 @@
 
 #include "GMCommon.h"
 #include "GMKernel.h"
-#include "GMCommonUniform.h"
-#include "GMCelestialScaleVisitor.h"
+#include "GMTerrain.h"
 
 namespace GM
 {
 	/*************************************************************************
 	Class
 	*************************************************************************/
-	class CGMTerrain;
 
 	/*!
 	*  @class CGMPlanet
 	*  @brief Galaxy-Music CGMPlanet
 	*/
-	class CGMPlanet
+	class CGMPlanet: public CGMTerrain
 	{
 		// 函数
 	public:
@@ -41,10 +39,21 @@ namespace GM
 		bool Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCommonUniform* pCommonUniform);
 
 		/**
+		* @brief 显示、隐藏行星
+		* @param bVisible: 是否可见
+		*/
+		void SetVisible(const bool bVisible);
+
+		/**
 		* @brief 创建行星
 		* @return bool 成功true， 失败false
 		*/
 		bool CreatePlanet();
+		/**
+		* @brief 由于空间层级变化而更新场景
+		* @param iHieNew:			更新后的空间层级编号
+		* @return bool:				成功true，失败false */
+		bool UpdateHierarchy(int iHieNew);
 
 		/**
 		* @brief 创建六面体细分后的球体，每个顶点都有法线和UV
@@ -113,15 +122,5 @@ namespace GM
 		* @return int: 顶点的索引
 		*/
 		int _GetVertIndex(const int iFace, const int iX, const int iY, const int iSegment, const bool bEast);
-
-		// 变量
-	protected:
-		SGMKernelData*							m_pKernelData;					//!< 内核数据
-		SGMConfigData*							m_pConfigData;					//!< 配置数据
-		CGMCommonUniform*						m_pCommonUniform;				//!< 公共Uniform
-		std::string								m_strCoreModelPath;				//!< 核心模型资源路径
-
-		CGMTerrain*								m_pTerrain;						//!< 地形模块
-		CGMCelestialScaleVisitor*				m_pCelestialScaleVisitor;		//!< 用于控制天体大小
 	};
 }	// GM
