@@ -164,10 +164,15 @@ namespace GM
 		bool _CreateWanderingEarth();
 
 		/**
-		* @brief 创建地形、云层、大气的材质
+		* @brief 创建地形的材质，专门用于地球的地形（只有近处有，精度高）
 		* @param pSS: 状态集
 		*/
 		void _CreateTerrainMaterial(osg::StateSet* pSS) const;
+		/**
+		* @brief 创建地面（整个球面，面数少，精度低）、云层、大气的材质
+		* @param pSS: 状态集
+		*/
+		void _CreateGroundMaterial(osg::StateSet* pSS) const;
 		void _CreateCloudMaterial(osg::StateSet* pSS) const;
 		void _CreateAtmosphereMaterial(osg::StateSet* pSS) const;
 

@@ -277,7 +277,7 @@ namespace GM
 		* @brief 创建地形、云层、大气的材质
 		* @param pSS: 状态集
 		*/
-		void _CreateTerrainMaterial(osg::StateSet* pSS) const;
+		void _CreateGroundMaterial(osg::StateSet* pSS) const;
 		void _CreateCloudMaterial(osg::StateSet* pSS) const;
 		void _CreateAtmosphereMaterial(osg::StateSet* pSS) const;
 		/**

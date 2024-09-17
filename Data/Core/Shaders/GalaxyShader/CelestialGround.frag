@@ -1,3 +1,5 @@
+#pragma import_defines(TERRAIN)
+
 uniform sampler2DArray baseTex;
 uniform vec2 planetRadius;
 
@@ -38,14 +40,20 @@ float SeaLevel(in float latCoord, in float seaLevelAddProgress)
 void main()
 {
 	float lenV = length(viewPos.xyz)*unit; // meter
-	if(lenV < 2e6) discard;
+
+	float terrainMaxVis = planetRadius.x*unit*0.2;
+#ifdef TERRAIN
+	if(lenV > terrainMaxVis) discard;
+#else // not TERRAIN
+	if(lenV < terrainMaxVis) discard;
+#endif // TERRAIN or not
 
 	vec4 celestialCoordScale = vec4(1,1,1,1);
 #ifdef EARTH
 	celestialCoordScale = coordScale_Earth;
 #else // not EARTH
 	celestialCoordScale = coordScale;
-#endif // EARTH
+#endif // EARTH or not
 
 	vec3 baseCoord = texCoord_1;
 	baseCoord.xy = (baseCoord.xy - 0.5)*celestialCoordScale.x + 0.5;
@@ -147,4 +155,7 @@ void main()
 #endif // EARTH
 
 	gl_FragColor = vec4(color, 1);
+#ifdef TERRAIN
+	gl_FragColor = vec4(texCoord_1.xy,0,1);//vec4(color, 1); // 
+#endif // EARTH
 }

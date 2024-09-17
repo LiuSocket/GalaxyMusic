@@ -21,7 +21,13 @@ namespace GM
 	class CGMCelestialScaleVisitor : public osg::NodeVisitor
 	{
 	public:
-		CGMCelestialScaleVisitor(): NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN) {}
+		CGMCelestialScaleVisitor(): NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN){}
+
+		void SetQuatorFace(const bool bQuator, const int iQuatorFaceID = 0)
+		{
+			_bQuator = bQuator;
+			_iQuatorFaceID = iQuatorFaceID;
+		}
 
 		void SetRadius(const double fEquator, const double fPolar)
 		{
@@ -35,44 +41,93 @@ namespace GM
 		{
 			osg::Vec3Array* pVert = dynamic_cast<osg::Vec3Array*>(geom.getVertexArray());
 			osg::Vec3Array* pNorm = dynamic_cast<osg::Vec3Array*>(geom.getNormalArray());
+			// 0层纹理单元 xy = WGS84对应的UV，[0.0, 1.0]
+			// 1层纹理单元 xy = 四分之一面体贴图UV，[0.0, 1.0]; z = 面对应的编号0-23
+			osg::Vec2Array* pCoord0 = dynamic_cast<osg::Vec2Array*>(geom.getTexCoordArray(0));
+			osg::Vec3Array* pCoord1 = dynamic_cast<osg::Vec3Array*>(geom.getTexCoordArray(1));
 
-			osg::Vec2Array* pV2Coord0 = dynamic_cast<osg::Vec2Array*>(geom.getTexCoordArray(0));
-			osg::Vec3Array* pV3Coord0 = nullptr;
-			bool bQuator = false;// 默认不是四分之一地形块，而是全球地形块
-			if (!pV2Coord0)
-			{
-				// 如果0号纹理单元不是二维纹理坐标，那么就是三维纹理坐标
-				pV3Coord0 = dynamic_cast<osg::Vec3Array*>(geom.getTexCoordArray(0));
-				bQuator = true;
-			}
+			if (!pVert || !pNorm || !pCoord0 || !pCoord1) return;
 
-			if (!pVert || !pNorm || (!pV2Coord0 && !pV3Coord0)) return;
+			osg::Vec2Array* pNewCoord0 =  new osg::Vec2Array();
+			pNewCoord0->resize(pVert->size());
 
+			// 每条边上的顶点数
+			int iVertEdgeNum = sqrt(float(pVert->size()));
 			for (int i = 0; i < pVert->size(); i++)
 			{
-				// 原始球面上的位置转经纬度
-				double fLat,fLon;
-				if (bQuator) // 四分之一地形块，分为极地和赤道两种情况
+				double fLat = (pCoord0->at(i).y() - 0.5) * osg::PI;
+				double fLon = (pCoord0->at(i).x() - 0.5) * osg::PI * 2;
+				if (_bQuator)
 				{
-					// 0层纹理单元 xy = 六面体贴图UV，[0.0, 1.0]；z= 纬度，[-PI/2, PI/2];
-					fLat = pV3Coord0->at(i).z();
-					osg::Vec2d v2 = osg::Vec2d(pV3Coord0->at(i).x(), pV3Coord0->at(i).y());
-					v2.normalize();
-					fLon = atan2(v2.y(), v2.x());
-				}
-				else // 全球地形块
-				{
-					fLat = (pV2Coord0->at(i).y() - 0.5) * osg::PI;
-					fLon = (pV2Coord0->at(i).x() - 0.5) * osg::PI * 2;
-				}
+					int iX = i % iVertEdgeNum;
+					int iY = i / iVertEdgeNum;
+					int iAddX = 2 * (iVertEdgeNum / 2 - iX);
+					// X轴对称点的索引
+					int iInvX = i + iAddX;
+					// Y轴对称点的索引
+					int iInvY = (iY + 2 * (iVertEdgeNum / 2 - iY)) * iVertEdgeNum + iX;
+					// 中心对称点的索引
+					int iInvXY = iInvY + iAddX;
 
+					// 四分之面体的0层纹理单元不是WGS84对应的最终UV，会根据ID变化，所以这里要重新计算
+					// 赤道地形块的ID为0-15，北极地形块的ID为16-19，南极地形块的ID为20-23
+					// 6个面一共24块地形，每个面内部，按照一二三四象限顺序依次编号
+					//	1/5/9/13/17/21		|		0/4/8/12/16/20
+					//		第二象限		|			第一象限
+					//----------------------+-----------------------
+					//		第三象限		|			第四象限
+					//	2/6/10/14/18/22		|		3/7/11/15/19/23
+					switch (_iQuatorFaceID)
+					{
+					case 1: // 第二象限 posX 赤道
+					{
+						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
+						fLon = (0.5 - pCoord0->at(iInvX).x()) * osg::PI * 2;
+					}
+					break;
+					case 2: // 第三象限 posX 赤道
+					{
+						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
+						fLon = (0.5 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
+					}
+					break;
+					case 3: // 第四象限 posX 赤道
+					{
+						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
+						fLon = (pCoord0->at(iInvY).x() - 0.5) * osg::PI * 2;
+					}
+					break;
+					case 17: // 第二象限 posZ 北极
+					{
+						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
+						fLon = (0.5 - pCoord0->at(iInvX).x()) * osg::PI * 2;
+					}
+					break;
+					case 18: // 第三象限 posZ 北极
+					{
+						fLat = (pCoord0->at(iInvXY).y() - 0.5) * osg::PI;
+						fLon = pCoord0->at(iInvXY).x() * osg::PI * 2;
+					}
+					break;
+					case 19: // 第四象限 posZ 北极
+					{
+						fLat = (pCoord0->at(iInvY).y() - 0.5) * osg::PI;
+						fLon = (1.0 - pCoord0->at(iInvY).x()) * osg::PI * 2;
+					}
+					break;
+					default:
+						break;
+					}
+					pNewCoord0->at(i) = osg::Vec2(fLon, fLat);
+					pCoord1->at(i).z() = _iQuatorFaceID;
+				}
 				double fCosLat = cos(fLat);
 				// 经纬度转椭球面上的位置
 				double fX, fY, fZ;
 				ellipsoid.convertLatLongHeightToXYZ(fLat, fLon, 0, fX, fY, fZ);
 
 				pVert->at(i) = osg::Vec3(fX, fY, fZ);
-				pNorm->at(i) = osg::Vec3d(cos(fLon) * fCosLat, sin(fLon) * fCosLat, sin(fLat));
+				pNorm->at(i) = osg::Vec3(cos(fLon) * fCosLat, sin(fLon) * fCosLat, sin(fLat));
 			}
 
 			geom.setUseVertexBufferObjects(true);
@@ -81,6 +136,11 @@ namespace GM
 
 			pVert->dirty();
 			pNorm->dirty();
+			if (_bQuator)
+			{
+				geom.setTexCoordArray(0, pNewCoord0);
+				pCoord1->dirty();
+			}
 			geom.dirtyBound();
 
 			traverse(geom);
@@ -88,6 +148,8 @@ namespace GM
 
 	private:
 		osg::EllipsoidModel ellipsoid;
+		bool _bQuator = false; // 是否是四分之一面体
+		int _iQuatorFaceID = 0; // 四分之一面体对应的编号 0-23
 	};
 
 }	// GM

@@ -160,7 +160,8 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 /** @brief 更新 */
 bool CGMEarth::Update(double dDeltaTime)
 {
-	double fTimes = osg::Timer::instance()->time_s();
+	CGMPlanet::Update(dDeltaTime);
+
 	int iHie = m_pKernelData->iHierarchy;
 
 	switch (iHie)
@@ -193,6 +194,8 @@ bool CGMEarth::Update(double dDeltaTime)
 /** @brief 更新(在主相机更新姿态之后) */
 bool CGMEarth::UpdateLater(double dDeltaTime)
 {
+	CGMPlanet::UpdateLater(dDeltaTime);
+
 	int iHie = m_pKernelData->iHierarchy;
 
 	osg::Matrixd mViewMatrix = GM_View->getCamera()->getViewMatrix();
@@ -217,6 +220,14 @@ bool CGMEarth::Load()
 	std::string strGalaxyShader = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	std::string strEarthShader = m_pConfigData->strCorePath + m_strEarthShaderPath;
 
+	if (m_pHieTerrainRootVector.at(1).valid())
+	{
+		CGMKit::LoadShaderWithCommonFrag(m_pHieTerrainRootVector.at(1)->getStateSet(),
+			strGalaxyShader + "CelestialGround.vert",
+			strGalaxyShader + "CelestialGround.frag",
+			strGalaxyShader + "CelestialCommon.frag",
+			"EarthTerrain_1");
+	}
 	if (m_pSSEarthGround_1.valid())
 	{
 		CGMKit::LoadShaderWithCommonFrag(m_pSSEarthGround_1,
@@ -396,6 +407,8 @@ void CGMEarth::SetWanderingEarthProgress(const float fProgress)
 bool CGMEarth::CreateEarth()
 {
 	CGMPlanet::CreatePlanet();
+	// 给地形添加材质
+	_CreateTerrainMaterial(m_pHieTerrainRootVector.at(1)->getOrCreateStateSet());
 
 	_CreateGlobalCloudShadow();
 
@@ -496,6 +509,7 @@ bool CGMEarth::_CreateGlobalCloudShadow()
 		if (!pShadowEarthGeom.valid()) return false;
 
 		double fUnit = m_pKernelData->fUnitArray->at(i);
+		m_pCelestialScaleVisitor->SetQuatorFace(false);
 		m_pCelestialScaleVisitor->SetRadius(
 			(osg::WGS_84_RADIUS_EQUATOR + m_fCloudTop) / fUnit,
 			(osg::WGS_84_RADIUS_POLAR + m_fCloudTop) / fUnit);
@@ -565,6 +579,7 @@ bool CGMEarth::_CreateEarth_1()
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	unsigned int iOnOverride = osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE;
 	double fUnit1 = m_pKernelData->fUnitArray->at(1);
+	m_pCelestialScaleVisitor->SetQuatorFace(false);
 	m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit1, osg::WGS_84_RADIUS_POLAR / fUnit1);
 	// 改变大小
 	m_pEarthGeom_1->accept(*m_pCelestialScaleVisitor);
@@ -575,7 +590,7 @@ bool CGMEarth::_CreateEarth_1()
 	m_pEarthRoot_1->addChild(pEarthGround_1);
 
 	m_pSSEarthGround_1 = pEarthGround_1->getOrCreateStateSet();
-	_CreateTerrainMaterial(m_pSSEarthGround_1.get());
+	_CreateGroundMaterial(m_pSSEarthGround_1.get());
 
 	////////////////////////////////////
 	// 地球云层
@@ -604,6 +619,7 @@ bool CGMEarth::_CreateEarth_2()
 	if (!m_pEarthGeom_2.valid()) return false;
 
 	double fUnit2 = m_pKernelData->fUnitArray->at(2);
+	m_pCelestialScaleVisitor->SetQuatorFace(false);
 	m_pCelestialScaleVisitor->SetRadius(6378137.0 / fUnit2, 6356752.0 / fUnit2);
 	// 改变大小
 	m_pEarthGeom_2->accept(*m_pCelestialScaleVisitor);
@@ -614,7 +630,7 @@ bool CGMEarth::_CreateEarth_2()
 	m_pEarthRoot_2->addChild(m_pEarthGround_2);
 
 	m_pSSEarthGround_2 = m_pEarthGround_2->getOrCreateStateSet();
-	_CreateTerrainMaterial(m_pSSEarthGround_2.get());
+	_CreateGroundMaterial(m_pSSEarthGround_2.get());
 
 	////////////////////////////////////
 	// 地球云层
@@ -665,6 +681,78 @@ bool CGMEarth::_CreateWanderingEarth()
 }
 
 void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS) const
+{
+	std::string strShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	unsigned int iOnOverride = osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE;
+
+	pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+	pSS->setMode(GL_BLEND, osg::StateAttribute::OFF);
+	pSS->setAttributeAndModes(new osg::BlendFunc(
+		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+	), osg::StateAttribute::ON);
+	pSS->setAttributeAndModes(new osg::CullFace());
+	pSS->setRenderBinDetails(BIN_ROCKSPHERE, "DepthSortedBin");
+
+	// 地形宏定义
+	pSS->setDefine("TERRAIN", osg::StateAttribute::ON);
+	// 地球宏定义
+	pSS->setDefine("EARTH", osg::StateAttribute::ON);
+	pSS->setDefine("ATMOS", osg::StateAttribute::ON);
+
+	int iGroundUnit = 0;
+	// 基础贴图
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex, iOnOverride);
+	osg::ref_ptr<osg::Uniform> pGrundBaseUniform = new osg::Uniform("baseTex", iGroundUnit++);
+	pSS->addUniform(pGrundBaseUniform.get());
+	// 自发光贴图
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex, iOnOverride);
+	osg::ref_ptr<osg::Uniform> pGrundIllumUniform = new osg::Uniform("illumTex", iGroundUnit++);
+	pSS->addUniform(pGrundIllumUniform.get());
+	// DEM贴图
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_aDEMTex, iOnOverride);
+	osg::ref_ptr<osg::Uniform> pDEMUniform = new osg::Uniform("DEMTex", iGroundUnit++);
+	pSS->addUniform(pDEMUniform.get());
+	// 全球阴影
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_pGlobalShadowTex, iOnOverride);
+	osg::ref_ptr<osg::Uniform> pGlobalShadowUniform = new osg::Uniform("globalShadowTex", iGroundUnit++);
+	pSS->addUniform(pGlobalShadowUniform.get());
+	// 地面上的大气“内散射”纹理
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_pInscatteringTex, iOnOverride);
+	osg::ref_ptr<osg::Uniform> pGroundInscatteringUniform = new osg::Uniform("inscatteringTex", iGroundUnit++);
+	pSS->addUniform(pGroundInscatteringUniform.get());
+
+	if (m_pConfigData->bWanderingEarth)
+	{
+		// 流浪地球尾迹（吹散的大气）
+		pSS->setTextureAttributeAndModes(iGroundUnit, m_pEarthTail->GetTAATex(), iOnOverride);
+		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
+		pSS->addUniform(pGroundTailUniform.get());
+
+		pSS->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
+		pSS->addUniform(m_fWanderProgressUniform.get());
+		pSS->setDefine("WANDERING", osg::StateAttribute::ON);
+	}
+
+	pSS->addUniform(m_pCommonUniform->GetViewUp());
+	pSS->addUniform(m_vViewLightUniform.get());
+	pSS->addUniform(m_fAtmosHeightUniform.get());
+	pSS->addUniform(m_fEyeAltitudeUniform.get());
+	pSS->addUniform(m_vPlanetRadiusUniform.get());
+	pSS->addUniform(m_fMinDotULUniform.get());
+	pSS->addUniform(m_pCommonUniform->GetScreenSize());
+	pSS->addUniform(m_vEarthCoordScaleUniform.get());
+	pSS->addUniform(m_pCommonUniform->GetUnit());
+	pSS->addUniform(m_mView2ECEFUniform.get());
+
+	// 添加shader
+	CGMKit::LoadShaderWithCommonFrag(pSS,
+		strShaderPath + "CelestialGround.vert",
+		strShaderPath + "CelestialGround.frag",
+		strShaderPath + "CelestialCommon.frag",
+		"CelestialGround");
+}
+
+void CGMEarth::_CreateGroundMaterial(osg::StateSet* pSS) const
 {
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	unsigned int iOnOverride = osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE;

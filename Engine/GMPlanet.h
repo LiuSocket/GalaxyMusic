@@ -37,6 +37,10 @@ namespace GM
 
 		/** @brief 初始化 */
 		bool Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCommonUniform* pCommonUniform);
+		/** @brief 更新 */
+		bool Update(double dDeltaTime);
+		/** @brief 更新(在主相机更新姿态之后) */
+		bool UpdateLater(double dDeltaTime);
 
 		/**
 		* @brief 显示、隐藏行星

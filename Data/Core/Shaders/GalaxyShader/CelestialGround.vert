@@ -1,5 +1,6 @@
 #version 400 compatibility
-#pragma import_defines(EARTH)
+
+#pragma import_defines(EARTH, TERRAIN)
 
 #ifdef EARTH
 uniform float unit;
@@ -22,7 +23,6 @@ void main()
 {
 	viewNormal = normalize(gl_NormalMatrix*gl_Normal);
 	vec4 modelVertex = gl_Vertex;
-	viewPos = gl_ModelViewMatrix*modelVertex;
 
 #ifdef EARTH
 	vec3 DEMCoord = gl_MultiTexCoord1.xyz;
@@ -30,10 +30,12 @@ void main()
 	float elev = DEM(texture(DEMTex, DEMCoord).r); // meter
 	modelVertex.xyz += max(0, elev/unit)*gl_Normal;
 	gl_Position = gl_ModelViewProjectionMatrix*modelVertex;
+
 #else // not EARTH
 	gl_Position = ftransform();
 #endif // EARTH or not
 
+	viewPos = gl_ModelViewMatrix*modelVertex;
 	texCoord_0 = gl_MultiTexCoord0.xy;
 	texCoord_1 = gl_MultiTexCoord1.xyz;
 }

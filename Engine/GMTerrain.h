@@ -17,6 +17,17 @@
 namespace GM
 {
 	/*!
+	*  @brief 四分之一面的数据结构体
+	*/
+	struct SQuatorData
+	{
+		osg::ref_ptr<osg::Transform> pQuatorTrans;	//!< 四分之一面的位置节点
+		std::vector<osg::Vec3d> vCenterDirVec;		//!< 所有可能的中心点方向的vector
+		int iQuatorID;				//!< 四分之一面象限，0123
+		bool bPolar;				//!< 是否是极地区域
+	};
+
+	/*!
 	*  @class CGMTerrain
 	*  @brief Galaxy-Music GMTerrain
 	*/
@@ -36,8 +47,6 @@ namespace GM
 		bool Update(double dDeltaTime);
 		/** @brief 更新(在主相机更新姿态之后) */
 		bool UpdateLater(double dDeltaTime);
-		/** @brief 加载 */
-		bool Load();
 
 		/**
 		* @brief 修改屏幕尺寸时调用此函数
@@ -50,13 +59,6 @@ namespace GM
 		* @param bVisible: 是否可见
 		*/
 		void SetVisible(const bool bVisible);
-
-		/**
-		* @brief 获取指定层级的根节点，如果不存在，就返回空
-		* @param iHie: 空间层级，0,1,2
-		* @return osg::Node* 对应层级的根节点指针
-		*/
-		osg::Node* GetTerrainRoot(const int iHie) const;
 
 		/**
 		* @brief 创建地形
@@ -115,8 +117,7 @@ namespace GM
 		std::string m_strTerrainShaderPath = "Shaders/TerrainShader/";			//!< Terrain shader 路径
 
 		std::vector<osg::ref_ptr<osg::Group>>		m_pHieTerrainRootVector;		//!< 01空间层级的根节点
-		std::vector<osg::ref_ptr<osg::Transform>>	m_pTerrainPolarTransVec;		//!< 四分之一面的极地节点vector
-		std::vector<osg::ref_ptr<osg::Transform>>	m_pTerrainEquatorTransVec;		//!< 四分之一面的赤道节点vector
+		std::vector<SQuatorData>					m_sQuatorVec;					//!< 四分之一面数据vector
 
 		CGMCelestialScaleVisitor*	m_pCelestialScaleVisitor = nullptr;		//!< 用于控制天体大小
 	};

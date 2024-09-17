@@ -47,6 +47,16 @@ bool CGMPlanet::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGM
 	return true;
 }
 
+bool CGMPlanet::Update(double dDeltaTime)
+{
+	return CGMTerrain::Update(dDeltaTime);
+}
+
+bool CGMPlanet::UpdateLater(double dDeltaTime)
+{
+	return CGMTerrain::UpdateLater(dDeltaTime);
+}
+
 void CGMPlanet::SetVisible(const bool bVisible)
 {
 	CGMTerrain::SetVisible(bVisible);
