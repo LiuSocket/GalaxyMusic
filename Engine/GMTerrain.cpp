@@ -31,6 +31,100 @@ CGMTerrain Methods
 CGMTerrain::CGMTerrain()
 {
 	m_pCelestialScaleVisitor = new CGMCelestialScaleVisitor();
+
+	// 初始化1级瓦片中心点方向
+	vTileDirVec_1.reserve(24);
+	osg::Vec3d vCenter = osg::Vec3d(0, 1, 0);
+	osg::Vec3d vAxisX = osg::Vec3d(1, 0, 0);
+	osg::Vec3d vAxisY = osg::Vec3d(0, 0, 1);
+	for (int i = 0; i < 6; i++)
+	{
+		switch (i)
+		{
+		case 0:
+		{
+			// posX
+			vCenter = osg::Vec3d(1, 0, 0);
+			vAxisX = osg::Vec3d(0, 1, 0);
+			vAxisY = osg::Vec3d(0, 0, 1);
+		}
+		break;
+		case 1:
+		{
+			// negX
+			vCenter = osg::Vec3d(-1, 0, 0);
+			vAxisX = osg::Vec3d(0, -1, 0);
+			vAxisY = osg::Vec3d(0, 0, 1);
+		}
+		break;
+		case 2:
+		{
+			// posY
+			vCenter = osg::Vec3d(0, 1, 0);
+			vAxisX = osg::Vec3d(-1, 0, 0);
+			vAxisY = osg::Vec3d(0, 0, 1);
+		}
+		break;
+		case 3:
+		{
+			// negY
+			vCenter = osg::Vec3d(0, -1, 0);
+			vAxisX = osg::Vec3d(1, 0, 0);
+			vAxisY = osg::Vec3d(0, 0, 1);
+		}
+		break;
+		case 4:
+		{
+			// posZ
+			vCenter = osg::Vec3d(0, 0, 1);
+			vAxisX = osg::Vec3d(0, 1, 0);
+			vAxisY = osg::Vec3d(-1, 0, 0);
+		}
+		break;
+		case 5:
+		{
+			// negZ
+			vCenter = osg::Vec3d(0, 0, -1);
+			vAxisX = osg::Vec3d(0, 1, 0);
+			vAxisY = osg::Vec3d(1, 0, 0);
+		}
+		break;
+		default:
+			break;
+		}
+
+		for (int j = 0; j < 4; j++)
+		{
+			osg::Vec3d vECEFDir = vCenter * 2;
+			switch (j)
+			{
+			case 0:
+			{
+				vECEFDir += vAxisX + vAxisY;
+			}
+			break;
+			case 1:
+			{
+				vECEFDir -= vAxisX - vAxisY;
+			}
+			break;
+			case 2:
+			{
+				vECEFDir -= vAxisX + vAxisY;
+			}
+			break;
+			case 3:
+			{
+				vECEFDir += vAxisX - vAxisY;
+			}
+			break;
+			default:
+				break;
+			}
+			vECEFDir.normalize();
+			vTileDirVec_1.push_back(vECEFDir);
+		}
+	}
 }
 
 /** @brief 析构 */
@@ -105,37 +199,37 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 		// 3个：2赤道+1极地
 		// 4个：4赤道、2赤道+2极地、4极地
 		// 遍历所有地形块，根据相机位置和朝向，决定哪些地形块需要显示，哪些地形块需要旋转
-		for (auto& itr : m_sQuatorVec)
+		for (auto& itr : m_sTileVec_1)
 		{
 			bool bVisible = false;
-			for (int k = 0; k < itr.vCenterDirVec.size(); k++)
+			for (int k = 0; k < itr.vTileDirVec.size(); k++)
 			{
-				double fDot = vCore2EyeDir * itr.vCenterDirVec.at(k);
+				double fDot = vCore2EyeDir * itr.vTileDirVec.at(k);
 				if (fDot > 0.7)// 显示并旋转
 				{
 					bVisible = true;
 					//旋转
 					if (itr.bPolar)
 					{
-						itr.pQuatorTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI*k, osg::Vec3d(0, 1, 0)));
+						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI*k, osg::Vec3d(0, 1, 0)));
 					}
 					else
 					{
 						if (0 == k) // posX
 						{
-							itr.pQuatorTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(0, osg::Vec3d(0, 0, 1)));
+							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(0, osg::Vec3d(0, 0, 1)));
 						}
 						else if (1 == k) // negX
 						{
-							itr.pQuatorTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI, osg::Vec3d(0, 0, 1)));
+							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI, osg::Vec3d(0, 0, 1)));
 						}
 						else if (2 == k) // posY
 						{
-							itr.pQuatorTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI_2, osg::Vec3d(0, 0, 1)));
+							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI_2, osg::Vec3d(0, 0, 1)));
 						}
 						else // if (3 == k) negY
 						{
-							itr.pQuatorTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI * 1.5, osg::Vec3d(0, 0, 1)));
+							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI * 1.5, osg::Vec3d(0, 0, 1)));
 						}
 					}
 					break;
@@ -144,16 +238,16 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 			// 显示或隐藏
 			if (bVisible)
 			{
-				if (0 == itr.pQuatorTrans->getNodeMask())
+				if (0 == itr.pTileTrans->getNodeMask())
 				{
-					itr.pQuatorTrans->setNodeMask(~0);
+					itr.pTileTrans->setNodeMask(~0);
 				}
 			}
 			else
 			{
-				if (0 != itr.pQuatorTrans->getNodeMask())
+				if (0 != itr.pTileTrans->getNodeMask())
 				{
-					itr.pQuatorTrans->setNodeMask(0);
+					itr.pTileTrans->setNodeMask(0);
 				}
 			}
 		}
@@ -250,101 +344,44 @@ bool CGMTerrain::_CreateTerrain_0()
 
 bool CGMTerrain::_CreateTerrain_1()
 {
-	std::vector<osg::Vec3d> vAllCenterDirVec;
-	vAllCenterDirVec.reserve(24);
-	osg::Vec3d vCenter = osg::Vec3d(0, 1, 0);
-	osg::Vec3d vAxisX = osg::Vec3d(1, 0, 0);
-	osg::Vec3d vAxisY = osg::Vec3d(0, 0, 1);
-	for (int i = 0; i < 6; i++)
-	{
-		switch (i)
-		{
-		case 0:
-		{
-			// posX
-			vCenter = osg::Vec3d(1, 0, 0);
-			vAxisX = osg::Vec3d(0, 1, 0);
-			vAxisY = osg::Vec3d(0, 0, 1);
-		}
-		break;
-		case 1:
-		{
-			// negX
-			vCenter = osg::Vec3d(-1, 0, 0);
-			vAxisX = osg::Vec3d(0, -1, 0);
-			vAxisY = osg::Vec3d(0, 0, 1);
-		}
-		break;
-		case 2:
-		{
-			// posY
-			vCenter = osg::Vec3d(0, 1, 0);
-			vAxisX = osg::Vec3d(-1, 0, 0);
-			vAxisY = osg::Vec3d(0, 0, 1);
-		}
-		break;
-		case 3:
-		{
-			// negY
-			vCenter = osg::Vec3d(0, -1, 0);
-			vAxisX = osg::Vec3d(1, 0, 0);
-			vAxisY = osg::Vec3d(0, 0, 1);
-		}
-		break;
-		case 4:
-		{
-			// posZ
-			vCenter = osg::Vec3d(0, 0, 1);
-			vAxisX = osg::Vec3d(0, 1, 0);
-			vAxisY = osg::Vec3d(-1, 0, 0);
-		}
-		break;
-		case 5:
-		{
-			// negZ
-			vCenter = osg::Vec3d(0, 0, -1);
-			vAxisX = osg::Vec3d(0, 1, 0);
-			vAxisY = osg::Vec3d(1, 0, 0);
-		}
-		break;
-		default:
-			break;
-		}
+	_CreateTile_0();
+	//_CreateTile_1();
 
-		for (int j = 0; j < 4; j++)
+	return true;
+}
+
+bool CGMTerrain::_CreateTile_0()
+{
+	m_sTileVec_0.reserve(24);
+	for (int j = 0; j < 6; j++)
+	{
+		bool bPolar = (4 <= j);
+		for (int i = 0; i < 4; i++)
 		{
-			osg::Vec3d vECEFDir = vCenter * 2.5;// 2.1是为了让地形块中点与四个边界点的距离尽量相等
-			switch (j)
-			{
-			case 0:
-			{
-				vECEFDir += vAxisX + vAxisY;
-			}
-			break;
-			case 1:
-			{
-				vECEFDir -= vAxisX - vAxisY;
-			}
-			break;
-			case 2:
-			{
-				vECEFDir -= vAxisX + vAxisY;
-			}
-			break;
-			case 3:
-			{
-				vECEFDir += vAxisX - vAxisY;
-			}
-			break;
-			default:
-				break;
-			}
-			vECEFDir.normalize();
-			vAllCenterDirVec.push_back(vECEFDir);
+			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode = new osg::Geode();
+			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom = _MakeHexahedronQuaterGeometry(bPolar, 31);
+
+			double fUnit = m_pKernelData->fUnitArray->at(1);
+			// 赤道地形块的ID为0-15，北极地形块的ID为16-19，南极地形块的ID为20-23
+			m_pCelestialScaleVisitor->SetQuatorFace(true, j * 4 + i);
+			m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit, osg::WGS_84_RADIUS_POLAR / fUnit);
+			pTerrainQuaterGeom->accept(*m_pCelestialScaleVisitor);	// 改变大小
+
+			m_pHieTerrainRootVector.at(1)->addChild(pTerrainQuaterGeode.get());
+			pTerrainQuaterGeode->addDrawable(pTerrainQuaterGeom.get());
+
+			STileData sTile;
+			sTile.iTileID = i;
+			sTile.bPolar = bPolar;
+			m_sTileVec_0.push_back(sTile);
 		}
 	}
+	return true;
+}
 
-	m_sQuatorVec.reserve(8);
+bool CGMTerrain::_CreateTile_1()
+{
+	m_sTileVec_1.reserve(8);
 	for (int j = 0; j < 2; j++)
 	{
 		// 0: 赤道，1: 极地，每个地形块分为4个四分之一地形块，总共需要4个赤道和4个极地
@@ -353,7 +390,7 @@ bool CGMTerrain::_CreateTerrain_1()
 		bool bPolar = (1 == j);
 		for (int i = 0; i < 4; i++)
 		{
-			osg::ref_ptr<osg::Transform> pTerrainQuaterTrans = new osg::PositionAttitudeTransform();
+			osg::ref_ptr<osg::PositionAttitudeTransform> pTerrainQuaterTrans = new osg::PositionAttitudeTransform();
 			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode = new osg::Geode();
 			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom = _MakeHexahedronQuaterGeometry(bPolar);
 
@@ -367,27 +404,27 @@ bool CGMTerrain::_CreateTerrain_1()
 			pTerrainQuaterTrans->addChild(pTerrainQuaterGeode.get());
 			pTerrainQuaterGeode->addDrawable(pTerrainQuaterGeom.get());
 
-			SQuatorData sQuator;
-			sQuator.pQuatorTrans = pTerrainQuaterTrans;
-			sQuator.iQuatorID = j;
-			sQuator.bPolar = bPolar;
-			if (bPolar)// 极地，有8种可能
+			STileData sTile;
+			sTile.pTileTrans = pTerrainQuaterTrans;
+			sTile.iTileID = i;
+			sTile.bPolar = bPolar;
+			if (bPolar)// 极地，有2*4种可能
 			{
 				for (int k = 0; k < 2; k++)
 				{
 					int iID = 16 + k * 4 + i;
-					sQuator.vCenterDirVec.push_back(vAllCenterDirVec.at(iID));
+					sTile.vTileDirVec.push_back(vTileDirVec_1.at(iID));
 				}
 			}
-			else // 赤道，有16种可能
+			else // 赤道，有4*4种可能
 			{
-				for (int k = 0 ; k < 4 ; k++)
+				for (int k = 0; k < 4; k++)
 				{
 					int iID = k * 4 + i;
-					sQuator.vCenterDirVec.push_back(vAllCenterDirVec.at(iID));
+					sTile.vTileDirVec.push_back(vTileDirVec_1.at(iID));
 				}
 			}
-			m_sQuatorVec.push_back(sQuator);
+			m_sTileVec_1.push_back(sTile);
 		}
 	}
 	return true;
@@ -395,8 +432,8 @@ bool CGMTerrain::_CreateTerrain_1()
 
 osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int iSegment) const
 {
-	// 为了效率，限制iSegment的上限，以防element超过65536
-	iSegment = osg::clampBetween(iSegment, 2, 256);
+	// 为了效率，限制iSegment的上限，以防element超过65536，特意设置成2^n-1是为了保证高程图的分辨率是2^n
+	iSegment = osg::clampBetween(iSegment, 3, 255);
 	float fSize = float(iSegment);
 	int iVertPerEdge = iSegment + 1;
 	int iVertPerFace = iVertPerEdge * iVertPerEdge;
@@ -439,12 +476,18 @@ osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int 
 			osg::Vec3 vDir = vCenter + vAxisX * x / fSize + vAxisY * y / fSize;
 			vDir.normalize();
 
-			float fLon = atan2(vDir.y(), vDir.x());// 弧度 (-PI, PI]
-			float fLat = asin(vDir.z());// 弧度 [-PI/2, PI/2]
+			// 默认为临界值的点，防止三角函数失效
+			float fLon = bPolar ? osg::PI_2 : 0.0f;// 弧度
+			float fLat = bPolar ? osg::PI_2 : 0.0f;// 弧度
+			if (vCenter != vDir)
+			{
+				fLon = atan2(vDir.y(), vDir.x());// 弧度 (-PI, PI]
+				fLat = asin(vDir.z());// 弧度 [-PI/2, PI/2]
+			}
 
 			verts->push_back(vDir);
 			// 0层纹理单元 xy = WGS84对应的UV，[0.0, 1.0]
-			// 1层纹理单元 xy = 四分之一面体贴图UV，[0.0, 1.0]; z = 面对应的编号0-23
+			// 1层纹理单元 xy = 瓦片体贴图UV，[0.0, 1.0]; z = 面对应的编号0-23
 			coords0->push_back(osg::Vec2(0.5f + fLon / (osg::PI * 2), 0.5f + fLat / (osg::PI)));
 			coords1->push_back(osg::Vec3(float(x) / float(iSegment), float(y) / float(iSegment), 0));
 			normals->push_back(vDir);

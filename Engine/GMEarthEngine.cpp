@@ -64,27 +64,50 @@ namespace GM
 	class CRTTFinishCallback : public osg::Camera::DrawCallback
 	{
 	public:
-		CRTTFinishCallback(osg::Image* pBaseImg, osg::Image* pIllumImg, int i)
-			:_pBaseImage(pBaseImg), _pIllumImage(pIllumImg), iCount(i), bWritten(false) {}
+		CRTTFinishCallback(osg::Image* pImg, const std::string& strImgName, const std::vector<int>& iCountVec)
+			: _pImage(pImg), _strImgName(strImgName), _iCountVec(iCountVec) {}
 
 		virtual void operator() (osg::RenderInfo& renderInfo) const
 		{
-			if (!bWritten)
+			if (!_bWritten)
 			{
-				std::string strImgNum = std::to_string(iCount);
-				osgDB::writeImageFile(*(_pBaseImage), "../../Data/Core/Textures/Sphere/Earth/engineBody" + strImgNum + ".tif");
-				osgDB::writeImageFile(*(_pIllumImage.get()), "../../Data/Core/Textures/Sphere/Earth/bloom" + strImgNum + ".tif");
-				std::cout << strImgNum << " RTT Finished!" << std::endl;
+				int iTileLevel = _iCountVec.size() - 1;
+				std::string strImgTile = std::to_string(iTileLevel);
 
-				bWritten = true;
+				if (0 == iTileLevel)
+				{
+					std::string strImgNum = std::to_string(_iCountVec.at(0));
+
+					osgDB::writeImageFile(*(_pImage),
+						"../../Data/Core/Textures/Sphere/Earth/Tmp/Tile0/" + _strImgName + strImgNum + ".tif");
+				}
+				else if (1 == iTileLevel)
+				{
+					std::string strImgNum = std::to_string(_iCountVec.at(0)) + "_";
+					strImgNum += std::to_string(_iCountVec.at(1));
+
+					osgDB::writeImageFile(*(_pImage),
+						"../../Data/Core/Textures/Sphere/Earth/Tmp/Tile1/" + _strImgName + strImgNum + ".tif");
+				}
+				else {}
+
+				if (!_iCountVec.empty())
+				{
+					std::cout << "Tile" << iTileLevel << "_" << _iCountVec.back() << " RTT Finished!" << std::endl;
+				}
+
+				_bWritten = true;
 			}
 		}
 
 	private:
-		osg::ref_ptr<osg::Image>	_pBaseImage;
-		osg::ref_ptr<osg::Image>	_pIllumImage;
-		int							iCount;
-		mutable bool				bWritten; // 是否已经写入硬盘
+		osg::ref_ptr<osg::Image>	_pImage;
+		std::string					_strImgName = "";
+		// 图片编号vector，0级瓦片在数组的0号位置，1级瓦片在数组的1号位置
+		// 0级瓦片编号0-5（6个面组成球体）；1、2、3级瓦片编号都是0-3（四个象限）
+		std::vector<int>			_iCountVec;
+		// 是否已经写入硬盘
+		mutable bool				_bWritten = false;
 	};
 
 	class CGenEngineDataVisitor : public osg::NodeVisitor
@@ -785,8 +808,14 @@ bool CGMEarthEngine::CreateEngine()
 {
 	// 临时添加的生成“行星发动机数据”的工具函数
 	//_GenEarthEngineData();
-	// 临时添加的生成“行星发动机分布图”和“周围bloom图”的工具函数
-	//_GenEarthEngineTexture();
+	
+	//// 临时添加的生成“行星发动机主体外观图”的工具函数
+	//_GenEarthEngineBodyTexture(0);
+	//_GenEarthEngineBodyTexture(1);
+	//
+	//// 临时添加的生成“行星发动机周围bloom图”的工具函数
+	//_GenEarthEngineBloomTexture(0);
+	//_GenEarthEngineBloomTexture(1);
 
 	_GenEarthEnginePoint_1();
 	_GenEarthEngineJetLine_1();
@@ -1195,7 +1224,7 @@ void CGMEarthEngine::_GenEarthEngineData()
 	pNode->accept(cGenDataVisitor);
 }
 
-void CGMEarthEngine::_GenEarthEngineTexture()
+void CGMEarthEngine::_GenEarthEngineBodyTexture(const int iTileLevel)
 {
 	osg::ref_ptr<osg::Geode> pGeode = new osg::Geode();
 	double fUnit = m_pKernelData->fUnitArray->at(2);
@@ -1204,22 +1233,22 @@ void CGMEarthEngine::_GenEarthEngineTexture()
 	m_pEllipsoid->setRadiusPolar(6.37e6 / fUnit);
 	pGeode->addDrawable(_MakeEnginePointGeometry(m_pEllipsoid, fUnit));
 
-	int iH = 2048;
-	int iCharSize = iH * iH * 4;
-	for (int i = 0; i < 5; i++)
-	{
-		osg::ref_ptr<osg::Image> pEngineBodyImage = new osg::Image();
-		osg::ref_ptr<osg::Image> pBloomImage = new osg::Image();
-		unsigned char* pEngineData = new unsigned char[iCharSize];
-		unsigned char* pBloomData = new unsigned char[iCharSize];
-		for (int j = 0; j < iCharSize; j++)
-		{
-			pEngineData[j] = 0;
-			pBloomData[j] = 0;
-		}
-		pEngineBodyImage->setImage(iH, iH, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pEngineData, osg::Image::USE_NEW_DELETE);
-		pBloomImage->setImage(iH, iH, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pBloomData, osg::Image::USE_NEW_DELETE);
+	osg::ref_ptr<osg::Texture2D> pEngineTex = new osg::Texture2D;
+	pEngineTex->setImage(osgDB::readImageFile(m_pConfigData->strCorePath + "Textures/Sphere/Earth/EarthEngine.tga"));
+	pEngineTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	pEngineTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	pEngineTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_BORDER);
+	pEngineTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_BORDER);
+	pEngineTex->setBorderColor(osg::Vec4(0, 0, 0, 0));
+	pEngineTex->setInternalFormat(GL_RGBA8);
+	pEngineTex->setSourceFormat(GL_RGBA);
+	pEngineTex->setSourceType(GL_UNSIGNED_BYTE);
 
+	int iQuatNum = pow(4, iTileLevel);
+	int iH = 1024;
+	int iCharSize = iH * iH * 4;
+	for (int i = 0; i < 5; i++) // 由于南极面没有发动机，所以只生成5个面
+	{
 		osg::Vec3 vCenter = osg::Vec3(0, 1, 0);
 		osg::Vec3 vUp = osg::Vec3(0, 0, 1);
 		switch (i)
@@ -1270,54 +1299,216 @@ void CGMEarthEngine::_GenEarthEngineTexture()
 			break;
 		}
 
-		osg::ref_ptr<osg::Camera> pCamera = new osg::Camera;
-		pCamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
-		pCamera->setClearMask(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		pCamera->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
-		pCamera->setViewport(0, 0, iH, iH);
-		pCamera->setRenderOrder(osg::Camera::PRE_RENDER);
-		pCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
-		pCamera->attach(osg::Camera::COLOR_BUFFER0, pEngineBodyImage);
-		pCamera->attach(osg::Camera::COLOR_BUFFER1, pBloomImage);
-		pCamera->setAllowEventFocus(false);
-		pCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
-		pCamera->setViewMatrixAsLookAt(osg::Vec3(0,0,0), vCenter, vUp);
-		// 需要考虑一个像素的过渡边缘
-		pCamera->setProjectionMatrixAsPerspective(2 * osg::RadiansToDegrees(atan(1024.0 / 1023.0)), 1, 1e-4, 1e-3);
-		pCamera->setProjectionResizePolicy(osg::Camera::FIXED);
-		pCamera->addChild(pGeode);
+		for (int j = 0; j < iQuatNum; j++)
+		{
+			osg::ref_ptr<osg::Image> pEngineBodyImage = new osg::Image();
+			unsigned char* pEngineData = new unsigned char[iCharSize];
+			for (int k = 0; k < iCharSize; k++) pEngineData[k] = 0;
+			pEngineBodyImage->setImage(iH, iH, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pEngineData, osg::Image::USE_NEW_DELETE);
 
-		CRTTFinishCallback* pRTTFinishCallback = new CRTTFinishCallback(pEngineBodyImage, pBloomImage, i);
-		pCamera->setFinalDrawCallback(pRTTFinishCallback);
-		GM_Root->addChild(pCamera);
+			osg::ref_ptr<osg::Camera> pCamera = new osg::Camera;
+			pCamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
+			pCamera->setClearMask(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			pCamera->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
+			pCamera->setViewport(0, 0, iH, iH);
+			pCamera->setRenderOrder(osg::Camera::PRE_RENDER);
+			pCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
+			pCamera->attach(osg::Camera::COLOR_BUFFER, pEngineBodyImage);
+			pCamera->setAllowEventFocus(false);
+			pCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+			pCamera->setViewMatrixAsLookAt(osg::Vec3(0, 0, 0), vCenter, vUp);
+			pCamera->setProjectionResizePolicy(osg::Camera::FIXED);
+			pCamera->addChild(pGeode);
+			// 计算相机的四个截面，需要考虑1个像素的过渡边缘
+			bool bQuat = iQuatNum > 1;
+			
+			double fNear = 1e-4;
+			if (bQuat)
+			{	
+				double fEdge = fNear * (iH * 0.5 / (iH * 0.5 - 1));// 边缘的截面
+				double fMid = fNear * (1.0 / (iH * 0.5 - 1)); // 中间的截面
 
-		osg::ref_ptr<osg::StateSet> pSS = pCamera->getOrCreateStateSet();
-		pSS->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
-		pSS->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
-		pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-		pSS->setMode(GL_BLEND, osg::StateAttribute::ON);
-		pSS->setAttributeAndModes(new osg::BlendFunc(
-			GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
-		), osg::StateAttribute::ON);
-		pSS->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
+				double fLeft = -fEdge;
+				double fRight = fEdge;
+				double fBottom = -fEdge;
+				double fTop = fEdge;
 
-		osg::ref_ptr<osg::Texture2D> pEngineTex = new osg::Texture2D;
-		pEngineTex->setImage(osgDB::readImageFile(m_pConfigData->strCorePath + "Textures/Sphere/Earth/EarthEngine.tga"));
-		pEngineTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-		pEngineTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-		pEngineTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_BORDER);
-		pEngineTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_BORDER);
-		pEngineTex->setBorderColor(osg::Vec4(0, 0, 0, 0));
-		pEngineTex->setInternalFormat(GL_RGBA8);
-		pEngineTex->setSourceFormat(GL_RGBA);
-		pEngineTex->setSourceType(GL_UNSIGNED_BYTE);
+				if (1 == j || 2 == j) fLeft = -fMid;
+				if(0 == j || 3 == j) fRight = fMid;
+				if(0 == j || 1 == j) fBottom = -fMid;
+				if(2 == j || 3 == j) fTop = fMid;
 
-		int iUnit = 0;
-		CGMKit::AddTexture(pSS, pEngineTex, "engineTex", iUnit++);
+				pCamera->setProjectionMatrixAsFrustum(fLeft, fRight, fBottom, fTop, fNear, 1e-3);
+			}
+			else
+			{
+				double fFov = 2 * osg::RadiansToDegrees(atan(iH * 0.5 / (iH * 0.5 - 1)));
+				pCamera->setProjectionMatrixAsPerspective(fFov, 1, fNear, 1e-3);
+			}
 
-		std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineRTT.vert";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineRTT.frag";
-		CGMKit::LoadShader(pSS, strVertPath, strFragPath, "PlanetEngineRTT");
+			std::vector<int> iTileVector;
+			iTileVector.push_back(i);
+			if(bQuat) iTileVector.push_back(j);
+
+			CRTTFinishCallback* pRTTFinishCallback = new CRTTFinishCallback(pEngineBodyImage, "engineBody", iTileVector);
+			pCamera->setFinalDrawCallback(pRTTFinishCallback);
+			GM_Root->addChild(pCamera);
+
+			osg::ref_ptr<osg::StateSet> pSS = pCamera->getOrCreateStateSet();
+			pSS->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
+			pSS->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
+			pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+			pSS->setMode(GL_BLEND, osg::StateAttribute::ON);
+			pSS->setAttributeAndModes(new osg::BlendFunc(
+				GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+			), osg::StateAttribute::ON);
+			pSS->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
+			pSS->setDefine("TILE_LEVEL", std::to_string(iTileLevel), osg::StateAttribute::ON);
+
+			int iUnit = 0;
+			CGMKit::AddTexture(pSS, pEngineTex, "engineTex", iUnit++);
+
+			std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineRTT.vert";
+			std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineRTT.frag";
+			CGMKit::LoadShader(pSS, strVertPath, strFragPath, "PlanetEngineRTT");
+		}
+	}
+}
+
+void CGMEarthEngine::_GenEarthEngineBloomTexture(const int iTileLevel)
+{
+	osg::ref_ptr<osg::Geode> pGeode = new osg::Geode();
+	double fUnit = m_pKernelData->fUnitArray->at(2);
+	// 要保证这里是个球体，不能是椭球
+	m_pEllipsoid->setRadiusEquator(6.37e6 / fUnit);
+	m_pEllipsoid->setRadiusPolar(6.37e6 / fUnit);
+	pGeode->addDrawable(_MakeEnginePointGeometry(m_pEllipsoid, fUnit));
+	
+	int iQuatNum = pow(4, iTileLevel);
+	int iH = 512;
+	int iCharSize = iH * iH * 4;
+	for (int i = 0; i < 5; i++) // 由于南极面没有发动机，所以只生成5个面
+	{
+		osg::Vec3 vCenter = osg::Vec3(0, 1, 0);
+		osg::Vec3 vUp = osg::Vec3(0, 0, 1);
+		switch (i)
+		{
+		case 0:
+		{
+			// posX
+			vCenter = osg::Vec3(1, 0, 0);
+			vUp = osg::Vec3(0, 0, 1);
+		}
+		break;
+		case 1:
+		{
+			// negX
+			vCenter = osg::Vec3(-1, 0, 0);
+			vUp = osg::Vec3(0, 0, 1);
+		}
+		break;
+		case 2:
+		{
+			// posY
+			vCenter = osg::Vec3(0, 1, 0);
+			vUp = osg::Vec3(0, 0, 1);
+		}
+		break;
+		case 3:
+		{
+			// negY
+			vCenter = osg::Vec3(0, -1, 0);
+			vUp = osg::Vec3(0, 0, 1);
+		}
+		break;
+		case 4:
+		{
+			// posZ
+			vCenter = osg::Vec3(0, 0, 1);
+			vUp = osg::Vec3(-1, 0, 0);
+		}
+		break;
+		case 5:
+		{
+			// negZ
+			vCenter = osg::Vec3(0, 0, -1);
+			vUp = osg::Vec3(1, 0, 0);
+		}
+		break;
+		default:
+			break;
+		}
+
+		for (int j = 0; j < iQuatNum; j++)
+		{
+			osg::ref_ptr<osg::Image> pBloomImage = new osg::Image();
+			unsigned char* pBloomData = new unsigned char[iCharSize];
+			for (int j = 0; j < iCharSize; j++) pBloomData[j] = 0;
+			pBloomImage->setImage(iH, iH, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pBloomData, osg::Image::USE_NEW_DELETE);
+
+			osg::ref_ptr<osg::Camera> pCamera = new osg::Camera;
+			pCamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
+			pCamera->setClearMask(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			pCamera->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
+			pCamera->setViewport(0, 0, iH, iH);
+			pCamera->setRenderOrder(osg::Camera::PRE_RENDER);
+			pCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
+			pCamera->attach(osg::Camera::COLOR_BUFFER, pBloomImage);
+			pCamera->setAllowEventFocus(false);
+			pCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+			pCamera->setViewMatrixAsLookAt(osg::Vec3(0, 0, 0), vCenter, vUp);
+			pCamera->setProjectionResizePolicy(osg::Camera::FIXED);
+			pCamera->addChild(pGeode);
+			// 计算相机的四个截面，需要考虑1个像素的过渡边缘
+			bool bQuat = iQuatNum > 1;
+
+			double fNear = 1e-4;
+			if (bQuat)
+			{
+				double fEdge = fNear * (iH * 0.5 / (iH * 0.5 - 1));// 边缘的截面
+				double fMid = fNear * (1.0 / (iH * 0.5 - 1)); // 中间的截面
+
+				double fLeft = -fEdge;
+				double fRight = fEdge;
+				double fBottom = -fEdge;
+				double fTop = fEdge;
+
+				if (1 == j || 2 == j) fLeft = -fMid;
+				if (0 == j || 3 == j) fRight = fMid;
+				if (0 == j || 1 == j) fBottom = -fMid;
+				if (2 == j || 3 == j) fTop = fMid;
+
+				pCamera->setProjectionMatrixAsFrustum(fLeft, fRight, fBottom, fTop, fNear, 1e-3);
+			}
+			else
+			{
+				double fFov = 2 * osg::RadiansToDegrees(atan(iH * 0.5 / (iH * 0.5 - 1)));
+				pCamera->setProjectionMatrixAsPerspective(fFov, 1, fNear, 1e-3);
+			}
+
+			std::vector<int> iTileVector;
+			iTileVector.push_back(i);
+			if (bQuat) iTileVector.push_back(j);
+
+			CRTTFinishCallback* pRTTFinishCallback = new CRTTFinishCallback(pBloomImage, "bloom", iTileVector);
+			pCamera->setFinalDrawCallback(pRTTFinishCallback);
+			GM_Root->addChild(pCamera);
+
+			osg::ref_ptr<osg::StateSet> pSS = pCamera->getOrCreateStateSet();
+			pSS->setTextureAttributeAndModes(0, new osg::PointSprite(), osg::StateAttribute::ON);
+			pSS->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
+			pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+			pSS->setMode(GL_BLEND, osg::StateAttribute::ON);
+			pSS->setAttributeAndModes(new osg::BlendFunc(
+				GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
+			), osg::StateAttribute::ON);
+			pSS->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
+			pSS->setDefine("TILE_LEVEL", std::to_string(iTileLevel), osg::StateAttribute::ON);
+
+			std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineBloomRTT.vert";
+			std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineBloomRTT.frag";
+			CGMKit::LoadShader(pSS, strVertPath, strFragPath, "PlanetEngineBloomRTT");
+		}
 	}
 }
 
@@ -1360,7 +1551,7 @@ osg::Geometry* CGMEarthEngine::_MakeEnginePointGeometry(const osg::EllipsoidMode
 		}
 
 		// 计算发动机底座直径, 单位：像素
-		float fDiameter = (vData.w() / 11000) * 2048 * (3e4 / 6.36e6) / osg::PI_2;
+		float fDiameter = (vData.w() / 11000) * 1024 * (3e4 / 6.36e6) / osg::PI_2;
 		// 计算发动机喷射方向
 		osg::Vec3 vDir = m_pEEDirControl->EngineDir(vTopPos);
 		// 计算发动机喷射口位置
@@ -1568,75 +1759,4 @@ osg::Geometry* CGMEarthEngine::_MakeEngineJetStreamGeometry(const osg::Ellipsoid
 	geom->setNormalBinding(osg::Geometry::BIND_OFF);
 	geom->addPrimitiveSet(pEle);
 	return geom;
-}
-
-void CGMEarthEngine::_MixWEETexture(
-	const std::string& strPath0, const std::string& strPath1, const std::string& strOut,
-	const int iType)
-{
-	for (int iFace = 0; iFace < 5; iFace++)
-	{
-		osg::ref_ptr<osg::Image> pImage0 = osgDB::readImageFile(
-			strPath0 + std::to_string(iFace) + ".tif");
-		osg::ref_ptr<osg::Image> pImage1 = osgDB::readImageFile(
-			strPath1 + std::to_string(iFace) + ".tif");
-		if (!pImage0.valid() || !pImage1.valid()) return;
-
-		int iDataSize = pImage0->s() * pImage0->t() * 4;
-		osg::ref_ptr<osg::Image> pOutImage = new osg::Image;
-		unsigned char* pData = new unsigned char[iDataSize];
-		for (int i = 0; i < pImage0->s(); i++)
-		{
-			for (int j = 0; j < pImage0->t(); j++)
-			{
-				float fX = float(i) / float(pImage0->s()-1);
-				float fY = float(j) / float(pImage0->t()-1);
-				osg::Vec4 c0 = CGMKit::GetImageColor(pImage0, fX, fY);
-				osg::Vec4 c1 = CGMKit::GetImageColor(pImage1, 1 - fX, fY, true);
-				// 目标图片当前像素R通道的地址
-				int iAddress = 4 * (pImage0->s() * j + i);
-				// 根据不同图片，采取不同的叠加算法
-				switch (iType)
-				{
-				case 0:
-				{
-					// base color
-					osg::Vec4 c2 = c0;
-					c2.r() = CGMKit::Mix(c0.r(), c1.r(), c1.a());
-					c2.g() = CGMKit::Mix(c0.g(), c1.g(), c1.a());
-					c2.b() = CGMKit::Mix(c0.b(), c1.b(), c1.a());
-					c2.a() = CGMKit::Mix(c0.a(), 0, c1.a()); // 0=陆地，1=海洋
-
-					pData[iAddress] = (unsigned char)(c2.r() * 255);
-					pData[iAddress + 1] = (unsigned char)(c2.g() * 255);
-					pData[iAddress + 2] = (unsigned char)(c2.b() * 255);
-					pData[iAddress + 3] = (unsigned char)(c2.a() * 255);
-				}
-				break;
-				case 1:
-				{
-					// cloud color
-					pData[iAddress] = (unsigned char)(c1.a() * 255);
-					pData[iAddress + 1] = (unsigned char)(c0.g() * 255);
-					pData[iAddress + 2] = (unsigned char)(c0.b() * 255);
-					pData[iAddress + 3] = (unsigned char)(c0.a() * 255);
-				}
-				break;
-				case 2:
-				{
-					// illumination color
-					pData[iAddress] = (unsigned char)(c0.r() * 255);
-					pData[iAddress + 1] = (unsigned char)(c0.g() * 255);
-					pData[iAddress + 2] = (unsigned char)(c0.b() * 255);
-					pData[iAddress + 3] = (unsigned char)(c1.a() * 255);
-				}
-				break;
-				default:
-					return;
-				}
-			}
-		}
-		pOutImage->setImage(pImage0->s(), pImage0->t(), 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pData, osg::Image::USE_NEW_DELETE);
-		osgDB::writeImageFile(*(pOutImage.get()), strOut + std::to_string(iFace) + ".tif");
-	}
 }

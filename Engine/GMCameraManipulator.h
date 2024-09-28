@@ -72,7 +72,7 @@ namespace GM
 			bPitchOrYaw(false), bRollLeft(false), bRollRight(false),
 			bShift(false), bBrakeMode(false), 
 			fRoll_Max(osg::PI*2), vSpeed_Max(3e7, 3e7, 3e7),
-			vAcceleration_Normal(98, 98, 200), vAcceleration_Max(98000, 98000, 200000)
+			vAcceleration_Normal(98, 98, 200), vAcceleration_Max(9800, 9800, 20000)
 		{}
 
 		// 速度，飞船右手坐标系下，xyz = 右上后，单位：m/s

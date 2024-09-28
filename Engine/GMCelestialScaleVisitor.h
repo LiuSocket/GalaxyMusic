@@ -42,12 +42,13 @@ namespace GM
 			osg::Vec3Array* pVert = dynamic_cast<osg::Vec3Array*>(geom.getVertexArray());
 			osg::Vec3Array* pNorm = dynamic_cast<osg::Vec3Array*>(geom.getNormalArray());
 			// 0层纹理单元 xy = WGS84对应的UV，[0.0, 1.0]
-			// 1层纹理单元 xy = 四分之一面体贴图UV，[0.0, 1.0]; z = 面对应的编号0-23
+			// 1层纹理单元 xy = 瓦片体贴图UV，[0.0, 1.0]; z = 面对应的编号0-23
 			osg::Vec2Array* pCoord0 = dynamic_cast<osg::Vec2Array*>(geom.getTexCoordArray(0));
 			osg::Vec3Array* pCoord1 = dynamic_cast<osg::Vec3Array*>(geom.getTexCoordArray(1));
 
 			if (!pVert || !pNorm || !pCoord0 || !pCoord1) return;
 
+			// 如果是瓦片体，重新计算顶点位置和纹理坐标
 			osg::Vec2Array* pNewCoord0 =  new osg::Vec2Array();
 			pNewCoord0->resize(pVert->size());
 
@@ -61,11 +62,11 @@ namespace GM
 				{
 					int iX = i % iVertEdgeNum;
 					int iY = i / iVertEdgeNum;
-					int iAddX = 2 * (iVertEdgeNum / 2 - iX);
+					int iAddX = 2 * (iVertEdgeNum / 2 - iX) - 1;
 					// X轴对称点的索引
 					int iInvX = i + iAddX;
 					// Y轴对称点的索引
-					int iInvY = (iY + 2 * (iVertEdgeNum / 2 - iY)) * iVertEdgeNum + iX;
+					int iInvY = (iY + 2 * (iVertEdgeNum / 2 - iY) - 1) * iVertEdgeNum + iX;
 					// 中心对称点的索引
 					int iInvXY = iInvY + iAddX;
 
@@ -79,46 +80,104 @@ namespace GM
 					//	2/6/10/14/18/22		|		3/7/11/15/19/23
 					switch (_iQuatorFaceID)
 					{
-					case 1: // 第二象限 posX 赤道
-					{
+					case 1: // 第二象限 posX 赤道大西洋
 						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
 						fLon = (0.5 - pCoord0->at(iInvX).x()) * osg::PI * 2;
-					}
-					break;
-					case 2: // 第三象限 posX 赤道
-					{
+						break;
+					case 2: // 第三象限 posX 赤道大西洋
 						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
 						fLon = (0.5 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
-					}
-					break;
-					case 3: // 第四象限 posX 赤道
-					{
+						break;
+					case 3: // 第四象限 posX 赤道大西洋
 						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
 						fLon = (pCoord0->at(iInvY).x() - 0.5) * osg::PI * 2;
-					}
-					break;
+						break;
+					///////////////////////////////////////////////////////////
+					case 4: // 第一象限 negX 赤道太平洋
+						fLat = (pCoord0->at(i).y() - 0.5) * osg::PI;
+						fLon = (pCoord0->at(i).x() - 1.0) * osg::PI * 2;
+						break;
+					case 5: // 第二象限 negX 赤道太平洋
+						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
+						fLon = (1.0-pCoord0->at(iInvX).x()) * osg::PI * 2;
+						break;
+					case 6: // 第三象限 negX 赤道太平洋
+						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
+						fLon = (1.0 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
+						break;
+					case 7: // 第四象限 negX 赤道太平洋
+						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
+						fLon = (pCoord0->at(iInvY).x() - 1.0) * osg::PI * 2;
+						break;
+					///////////////////////////////////////////////////////////
+					case 8: // 第一象限 posY 赤道印尼
+						fLat = (pCoord0->at(i).y() - 0.5) * osg::PI;
+						fLon = (pCoord0->at(i).x() - 0.25) * osg::PI * 2;
+						break;
+					case 9: // 第二象限 posY 赤道印尼
+						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
+						fLon = (0.75 - pCoord0->at(iInvX).x()) * osg::PI * 2;
+						break;
+					case 10: // 第三象限 posY 赤道印尼
+						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
+						fLon = (0.75 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
+						break;
+					case 11: // 第四象限 posY 赤道印尼
+						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
+						fLon = (pCoord0->at(iInvY).x() - 0.25) * osg::PI * 2;
+						break;
+					///////////////////////////////////////////////////////////
+					case 12: // 第一象限 negY 赤道美洲
+						fLat = (pCoord0->at(i).y() - 0.5) * osg::PI;
+						fLon = (pCoord0->at(i).x() - 0.75) * osg::PI * 2;
+						break;
+					case 13: // 第二象限 negY 赤道美洲
+						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
+						fLon = (0.25 - pCoord0->at(iInvX).x()) * osg::PI * 2;
+						break;
+					case 14: // 第三象限 negY 赤道美洲
+						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
+						fLon = (0.25 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
+						break;
+					case 15: // 第四象限 negY 赤道美洲
+						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
+						fLon = (pCoord0->at(iInvY).x() - 0.75) * osg::PI * 2;
+						break;
+					///////////////////////////////////////////////////////////
 					case 17: // 第二象限 posZ 北极
-					{
 						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
 						fLon = (0.5 - pCoord0->at(iInvX).x()) * osg::PI * 2;
-					}
-					break;
+						break;
 					case 18: // 第三象限 posZ 北极
-					{
 						fLat = (pCoord0->at(iInvXY).y() - 0.5) * osg::PI;
-						fLon = pCoord0->at(iInvXY).x() * osg::PI * 2;
-					}
-					break;
+						fLon = (pCoord0->at(iInvXY).x() - 1.0) * osg::PI * 2;
+						break;
 					case 19: // 第四象限 posZ 北极
-					{
 						fLat = (pCoord0->at(iInvY).y() - 0.5) * osg::PI;
 						fLon = (1.0 - pCoord0->at(iInvY).x()) * osg::PI * 2;
-					}
-					break;
+						break;
+					///////////////////////////////////////////////////////////
+					case 20: // 第一象限 negZ 南极
+						fLat = (0.5 - pCoord0->at(i).y()) * osg::PI;
+						fLon = (1.0 - pCoord0->at(i).x()) * osg::PI * 2;
+						break;
+					case 21: // 第二象限 negZ 南极
+						fLat = (0.5 - pCoord0->at(iInvX).y()) * osg::PI;
+						fLon = (pCoord0->at(iInvX).x()-1.0) * osg::PI * 2;
+						break;
+					case 22: // 第三象限 negZ 南极
+						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
+						fLon = (0.5 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
+						break;
+					case 23: // 第四象限 negZ 南极
+						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
+						fLon = (pCoord0->at(iInvY).x()-0.5) * osg::PI * 2;
+						break;
+					///////////////////////////////////////////////////////////
 					default:
 						break;
 					}
-					pNewCoord0->at(i) = osg::Vec2(fLon, fLat);
+					pNewCoord0->at(i) = osg::Vec2(0.5f + fLon / (osg::PI * 2), 0.5f + fLat / osg::PI);
 					pCoord1->at(i).z() = _iQuatorFaceID;
 				}
 				double fCosLat = cos(fLat);
@@ -148,8 +207,8 @@ namespace GM
 
 	private:
 		osg::EllipsoidModel ellipsoid;
-		bool _bQuator = false; // 是否是四分之一面体
-		int _iQuatorFaceID = 0; // 四分之一面体对应的编号 0-23
+		bool _bQuator = false; // 是否是瓦片体
+		int _iQuatorFaceID = 0; // 瓦片体对应的编号 0-23
 	};
 
 }	// GM

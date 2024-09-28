@@ -17,14 +17,14 @@
 namespace GM
 {
 	/*!
-	*  @brief 四分之一面的数据结构体
+	*  @brief 瓦片的数据结构体
 	*/
-	struct SQuatorData
+	struct STileData
 	{
-		osg::ref_ptr<osg::Transform> pQuatorTrans;	//!< 四分之一面的位置节点
-		std::vector<osg::Vec3d> vCenterDirVec;		//!< 所有可能的中心点方向的vector
-		int iQuatorID;				//!< 四分之一面象限，0123
-		bool bPolar;				//!< 是否是极地区域
+		osg::ref_ptr<osg::Transform> pTileTrans;	// 瓦片的位置节点
+		std::vector<osg::Vec3d> vTileDirVec;		// 所有可能的中心点方向的vector
+		int iTileID = 0;		// 瓦片象限，0123
+		bool bPolar = false;	// 是否是极地区域
 	};
 
 	/*!
@@ -86,20 +86,28 @@ namespace GM
 		bool _CreateTerrain_1();
 
 		/**
+		* @brief 创建0/1级瓦片
+		*	0级瓦片是六面体细分后的球体的一个面的四分之一，1级瓦片是0级瓦片细分一次的结果
+		* @return bool:			成功true，失败false
+		*/
+		bool _CreateTile_0();
+		bool _CreateTile_1();
+		/**
 		* @brief 创建六面体细分后的球体的一个面的四分之一的部分，每个顶点都有法线和UV
 		* UV0.xy = WGS84对应的UV，[0.0, 1.0]
 		* UV1.xy = 六面体贴图UV，[0.0, 1.0]
 		* UV1.z = 六面体ID，0,1,2,3,4,5
 		* @param bPolar:			是否是极地区域
-		* @param iHalfSegment:		四分之一面体的边长的分段数，也就是一个六面体的半边长的分段数
+		* @param iHalfSegment:		瓦片体的边长的分段数，也就是一个六面体的半边长的分段数
+		*							特意设置成2^n-1是为了保证高程图的分辨率是2^n
 		* @return Geometry:			返回几何体指针
 		*/
-		osg::Geometry* _MakeHexahedronQuaterGeometry(const bool bPolar, int iHalfSegment = 64) const;
+		osg::Geometry* _MakeHexahedronQuaterGeometry(const bool bPolar, int iHalfSegment = 63) const;
 
 		/**
 		* @brief 根据顶点的信息获取顶点的索引，会特殊处理国际日期变更线上的顶点
 		* @param iX，iY: 顶点的XY位置
-		* @param iHalfSeg: 四分之一面体的边长的分段数，也就是一个六面体的半边长的分段数
+		* @param iHalfSeg: 瓦片体的边长的分段数，也就是一个六面体的半边长的分段数
 		* @return int: 顶点的索引
 		*/
 		inline int _GetVertIndex(const int iX, const int iY, const int iHalfSeg) const
@@ -116,9 +124,12 @@ namespace GM
 		std::string m_strGalaxyShaderPath = "Shaders/GalaxyShader/";			//!< galaxy shader 路径
 		std::string m_strTerrainShaderPath = "Shaders/TerrainShader/";			//!< Terrain shader 路径
 
-		std::vector<osg::ref_ptr<osg::Group>>		m_pHieTerrainRootVector;		//!< 01空间层级的根节点
-		std::vector<SQuatorData>					m_sQuatorVec;					//!< 四分之一面数据vector
+		std::vector<osg::ref_ptr<osg::Group>>		m_pHieTerrainRootVector;	//!< 01空间层级的根节点
+		CGMCelestialScaleVisitor*	m_pCelestialScaleVisitor = nullptr;			//!< 用于控制天体大小
 
-		CGMCelestialScaleVisitor*	m_pCelestialScaleVisitor = nullptr;		//!< 用于控制天体大小
+	private:
+		std::vector<STileData>						m_sTileVec_0;				//!< 0级瓦片数据vector
+		std::vector<STileData>						m_sTileVec_1;				//!< 1级瓦片数据vector
+		std::vector<osg::Vec3d>						vTileDirVec_1;				//!< 1级瓦片中心点方向的vector	
 	};
 }	// GM

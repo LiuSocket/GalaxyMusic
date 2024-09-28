@@ -102,20 +102,28 @@ namespace GM
 		* @brief 全景DEM转cubemap版本DEM
 		* @param strPanoPath: 全景DEM_bed路径
 		* @param strCubeMapPath: CubeDEM路径
+		* @param iSize: CubeDEM大小
+		* @param iTileLevel: 瓦片级别
 		* @return bool: 成功true，失败false
 		*/
 		bool _Panorama_2_CubeDEM(
 			const std::string& strPanoPath,
-			const std::string& strCubeDEMPath);
+			const std::string& strCubeDEMPath,
+			const int iSize,
+			const int iTileLevel = 0);
 		/**
 		* @brief 全景图转cubemap
 		* @param strPanoramaPath: 全景图路径
 		* @param strCubeMapPath: CubeMap路径
+		* @param iSize: CubeMap大小
+		* @param iTileLevel: 瓦片级别
 		* @return bool: 成功true，失败false
 		*/
 		bool _Panorama_2_CubeMap(
 			const std::string& strPanoramaPath,
-			const std::string& strCubeMapPath);
+			const std::string& strCubeMapPath,
+			const int iSize,
+			const int iTileLevel = 0);
 
 		/**
 		* @brief 根据顶点的信息获取顶点的索引，会特殊处理国际日期变更线上的顶点

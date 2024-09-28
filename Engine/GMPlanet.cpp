@@ -379,28 +379,36 @@ void CGMPlanet::Panorama2CubeMap()
 {
 	// 全景图转Cubemap
 	std::string strPanoPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/DEM_bed.tif";
-	std::string strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_DEM_";
-	//_Panorama_2_CubeDEM(strPanoPath, strCubemapPath);
+	std::string strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tile0/Earth_DEM_";
+	//_Panorama_2_CubeDEM(strPanoPath, strCubemapPath, 1024);
+	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tile1/Earth_DEM_";
+	//_Panorama_2_CubeDEM(strPanoPath, strCubemapPath, 1024, 1);
 
 	//strPanoPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_base.tif";
-	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_base_";
-	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath);
-	
+	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tile0/Earth_base_";
+	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath, 1024);
+	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tile1/Earth_base_";
+	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath, 1024, 1);
+
 	//strPanoPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_base_real.tif";
-	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_base_real_";
-	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath);
+	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/wanderingEarth_base_real_";
+	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath, 1024);
+	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile1/wanderingEarth_base_real_";
+	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath, 1024, 1);
 
 	//strPanoPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_illum_real.tif";
-	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_illum_real_";
-	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath);
+	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tile0/Earth_illum_real_";
+	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath, 512);
+	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tile1/Earth_illum_real_";
+	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath, 512, 1);
 
 	//strPanoPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_cloud_real.tif";
-	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_cloud_real_";
-	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath);
+	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/Earth_cloud_real_";
+	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath, 512);
 
-	strPanoPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_cloud.tif";
-	strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_cloud_real_";
-	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath);
+	//strPanoPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/WanderingEarth/wanderingEarth_cloud.tif";
+	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/wanderingEarth_cloud_real_";
+	//_Panorama_2_CubeMap(strPanoPath, strCubemapPath, 512);
 
 	/*strPanoPath = m_pConfigData->strCorePath + "Textures/Sphere/Jupiter/Jupiter_cloud.tif";
 	strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Jupiter/Jupiter_cloud_";
@@ -457,215 +465,287 @@ void CGMPlanet::Panorama2CubeMap()
 
 bool CGMPlanet::_Panorama_2_CubeDEM(
 	const std::string& strPanoPath,
-	const std::string& strCubeDEMPath)
+	const std::string& strCubeDEMPath,
+	const int iSize,
+	const int iTileLevel)
 {
 	osg::ref_ptr<osg::Image> pBedImg = osgDB::readImageFile(strPanoPath);
 	if (!pBedImg.valid()) return false;
 
-	int iSize = 4096;
-	float fHalfSize = iSize * 0.5f;
-
-	parallel_for(int(0), int(6), [&](int i) // 多线程
-	//for (int i = 0; i < 6; i++)
+	for (int t1 = 0; t1 < (iTileLevel >= 1 ? 4 : 1); t1++)
 	{
-		osg::Vec3 vCenter = osg::Vec3(0, 1, 0);
-		osg::Vec3 vAxisX = osg::Vec3(1, 0, 0);
-		osg::Vec3 vAxisY = osg::Vec3(0, 0, 1);
-		switch (i)
+		parallel_for(int(0), int(6), [&](int i) // 多线程
+		//for (int i = 0; i < 6; i++)
 		{
-		case 0:
-		{
-			// posX
-			vCenter = osg::Vec3(1, 0, 0);
-			vAxisX = osg::Vec3(0, 1, 0);
-			vAxisY = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 1:
-		{
-			// negX
-			vCenter = osg::Vec3(-1, 0, 0);
-			vAxisX = osg::Vec3(0, -1, 0);
-			vAxisY = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 2:
-		{
-			// posY
-			vCenter = osg::Vec3(0, 1, 0);
-			vAxisX = osg::Vec3(-1, 0, 0);
-			vAxisY = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 3:
-		{
-			// negY
-			vCenter = osg::Vec3(0, -1, 0);
-			vAxisX = osg::Vec3(1, 0, 0);
-			vAxisY = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 4:
-		{
-			// posZ
-			vCenter = osg::Vec3(0, 0, 1);
-			vAxisX = osg::Vec3(0, 1, 0);
-			vAxisY = osg::Vec3(-1, 0, 0);
-		}
-		break;
-		case 5:
-		{
-			// negZ
-			vCenter = osg::Vec3(0, 0, -1);
-			vAxisX = osg::Vec3(0, 1, 0);
-			vAxisY = osg::Vec3(1, 0, 0);
-		}
-		break;
-		default:
-			break;
-		}
-
-		GLushort* pCubeDEMData = new GLushort[iSize * iSize];
-		for (int x = 0; x < iSize; x++)
-		{
-			for (int y = 0; y < iSize; y++)
+			osg::Vec3 vCenter = osg::Vec3(0, 1, 0);
+			osg::Vec3 vAxisX = osg::Vec3(1, 0, 0);
+			osg::Vec3 vAxisY = osg::Vec3(0, 0, 1);
+			switch (i)
 			{
-				// 要注意，每张图的周围一圈像素都是保护边界，与相邻的图片边界相同，这样可以避免边缘接缝问题
-				// 每个像素的方向
-				osg::Vec3 vDir = vCenter
-					+ vAxisX * (x * iSize / float(iSize - 1) - fHalfSize) / fHalfSize
-					+ vAxisY * (y * iSize / float(iSize - 1) - fHalfSize) / fHalfSize;
-				vDir.normalize();
+			case 0:
+			{
+				// posX
+				vCenter = osg::Vec3(1, 0, 0);
+				vAxisX = osg::Vec3(0, 1, 0);
+				vAxisY = osg::Vec3(0, 0, 1);
+			}
+			break;
+			case 1:
+			{
+				// negX
+				vCenter = osg::Vec3(-1, 0, 0);
+				vAxisX = osg::Vec3(0, -1, 0);
+				vAxisY = osg::Vec3(0, 0, 1);
+			}
+			break;
+			case 2:
+			{
+				// posY
+				vCenter = osg::Vec3(0, 1, 0);
+				vAxisX = osg::Vec3(-1, 0, 0);
+				vAxisY = osg::Vec3(0, 0, 1);
+			}
+			break;
+			case 3:
+			{
+				// negY
+				vCenter = osg::Vec3(0, -1, 0);
+				vAxisX = osg::Vec3(1, 0, 0);
+				vAxisY = osg::Vec3(0, 0, 1);
+			}
+			break;
+			case 4:
+			{
+				// posZ
+				vCenter = osg::Vec3(0, 0, 1);
+				vAxisX = osg::Vec3(0, 1, 0);
+				vAxisY = osg::Vec3(-1, 0, 0);
+			}
+			break;
+			case 5:
+			{
+				// negZ
+				vCenter = osg::Vec3(0, 0, -1);
+				vAxisX = osg::Vec3(0, 1, 0);
+				vAxisY = osg::Vec3(1, 0, 0);
+			}
+			break;
+			default:
+				break;
+			}
 
-				float fLon = atan2(vDir.y(), vDir.x());// 弧度
-				float fLat = asin(vDir.z());// 弧度
-				// tif的左下角坐标：(0.0, 0.0)
-				float fX = 0.5f + fLon / (osg::PI * 2);
-				float fY = 0.5f + fLat / (osg::PI);
-				float fElevBed = CGMKit::GetImageColor(pBedImg, fX, fY, true).r();
-				// float to short
-				GLushort sElevBed = min(1.0f, sqrt(abs(fElevBed * 1e-4)))*32767;
-				if (fElevBed > 0)
-					sElevBed = 32768 + sElevBed;
-				else
-					sElevBed = 32768 - sElevBed;
+			GLushort* pCubeDEMData = new GLushort[iSize * iSize];
+			for (int x = 0; x < iSize; x++)
+			{
+				for (int y = 0; y < iSize; y++)
+				{
+					// 要注意，每张图的周围一圈像素都是保护边界，与相邻的图片边界相同，这样可以避免边缘接缝问题
+					// 每个像素的方向
+					osg::Vec3 vDir = vCenter;
+					switch (iTileLevel)
+					{
+					case 0: // 六面体
+					{
+						float fHalfSize = iSize * 0.5f;
+						vDir += (vAxisX * (x * iSize / float(iSize - 1) - fHalfSize)
+							+ vAxisY * (y * iSize / float(iSize - 1) - fHalfSize)) / fHalfSize;
+					}
+					break;
+					case 1: // 第1级瓦片，六面体的每个面分成4个瓦片
+					{
+						float fSize = float(iSize - 1);
+						if (0 == t1)
+							vDir += (vAxisX * x + vAxisY * y) / fSize;
+						else if (1 == t1)
+							vDir -= (vAxisX * (fSize - x) - vAxisY * y) / fSize;
+						else if (2 == t1)
+							vDir -= (vAxisX * (fSize - x) + vAxisY * (fSize - y)) / fSize;
+						else if (3 == t1)
+							vDir += (vAxisX * x - vAxisY * (fSize - y)) / fSize;
+						else {}
+					}
+					break;
+					default:
+						break;
+					}
+					vDir.normalize();
 
-				// 最终要转成raw，所以y需要颠倒
-				int iAddress = x + (iSize - 1 - y) * iSize;
-				pCubeDEMData[iAddress] = sElevBed;
+					float fLon = atan2(vDir.y(), vDir.x());// 弧度
+					float fLat = asin(vDir.z());// 弧度
+					// tif的左下角坐标：(0.0, 0.0)
+					float fX = 0.5f + fLon / (osg::PI * 2);
+					float fY = 0.5f + fLat / (osg::PI);
+					float fElevBed = CGMKit::GetImageColor(pBedImg, fX, fY, true).r();
+					// float to short
+					GLushort sElevBed = min(1.0f, sqrt(abs(fElevBed * 1e-4))) * 32767;
+					if (fElevBed > 0)
+						sElevBed = 32768 + sElevBed;
+					else
+						sElevBed = 32768 - sElevBed;
+
+					// 最终要转成raw，所以y需要颠倒
+					int iAddress = x + (iSize - 1 - y) * iSize;
+					pCubeDEMData[iAddress] = sElevBed;
+				}
+			}
+
+			osg::ref_ptr<osg::Image> pCubeImage = new osg::Image();
+			pCubeImage->setImage(iSize, iSize, 1, GL_R16F, GL_RED, GL_UNSIGNED_SHORT, (unsigned char*)pCubeDEMData, osg::Image::USE_NEW_DELETE);
+			switch (iTileLevel)
+			{
+			case 0: // 六面体
+				osgDB::writeImageFile(*(pCubeImage.get()), strCubeDEMPath + std::to_string(i) + ".tif");
+				break;
+			case 1: // 第1级瓦片，六面体的每个面分成4个瓦片
+				osgDB::writeImageFile(*(pCubeImage.get()), strCubeDEMPath + std::to_string(i) + "_" + std::to_string(t1) + ".tif");
+				break;
+			default:
+				break;
 			}
 		}
-
-		osg::ref_ptr<osg::Image> pCubeImage = new osg::Image();
-		pCubeImage->setImage(iSize, iSize, 1, GL_R16F, GL_RED, GL_UNSIGNED_SHORT, (unsigned char*)pCubeDEMData, osg::Image::USE_NEW_DELETE);
-		osgDB::writeImageFile(*(pCubeImage.get()), strCubeDEMPath + std::to_string(i) + ".tif");
+		); // end parallel_for
 	}
-	); // end parallel_for
 	return true;
 }
 
-bool CGMPlanet::_Panorama_2_CubeMap(const std::string& strPanoramaPath, const std::string& strCubeMapPath)
+bool CGMPlanet::_Panorama_2_CubeMap(
+	const std::string& strPanoramaPath,
+	const std::string& strCubeMapPath,
+	const int iSize,
+	const int iTileLevel)
 {
 	osg::ref_ptr<osg::Image> pPanoImg = osgDB::readImageFile(strPanoramaPath);
 	if(!pPanoImg.valid()) return false;
 
-	int iSize = pPanoImg->t() / 2;
-	int iByteNum = iSize * iSize * 4;
-	float fHalfSize = iSize * 0.5f;
-
-	parallel_for(int(0), int(6), [&](int i) // 多线程
-	//for (int i = 0; i < 6; i++)
+	for (int t1 = 0; t1 < (iTileLevel >= 1 ? 4 : 1); t1++)
 	{
-		osg::Vec3 vCenter = osg::Vec3(0, 1, 0);
-		osg::Vec3 vAxisX = osg::Vec3(1, 0, 0);
-		osg::Vec3 vAxisY = osg::Vec3(0, 0, 1);
-		switch (i)
+		parallel_for(int(0), int(6), [&](int i) // 多线程
+		//for (int i = 0; i < 6; i++)
 		{
-		case 0:
-		{
-			// posX
-			vCenter = osg::Vec3(1, 0, 0);
-			vAxisX = osg::Vec3(0, 1, 0);
-			vAxisY = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 1:
-		{
-			// negX
-			vCenter = osg::Vec3(-1, 0, 0);
-			vAxisX = osg::Vec3(0, -1, 0);
-			vAxisY = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 2:
-		{
-			// posY
-			vCenter = osg::Vec3(0, 1, 0);
-			vAxisX = osg::Vec3(-1, 0, 0);
-			vAxisY = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 3:
-		{
-			// negY
-			vCenter = osg::Vec3(0, -1, 0);
-			vAxisX = osg::Vec3(1, 0, 0);
-			vAxisY = osg::Vec3(0, 0, 1);
-		}
-		break;
-		case 4:
-		{
-			// posZ
-			vCenter = osg::Vec3(0, 0, 1);
-			vAxisX = osg::Vec3(0, 1, 0);
-			vAxisY = osg::Vec3(-1, 0, 0);
-		}
-		break;
-		case 5:
-		{
-			// negZ
-			vCenter = osg::Vec3(0, 0, -1);
-			vAxisX = osg::Vec3(0, 1, 0);
-			vAxisY = osg::Vec3(1, 0, 0);
-		}
-		break;
-		default:
-			break;
-		}
-
-		unsigned char* pCubeColorData = new unsigned char[iByteNum];
-		for (int x = 0; x < iSize; x++)
-		{
-			for (int y = 0; y < iSize; y++)
+			osg::Vec3 vCenter = osg::Vec3(0, 1, 0);
+			osg::Vec3 vAxisX = osg::Vec3(1, 0, 0);
+			osg::Vec3 vAxisY = osg::Vec3(0, 0, 1);
+			switch (i)
 			{
-				// 要注意，每张图的周围一圈像素都是保护边界，与相邻的图片边界互补，这样可以避免边缘接缝问题
-				// 每个像素的方向
-				osg::Vec3 vDir = vCenter
-					+ vAxisX * (x - fHalfSize + 0.5f) / (fHalfSize-1)
-					+ vAxisY * (y - fHalfSize + 0.5f) / (fHalfSize-1);
-				vDir.normalize();
+			case 0:
+			{
+				// posX
+				vCenter = osg::Vec3(1, 0, 0);
+				vAxisX = osg::Vec3(0, 1, 0);
+				vAxisY = osg::Vec3(0, 0, 1);
+			}
+			break;
+			case 1:
+			{
+				// negX
+				vCenter = osg::Vec3(-1, 0, 0);
+				vAxisX = osg::Vec3(0, -1, 0);
+				vAxisY = osg::Vec3(0, 0, 1);
+			}
+			break;
+			case 2:
+			{
+				// posY
+				vCenter = osg::Vec3(0, 1, 0);
+				vAxisX = osg::Vec3(-1, 0, 0);
+				vAxisY = osg::Vec3(0, 0, 1);
+			}
+			break;
+			case 3:
+			{
+				// negY
+				vCenter = osg::Vec3(0, -1, 0);
+				vAxisX = osg::Vec3(1, 0, 0);
+				vAxisY = osg::Vec3(0, 0, 1);
+			}
+			break;
+			case 4:
+			{
+				// posZ
+				vCenter = osg::Vec3(0, 0, 1);
+				vAxisX = osg::Vec3(0, 1, 0);
+				vAxisY = osg::Vec3(-1, 0, 0);
+			}
+			break;
+			case 5:
+			{
+				// negZ
+				vCenter = osg::Vec3(0, 0, -1);
+				vAxisX = osg::Vec3(0, 1, 0);
+				vAxisY = osg::Vec3(1, 0, 0);
+			}
+			break;
+			default:
+				break;
+			}
 
-				float fLon = atan2(vDir.y(), vDir.x());// 弧度
-				float fLat = asin(vDir.z());// 弧度
-				// tif的左下角坐标：(0.0, 0.0)
-				osg::Vec4f vColor = CGMKit::GetImageColor(pPanoImg.get(),
-					0.5f + fLon / (osg::PI * 2),
-					0.5f + fLat / (osg::PI),
-					true);
+			unsigned char* pCubeColorData = new unsigned char[iSize * iSize * 4];
+			for (int x = 0; x < iSize; x++)
+			{
+				for (int y = 0; y < iSize; y++)
+				{
+					// 要注意，每张图的周围一圈像素都是保护边界，与相邻的图片边界互补，这样可以避免边缘接缝问题
+					// 每个像素的方向	
+					osg::Vec3 vDir = vCenter;
+					switch (iTileLevel)
+					{
+					case 0: // 六面体
+					{
+						float fHalfSize = iSize * 0.5f;
+						vDir += (vAxisX * (x - fHalfSize + 0.5f) + vAxisY * (y - fHalfSize + 0.5f)) / (fHalfSize - 1);
+					}
+					break;
+					case 1: // 第1级瓦片，六面体的每个面分成4个瓦片
+					{
+						float fSize1 = float(iSize - 2);
+						if (0 == t1)
+							vDir += (vAxisX * (x - 0.5f) + vAxisY * (y - 0.5f)) / fSize1;
+						else if (1 == t1)
+							vDir -= (vAxisX * (iSize - 0.5f - x) - vAxisY * (y - 0.5f)) / fSize1;
+						else if (2 == t1)
+							vDir -= (vAxisX * (iSize - 0.5f - x) + vAxisY * (iSize - 0.5f - y)) / fSize1;
+						else if (3 == t1)
+							vDir += (vAxisX * (x - 0.5f) - vAxisY * (iSize - 0.5f - y)) / fSize1;
+						else {}
+					}
+					break;
+					default:
+						break;
+					}
+					vDir.normalize();
 
-				int iAddress = 4 * (x + y * iSize);
-				pCubeColorData[iAddress] = (unsigned char)(vColor.r() * 255);
-				pCubeColorData[iAddress + 1] = (unsigned char)(vColor.g() * 255);
-				pCubeColorData[iAddress + 2] = (unsigned char)(vColor.b() * 255);
-				pCubeColorData[iAddress + 3] = (unsigned char)(vColor.a() * 255);
+					float fLon = atan2(vDir.y(), vDir.x());// 弧度
+					float fLat = asin(vDir.z());// 弧度
+					// tif的左下角坐标：(0.0, 0.0)
+					osg::Vec4f vColor = CGMKit::GetImageColor(pPanoImg.get(),
+						0.5f + fLon / (osg::PI * 2),
+						0.5f + fLat / (osg::PI),
+						true);
+
+					int iAddress = 4 * (x + y * iSize);
+					pCubeColorData[iAddress] = (unsigned char)(vColor.r() * 255);
+					pCubeColorData[iAddress + 1] = (unsigned char)(vColor.g() * 255);
+					pCubeColorData[iAddress + 2] = (unsigned char)(vColor.b() * 255);
+					pCubeColorData[iAddress + 3] = (unsigned char)(vColor.a() * 255);
+				}
+			}
+
+			osg::ref_ptr<osg::Image> pCubeImage = new osg::Image();
+			pCubeImage->setImage(iSize, iSize, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pCubeColorData, osg::Image::USE_NEW_DELETE);
+			switch (iTileLevel)
+			{
+			case 0: // 六面体
+				osgDB::writeImageFile(*(pCubeImage.get()), strCubeMapPath + std::to_string(i) + ".tif");
+				break;
+			case 1: // 第1级瓦片，六面体的每个面分成4个瓦片
+				osgDB::writeImageFile(*(pCubeImage.get()), strCubeMapPath + std::to_string(i) + "_" + std::to_string(t1) + ".tif");
+				break;
+			default:
+				break;
 			}
 		}
-
-		osg::ref_ptr<osg::Image> pCubeImage = new osg::Image();
-		pCubeImage->setImage(iSize, iSize, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pCubeColorData, osg::Image::USE_NEW_DELETE);
-		osgDB::writeImageFile(*(pCubeImage.get()), strCubeMapPath + std::to_string(i) + ".tif");
+		); // end parallel_for
 	}
-	); // end parallel_for
 	return true;
 }
 

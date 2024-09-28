@@ -155,9 +155,15 @@ namespace GM
 		void _GenEarthEngineData();
 
 		/**
-		* @brief 生成“行星发动机基座图”和“周围bloom图”，仅用于生成贴图，生成后不要再调用
+		* @brief 生成“行星发动机主体外观图”，仅用于生成贴图，生成后不要再调用
+		* @param iTileLevel 瓦片层级
 		*/
-		void _GenEarthEngineTexture();
+		void _GenEarthEngineBodyTexture(const int iTileLevel);
+		/**
+		* @brief 生成“行星发动机周围bloom图”，仅用于生成贴图，生成后不要再调用
+		* @param iTileLevel 瓦片层级
+		*/
+		void _GenEarthEngineBloomTexture(const int iTileLevel);
 
 		/**
 		* @brief 创建流浪地球上的行星发动机的喷射口亮点
@@ -180,17 +186,6 @@ namespace GM
 		* @return Geometry				返回创建的几何体指针
 		*/
 		osg::Geometry* _MakeEngineJetStreamGeometry(const osg::EllipsoidModel* pEllipsoid, const double fUnit) const;
-
-		/**
-		* @brief 临时添加的生成流浪地球版本的各个贴图的工具函数
-		* @param strPath0: 贴图0，不包含编号和后缀名
-		* @param strPath1: 贴图1，注意要水平翻转，不包含编号和后缀名
-		* @param strOut: 输出的贴图路径，不包含编号和后缀名
-		* @param iType: 不同的叠加方式
-		*/
-		void _MixWEETexture(
-			const std::string& strPath0, const std::string& strPath1, const std::string& strOut,
-			const int iType);
 
 		// 变量
 	private:

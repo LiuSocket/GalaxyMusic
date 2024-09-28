@@ -26,6 +26,7 @@
 #include <osg/CullFace>
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>
+#include <osgDB/FileUtils>
 
 using namespace GM;
 
@@ -86,34 +87,26 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 		m_pEarthRoot_2->addChild(m_pEarthEngine->GetEarthEngineRoot(2));
 	}
 
-	m_aEarthBaseTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Earth_base_");
-	m_aEarthCloudTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Earth_cloud_");
+	// 地球地面贴图
+	m_aEarthBaseTex_T0 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Tile0/Earth_base_");
+	m_aEarthBaseTex_T1 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Tile1/Earth_base_");
+	// 地球云层贴图
+	m_aEarthCloudTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Tile0/Earth_cloud_");
 	if (m_pConfigData->bWanderingEarth)
 	{
-		_AddTex2DArray(m_aEarthBaseTex, strSphereTexPath + "Earth/wanderingEarth_base_");
-		_AddTex2DArray(m_aEarthCloudTex, strSphereTexPath + "Earth/wanderingEarth_cloud_");
+		// 流浪地球地面贴图
+		_AddTex2DArray(m_aEarthBaseTex_T0, strSphereTexPath + "Earth/WanderingEarth/Tile0/wanderingEarth_base_", 0);
+		_AddTex2DArray(m_aEarthBaseTex_T1, strSphereTexPath + "Earth/WanderingEarth/Tile1/wanderingEarth_base_", 1);
+		// 流浪地球云层贴图
+		_AddTex2DArray(m_aEarthCloudTex, strSphereTexPath + "Earth/WanderingEarth/Tile0/wanderingEarth_cloud_", 0);
 	}
 
-	m_aIllumTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Earth_illum_");
+	m_aIllumTex_T0 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Tile0/Earth_illum_");
+	m_aIllumTex_T1 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Tile1/Earth_illum_");
 
 	// 加载DEM
-	m_aDEMTex = new osg::Texture2DArray;
-	m_aDEMTex->setTextureSize(4096, 4096, 6);
-	for (int i = 0; i < 6; i++)
-	{
-		std::string fileName = strSphereTexPath + "Earth/Earth_DEM_" + std::to_string(i) + ".raw";
-		osg::ref_ptr<osg::Image> pImg = osgDB::readImageFile(fileName);
-		pImg->setImage(4096, 4096, 1, GL_R16F, GL_RED, GL_UNSIGNED_SHORT, pImg->data(), osg::Image::NO_DELETE);
-		m_aDEMTex->setImage(i, pImg);
-	}
-	m_aDEMTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR);
-	m_aDEMTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_aDEMTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_aDEMTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_aDEMTex->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-	m_aDEMTex->setInternalFormat(GL_R16F);
-	m_aDEMTex->setSourceFormat(GL_RED);
-	m_aDEMTex->setSourceType(GL_UNSIGNED_SHORT);
+	m_aDEMTex_T0 = _CreateDEMTex2DArray(strSphereTexPath + "Earth/Tile0/Earth_DEM_");
+	m_aDEMTex_T1 = _CreateDEMTex2DArray(strSphereTexPath + "Earth/Tile1/Earth_DEM_");
 
 	//// 极光
 	//m_aAuroraTex = _CreateDDSTex2DArray(strSphereTexPath + "aurora.dds");
@@ -139,10 +132,10 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 	}
 
 	// 获取当前天体贴图的尺寸，用于修改UV缩放系数
-	float fBaseTexSize = m_aEarthBaseTex->getTextureWidth();
-	float fCloudTexSize = m_aEarthCloudTex->getTextureWidth();
-	float fIlluTexSize = m_aIllumTex->getTextureWidth();
-	float fDEMTexSize = m_aDEMTex->getTextureWidth();
+	float fBaseTexSize = m_aEarthBaseTex_T0->getTextureWidth(); // 1024
+	float fCloudTexSize = m_aEarthCloudTex->getTextureWidth(); // 512
+	float fIlluTexSize = m_aIllumTex_T0->getTextureWidth(); // 512
+	float fDEMTexSize = m_aDEMTex_T0->getTextureWidth(); // 1024
 	// 根据贴图大小，修改m_vCoordScaleUniform
 	// 为了避免六边形边缘采样时有缝，特意在每个面的贴图边缘留了一个像素的保护像素，和隔壁像素重合
 	// 所以采样时需要根据贴图大小，向每个面各自的中心缩小一个像素
@@ -228,13 +221,8 @@ bool CGMEarth::Load()
 			strGalaxyShader + "CelestialCommon.frag",
 			"EarthTerrain_1");
 	}
-	if (m_pSSEarthGround_1.valid())
+	if (m_pSSEarthGround_2.valid())
 	{
-		CGMKit::LoadShaderWithCommonFrag(m_pSSEarthGround_1,
-			strGalaxyShader + "CelestialGround.vert",
-			strGalaxyShader + "CelestialGround.frag",
-			strGalaxyShader + "CelestialCommon.frag",
-			"EarthGround_1");
 		CGMKit::LoadShaderWithCommonFrag(m_pSSEarthGround_2,
 			strGalaxyShader + "CelestialGround.vert",
 			strGalaxyShader + "CelestialGround.frag",
@@ -407,11 +395,10 @@ void CGMEarth::SetWanderingEarthProgress(const float fProgress)
 bool CGMEarth::CreateEarth()
 {
 	CGMPlanet::CreatePlanet();
-	// 给地形添加材质
-	_CreateTerrainMaterial(m_pHieTerrainRootVector.at(1)->getOrCreateStateSet());
 
 	_CreateGlobalCloudShadow();
-
+	// 给地形添加材质，必须等全球阴影创建后才能给地形添加材质
+	_CreateTerrainMaterial(m_pHieTerrainRootVector.at(1)->getOrCreateStateSet(), 1);
 	// 创建地球，用于1级空间
 	_CreateEarth_1();
 	// 创建地球，用于2级空间
@@ -584,14 +571,6 @@ bool CGMEarth::_CreateEarth_1()
 	// 改变大小
 	m_pEarthGeom_1->accept(*m_pCelestialScaleVisitor);
 
-	// 地球岩石地面
-	osg::ref_ptr<osg::Geode> pEarthGround_1 = new osg::Geode();
-	pEarthGround_1->addDrawable(m_pEarthGeom_1);
-	m_pEarthRoot_1->addChild(pEarthGround_1);
-
-	m_pSSEarthGround_1 = pEarthGround_1->getOrCreateStateSet();
-	_CreateGroundMaterial(m_pSSEarthGround_1.get());
-
 	////////////////////////////////////
 	// 地球云层
 	m_pEarthCloud_1 = new osg::Geode();
@@ -655,19 +634,31 @@ bool CGMEarth::_CreateEarth_2()
 
 bool CGMEarth::_CreateWanderingEarth()
 {
-	// 临时添加的生成流浪地球版本的各个贴图的工具函数
-	//std::string strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_base_real_";
-	//std::string strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/engineBody";
-	//std::string strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_base_";
-	//_MixWEETexture(strPath_0, strPath_1, strOut, 0);
-	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_cloud_real_";
-	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/bloom";
-	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/wanderingEarth_cloud_";
-	//_MixWEETexture(strPath_0, strPath_1, strOut, 1);
-	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_illum_real_";
-	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/bloom";
-	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_illum_";
-	//_MixWEETexture(strPath_0, strPath_1, strOut, 2);
+	//// 临时添加的生成流浪地球版本的各个贴图的工具函数
+	//std::string strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/wanderingEarth_base_real_";
+	//std::string strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/engineBody";
+	//std::string strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tif2DDS/wanderingEarth_base_";
+	//_MixWEETexture(strPath_0, strPath_1, strOut, 0, 0);
+
+	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile1/wanderingEarth_base_real_";
+	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile1/engineBody";
+	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tif2DDS/wanderingEarth_base_";
+	//_MixWEETexture(strPath_0, strPath_1, strOut, 0, 1);
+
+	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/wanderingEarth_cloud_real_";
+	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/bloom";
+	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/WanderingEarth/Tile0/wanderingEarth_cloud_";
+	//_MixWEETexture(strPath_0, strPath_1, strOut, 1, 0);
+
+	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/Earth_illum_real_";
+	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/bloom";
+	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tif2DDS/Earth_illum_";
+	//_MixWEETexture(strPath_0, strPath_1, strOut, 2, 0);
+
+	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile1/Earth_illum_real_";
+	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile1/bloom";
+	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tif2DDS/Earth_illum_";
+	//_MixWEETexture(strPath_0, strPath_1, strOut, 2, 1);
 
 	if ((m_pConfigData->bWanderingEarth))
 	{
@@ -680,7 +671,7 @@ bool CGMEarth::_CreateWanderingEarth()
 	return true;
 }
 
-void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS) const
+void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS, const int iTileLevel) const
 {
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	unsigned int iOnOverride = osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE;
@@ -701,15 +692,23 @@ void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS) const
 
 	int iGroundUnit = 0;
 	// 基础贴图
-	pSS->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex, iOnOverride);
+	if(0 == iTileLevel)
+		pSS->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex_T0, iOnOverride);
+	else if(1 == iTileLevel)
+		pSS->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex_T1, iOnOverride);
+	else{}
 	osg::ref_ptr<osg::Uniform> pGrundBaseUniform = new osg::Uniform("baseTex", iGroundUnit++);
 	pSS->addUniform(pGrundBaseUniform.get());
 	// 自发光贴图
-	pSS->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex, iOnOverride);
+	if (0 == iTileLevel)
+		pSS->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex_T0, iOnOverride);
+	else if (1 == iTileLevel)
+		pSS->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex_T1, iOnOverride);
+	else {}
 	osg::ref_ptr<osg::Uniform> pGrundIllumUniform = new osg::Uniform("illumTex", iGroundUnit++);
 	pSS->addUniform(pGrundIllumUniform.get());
 	// DEM贴图
-	pSS->setTextureAttributeAndModes(iGroundUnit, m_aDEMTex, iOnOverride);
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_aDEMTex_T1, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pDEMUniform = new osg::Uniform("DEMTex", iGroundUnit++);
 	pSS->addUniform(pDEMUniform.get());
 	// 全球阴影
@@ -770,15 +769,15 @@ void CGMEarth::_CreateGroundMaterial(osg::StateSet* pSS) const
 
 	int iGroundUnit = 0;
 	// 基础贴图
-	pSS->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex, iOnOverride);
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex_T0, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGrundBaseUniform = new osg::Uniform("baseTex", iGroundUnit++);
 	pSS->addUniform(pGrundBaseUniform.get());
 	// 自发光贴图
-	pSS->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex, iOnOverride);
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex_T0, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGrundIllumUniform = new osg::Uniform("illumTex", iGroundUnit++);
 	pSS->addUniform(pGrundIllumUniform.get());
 	// DEM贴图
-	pSS->setTextureAttributeAndModes(iGroundUnit, m_aDEMTex, iOnOverride);
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_aDEMTex_T0, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pDEMUniform = new osg::Uniform("DEMTex", iGroundUnit++);
 	pSS->addUniform(pDEMUniform.get());
 	// 全球阴影
@@ -863,7 +862,7 @@ void CGMEarth::_CreateCloudMaterial(osg::StateSet* pSS) const
 		osg::ref_ptr<osg::Uniform> pCloudTailUniform = new osg::Uniform("tailTex", iCloudUnit++);
 		pSS->addUniform(pCloudTailUniform.get());
 
-		pSS->setTextureAttributeAndModes(iCloudUnit, m_aIllumTex, iOnOverride);
+		pSS->setTextureAttributeAndModes(iCloudUnit, m_aIllumTex_T0, iOnOverride);
 		osg::ref_ptr<osg::Uniform> pCloudIllumUniform = new osg::Uniform("illumTex", iCloudUnit++);
 		pSS->addUniform(pCloudIllumUniform.get());
 
@@ -1009,22 +1008,49 @@ osg::Texture* CGMEarth::_CreateDDSTexture(const std::string& fileName,
 
 osg::Texture2DArray* CGMEarth::_CreateDDSTex2DArray(const std::string& filePreName, bool bFlip) const
 {
-	osg::Image* pImg = osgDB::readImageFile(filePreName + "0.dds");
-	if (!pImg) return nullptr;
+	int iPos = filePreName.find_last_of("/");
+	if (filePreName.npos == iPos) return nullptr;
+
+	int iImgWidth = 1024;
+	int	iImgHeight = 1024;
+	int iImgNum = 0;
+	std::string strPath = filePreName.substr(0, iPos + 1);
+	std::string strName = filePreName.substr(iPos + 1);
+	osgDB::DirectoryContents dirContents = osgDB::getSortedDirectoryContents(strPath);
+	for (unsigned int i = 0; i < dirContents.size(); ++i)
+	{
+		std::string filenameInDir = dirContents[i];
+		if (filenameInDir == "." || filenameInDir == ".." ||
+			filenameInDir.npos == filenameInDir.find(".dds")||
+			filenameInDir.npos == filenameInDir.find(strName))
+			continue;
+		// 先读取第一张图片，确定长宽
+		if (0 == iImgNum)
+		{
+			osg::ref_ptr<osg::Image> pImg = osgDB::readImageFile(strPath + filenameInDir);
+			iImgWidth = pImg->s();
+			iImgHeight = pImg->t();
+		}
+		// 统计图片的数量
+		iImgNum++;
+	}
+	if (0 == iImgNum) return nullptr;
 
 	osg::ref_ptr<osg::Texture2DArray> texture = new osg::Texture2DArray;
-	texture->setTextureSize(pImg->s(), pImg->t(), 6);
-	for (int i = 0; i < 6; i++)
+	texture->setTextureSize(iImgWidth, iImgHeight, iImgNum);
+	unsigned int j = 0;
+	for (unsigned int i = 0; i < dirContents.size(); ++i)
 	{
-		std::string fileName = filePreName + std::to_string(i) + ".dds";
-		if (bFlip)
-		{
-			texture->setImage(i, osgDB::readImageFile(fileName, m_pDDSOptions));
-		}
-		else
-		{
-			texture->setImage(i, osgDB::readImageFile(fileName));
-		}
+		std::string filenameInDir = dirContents[i];
+		if (filenameInDir == "." || filenameInDir == ".." ||
+			filenameInDir.npos == filenameInDir.find(".dds") ||
+			filenameInDir.npos == filenameInDir.find(strName))
+			continue;
+
+		osg::Image* pImg = bFlip ?
+			osgDB::readImageFile(strPath + filenameInDir, m_pDDSOptions) :
+			osgDB::readImageFile(strPath + filenameInDir);
+		texture->setImage(j++, pImg);
 	}
 
 	texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR);
@@ -1032,32 +1058,95 @@ osg::Texture2DArray* CGMEarth::_CreateDDSTex2DArray(const std::string& filePreNa
 	texture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
 	texture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 	texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-	texture->setBorderColor(osg::Vec4(0, 0, 0, 0));
 	texture->setSourceType(GL_UNSIGNED_BYTE);
 	return texture.release();
 }
 
-bool CGMEarth::_AddTex2DArray(osg::Texture2DArray* pTex, const std::string& filePreName, bool bFlip)
+osg::Texture2DArray* CGMEarth::_CreateDEMTex2DArray(const std::string& filePreName) const
+{
+	int iPos = filePreName.find_last_of("/");
+	if (filePreName.npos == iPos) return nullptr;
+
+	const int iImgWidth = 1024;
+	const int iImgHeight = 1024;
+	int iImgNum = 0;
+	std::string strPath = filePreName.substr(0, iPos + 1);
+	std::string strName = filePreName.substr(iPos + 1);
+	osgDB::DirectoryContents dirContents = osgDB::getSortedDirectoryContents(strPath);
+	for (unsigned int i = 0; i < dirContents.size(); ++i)
+	{
+		std::string filenameInDir = dirContents[i];
+		if (filenameInDir == "." || filenameInDir == ".." ||
+			filenameInDir.npos == filenameInDir.find(".raw") ||
+			filenameInDir.npos == filenameInDir.find(strName))
+			continue;
+		// 统计图片的数量
+		iImgNum++;
+	}
+	if (0 == iImgNum) return nullptr;
+
+	osg::ref_ptr<osg::Texture2DArray> texture = new osg::Texture2DArray;
+	texture->setTextureSize(iImgWidth, iImgHeight, iImgNum);
+	unsigned int j = 0;
+	for (unsigned int i = 0; i < dirContents.size(); ++i)
+	{
+		std::string filenameInDir = dirContents[i];
+		if (filenameInDir == "." || filenameInDir == ".." ||
+			filenameInDir.npos == filenameInDir.find(".raw") ||
+			filenameInDir.npos == filenameInDir.find(strName))
+			continue;
+
+		osg::ref_ptr<osg::Image> pImg = osgDB::readImageFile(strPath + filenameInDir);
+		pImg->setImage(iImgWidth, iImgHeight, 1, GL_R16F, GL_RED, GL_UNSIGNED_SHORT, pImg->data(), osg::Image::NO_DELETE);
+		texture->setImage(j++, pImg.get());
+	}
+
+	texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR);
+	texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	texture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+	texture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+	texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
+	texture->setInternalFormat(GL_R16F);
+	texture->setSourceFormat(GL_RED);
+	texture->setSourceType(GL_UNSIGNED_SHORT);
+	return texture.release();
+}
+
+bool CGMEarth::_AddTex2DArray(osg::Texture2DArray* pTex, const std::string& filePreName, const int iTileLevel, bool bFlip)
 {
 	if(!pTex) return false;
-	osg::Image* pImg = osgDB::readImageFile(filePreName + "0.dds");
-	if (!pImg) return false;
+	osg::Image* pImg = nullptr;
+	if(0 == iTileLevel)
+		pImg = osgDB::readImageFile(filePreName + "0.dds");
+	else if(1 == iTileLevel)
+		pImg = osgDB::readImageFile(filePreName + "0_0.dds");
+	else
+		return false;
 
+	if (!pImg) return false;
 	if (pTex->getTextureWidth() != pImg->s()) return false;
 	if (pTex->getTextureHeight() != pImg->t()) return false;
 	pTex->setTextureDepth(pTex->getTextureDepth()+6);
 
 	for (int i = 0; i < 6; i++)
 	{
-		std::string fileName = filePreName + std::to_string(i) + ".dds";
-		if (bFlip)
+		if (0 == iTileLevel)
 		{
-			pTex->setImage(6+i, osgDB::readImageFile(fileName, m_pDDSOptions));
+			std::string fileName = filePreName + std::to_string(i) + ".dds";
+			if (bFlip) pTex->setImage(6 + i, osgDB::readImageFile(fileName, m_pDDSOptions));
+			else pTex->setImage(6 + i, osgDB::readImageFile(fileName));
+		}
+		else if (1 == iTileLevel)
+		{
+			for (int j = 0; j < 4; j++)
+			{
+				std::string fileName = filePreName + std::to_string(i) + "_" + std::to_string(j) + ".dds";
+				if (bFlip) pTex->setImage(6 + i * 4 + j, osgDB::readImageFile(fileName, m_pDDSOptions));
+				else pTex->setImage(6 + i * 4 + j, osgDB::readImageFile(fileName));
+			}
 		}
 		else
-		{
-			pTex->setImage(6+i, osgDB::readImageFile(fileName));
-		}
+			return false;
 	}
 
 	return true;
@@ -1065,71 +1154,90 @@ bool CGMEarth::_AddTex2DArray(osg::Texture2DArray* pTex, const std::string& file
 
 void CGMEarth::_MixWEETexture(
 	const std::string& strPath0, const std::string& strPath1, const std::string& strOut,
-	const int iType)
+	const int iType, const int iTileLevel)
 {
+	// 象限数量
+	int iQuatNum = pow(4, iTileLevel);
+	// 只需要5个面，南极不需要
 	for (int iFace = 0; iFace < 5; iFace++)
 	{
-		osg::ref_ptr<osg::Image> pImage0 = osgDB::readImageFile(
-			strPath0 + std::to_string(iFace) + ".tif");
-		osg::ref_ptr<osg::Image> pImage1 = osgDB::readImageFile(
-			strPath1 + std::to_string(iFace) + ".tif");
-		if (!pImage0.valid() || !pImage1.valid()) return;
-
-		int iDataSize = pImage0->s() * pImage0->t() * 4;
-		osg::ref_ptr<osg::Image> pOutImage = new osg::Image;
-		unsigned char* pData = new unsigned char[iDataSize];
-		for (int i = 0; i < pImage0->s(); i++)
+		for (int iQuat = 0; iQuat < iQuatNum; iQuat++)
 		{
-			for (int j = 0; j < pImage0->t(); j++)
+			osg::ref_ptr<osg::Image> pImage0 = osgDB::readImageFile(strPath0 + std::to_string(iFace) + ".tif");
+			osg::ref_ptr<osg::Image> pImage1 = osgDB::readImageFile(strPath1 + std::to_string(iFace) + ".tif");
+			if (1 == iTileLevel)
 			{
-				float fX = float(i) / float(pImage0->s()-1);
-				float fY = float(j) / float(pImage0->t()-1);
-				osg::Vec4 c0 = CGMKit::GetImageColor(pImage0, fX, fY);
-				osg::Vec4 c1 = CGMKit::GetImageColor(pImage1, 1 - fX, fY, true);
-				// 目标图片当前像素R通道的地址
-				int iAddress = 4 * (pImage0->s() * j + i);
-				// 根据不同图片，采取不同的叠加算法
-				switch (iType)
-				{
-				case 0:
-				{
-					// base color
-					osg::Vec4 c2 = c0;
-					c2.r() = CGMKit::Mix(c0.r(), c1.r(), c1.a());
-					c2.g() = CGMKit::Mix(c0.g(), c1.g(), c1.a());
-					c2.b() = CGMKit::Mix(c0.b(), c1.b(), c1.a());
-					c2.a() = CGMKit::Mix(c0.a(), 0, c1.a()); // 0=陆地，1=海洋
+				pImage0 = osgDB::readImageFile(strPath0 + std::to_string(iFace) + "_" + std::to_string(iQuat) + ".tif");
+				pImage1 = osgDB::readImageFile(strPath1 + std::to_string(iFace) + "_" + std::to_string(iQuat) + ".tif");
+			}
+			if (!pImage0.valid() || !pImage1.valid()) return;
 
-					pData[iAddress] = (unsigned char)(c2.r() * 255);
-					pData[iAddress + 1] = (unsigned char)(c2.g() * 255);
-					pData[iAddress + 2] = (unsigned char)(c2.b() * 255);
-					pData[iAddress + 3] = (unsigned char)(c2.a() * 255);
-				}
-				break;
-				case 1:
+			int iDataSize = pImage0->s() * pImage0->t() * 4;
+			osg::ref_ptr<osg::Image> pOutImage = new osg::Image;
+			unsigned char* pData = new unsigned char[iDataSize];
+			for (int i = 0; i < pImage0->s(); i++)
+			{
+				for (int j = 0; j < pImage0->t(); j++)
 				{
-					// cloud color
-					pData[iAddress] = (unsigned char)(c1.a() * 255);
-					pData[iAddress + 1] = (unsigned char)(c0.g() * 255);
-					pData[iAddress + 2] = (unsigned char)(c0.b() * 255);
-					pData[iAddress + 3] = (unsigned char)(c0.a() * 255);
-				}
-				break;
-				case 2:
-				{
-					// illumination color
-					pData[iAddress] = (unsigned char)(c0.r() * 255);
-					pData[iAddress + 1] = (unsigned char)(c0.g() * 255);
-					pData[iAddress + 2] = (unsigned char)(c0.b() * 255);
-					pData[iAddress + 3] = (unsigned char)(c1.a() * 255);
-				}
-				break;
-				default:
-					return;
+					float fX = float(i) / float(pImage0->s() - 1);
+					float fY = float(j) / float(pImage0->t() - 1);
+					osg::Vec4 c0 = CGMKit::GetImageColor(pImage0, fX, fY);
+					// 1-fX是因为这张图是RRT相机从地心位置渲染的，与其他图片镜像对称
+					osg::Vec4 c1 = CGMKit::GetImageColor(pImage1, 1 - fX, fY, true);
+					// 目标图片当前像素R通道的地址
+					int iAddress = 4 * (pImage0->s() * j + i);
+					// 根据不同图片，采取不同的叠加算法
+					switch (iType)
+					{
+					case 0:
+					{
+						// base color
+						osg::Vec4 c2 = c0;
+						c2.r() = CGMKit::Mix(c0.r(), c1.r(), c1.a());
+						c2.g() = CGMKit::Mix(c0.g(), c1.g(), c1.a());
+						c2.b() = CGMKit::Mix(c0.b(), c1.b(), c1.a());
+						c2.a() = CGMKit::Mix(c0.a(), 0, c1.a()); // 0=陆地，1=海洋
+
+						pData[iAddress] = (unsigned char)(c2.r() * 255);
+						pData[iAddress + 1] = (unsigned char)(c2.g() * 255);
+						pData[iAddress + 2] = (unsigned char)(c2.b() * 255);
+						pData[iAddress + 3] = (unsigned char)(c2.a() * 255);
+					}
+					break;
+					case 1:
+					{
+						// cloud color
+						pData[iAddress] = (unsigned char)(c1.a() * 255);
+						pData[iAddress + 1] = (unsigned char)(c0.g() * 255);
+						pData[iAddress + 2] = (unsigned char)(c0.b() * 255);
+						pData[iAddress + 3] = (unsigned char)(c0.a() * 255);
+					}
+					break;
+					case 2:
+					{
+						// illumination color
+						pData[iAddress] = (unsigned char)(c0.r() * 255);
+						pData[iAddress + 1] = (unsigned char)(c0.g() * 255);
+						pData[iAddress + 2] = (unsigned char)(c0.b() * 255);
+						pData[iAddress + 3] = (unsigned char)(c1.a() * 255);
+					}
+					break;
+					default:
+						return;
+					}
 				}
 			}
+			pOutImage->setImage(pImage0->s(), pImage0->t(), 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pData, osg::Image::USE_NEW_DELETE);
+			
+			if (0 == iTileLevel)
+			{
+				osgDB::writeImageFile(*(pOutImage.get()), strOut + std::to_string(iFace) + ".tif");
+			}
+			else if (1 == iTileLevel)
+			{
+				osgDB::writeImageFile(*(pOutImage.get()), strOut + std::to_string(iFace) + "_" + std::to_string(iQuat) + ".tif");
+			}
+			else{}
 		}
-		pOutImage->setImage(pImage0->s(), pImage0->t(), 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pData, osg::Image::USE_NEW_DELETE);
-		osgDB::writeImageFile(*(pOutImage.get()), strOut + std::to_string(iFace) + ".tif");
 	}
 }

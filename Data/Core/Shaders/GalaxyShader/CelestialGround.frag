@@ -40,14 +40,6 @@ float SeaLevel(in float latCoord, in float seaLevelAddProgress)
 void main()
 {
 	float lenV = length(viewPos.xyz)*unit; // meter
-
-	float terrainMaxVis = planetRadius.x*unit*0.2;
-#ifdef TERRAIN
-	if(lenV > terrainMaxVis) discard;
-#else // not TERRAIN
-	if(lenV < terrainMaxVis) discard;
-#endif // TERRAIN or not
-
 	vec4 celestialCoordScale = vec4(1,1,1,1);
 #ifdef EARTH
 	celestialCoordScale = coordScale_Earth;
@@ -136,7 +128,7 @@ void main()
 	// global shadow
 	vec2 screenCoord = gl_FragCoord.xy/screenSize.xy;
 	float globalShadow = texture(globalShadowTex, screenCoord).r;
-	color *= mix(vec3(1), mix(vec3(0.2,0.4,0.6), vec3(1), globalShadow), clamp((eyeAltitude-0.1*atmosHeight)/atmosHeight,0,1));
+	color *= mix(vec3(1), mix(vec3(0.0,0.1,0.2), vec3(1), globalShadow), clamp((eyeAltitude-0.1*atmosHeight)/atmosHeight,0,1));
 #endif // EARTH
 	color = ToneMapping(color);
 	color = pow(color,vec3(1.0/2.2));
@@ -156,6 +148,6 @@ void main()
 
 	gl_FragColor = vec4(color, 1);
 #ifdef TERRAIN
-	gl_FragColor = vec4(texCoord_1.xy,0,1);//vec4(color, 1); // 
-#endif // EARTH
+	gl_FragColor = vec4(color, 1); 
+#endif // TERRAIN
 }

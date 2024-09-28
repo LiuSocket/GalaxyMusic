@@ -4,9 +4,9 @@
 void main()
 {
 #ifdef TILE_LEVEL
-	gl_PointSize = gl_MultiTexCoord0.y*exp2(TILE_LEVEL);
+	gl_PointSize = 10*gl_MultiTexCoord0.y*exp2(TILE_LEVEL);
 #else
-	gl_PointSize = gl_MultiTexCoord0.y;
+	gl_PointSize = 10*gl_MultiTexCoord0.y;
 #endif
 	gl_Position = ftransform();
 }

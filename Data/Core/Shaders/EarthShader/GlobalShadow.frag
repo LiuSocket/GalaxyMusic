@@ -58,6 +58,5 @@ void main()
 
 	float detailFinal = detail*clamp(cloudAlpha/0.2, 0, 1);
 	cloudAlpha = mix(cloudAlpha, detailFinal, edge*exp2(-lenV*0.5/planetRadius.x));
-	float cloudShadow = 1-cloudAlpha;
-	gl_FragColor = vec4(cloudShadow, 0, 0, 1);
+	gl_FragColor = vec4(1-cloudAlpha, 0, 0, 1);
 }

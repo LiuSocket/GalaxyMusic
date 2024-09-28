@@ -166,8 +166,9 @@ namespace GM
 		/**
 		* @brief 创建地形的材质，专门用于地球的地形（只有近处有，精度高）
 		* @param pSS: 状态集
+		* @param iTileLevel: 瓦片层级，01234...
 		*/
-		void _CreateTerrainMaterial(osg::StateSet* pSS) const;
+		void _CreateTerrainMaterial(osg::StateSet* pSS, const int iTileLevel) const;
 		/**
 		* @brief 创建地面（整个球面，面数少，精度低）、云层、大气的材质
 		* @param pSS: 状态集
@@ -210,13 +211,20 @@ namespace GM
 		*/
 		osg::Texture2DArray* _CreateDDSTex2DArray(const std::string& filePreName, bool bFlip = true) const;
 		/**
+		* @brief 加载DEM二维纹理数组，图片格式只能为raw，R16F
+		* @param filePreName: 图片文件路径（不包含数字和.raw）
+		* @return osg::Texture* 返回纹理指针
+		*/
+		osg::Texture2DArray* _CreateDEMTex2DArray(const std::string& filePreName) const;
+		/**
 		* @brief 追加DDS二维纹理数组
 		* @param pTex：	纹理指针
 		* @param filePreName: 图片文件路径（不包含数字和.dds）
+		* @param iTileLevel: 瓦片级别
 		* @param bFlip: 是否翻转上下（dds需要考虑是否翻转）
 		* @return bool 成功true，如果纹理指针为空或者增加的图片尺寸和已有图尺寸不同，则返回false
 		*/
-		bool _AddTex2DArray(osg::Texture2DArray* pTex, const std::string& filePreName, bool bFlip = true);
+		bool _AddTex2DArray(osg::Texture2DArray* pTex, const std::string& filePreName, const int iTileLevel, bool bFlip = true);
 
 		/**
 		* @brief 临时添加的生成流浪地球版本的各个贴图的工具函数
@@ -224,10 +232,11 @@ namespace GM
 		* @param strPath1: 贴图1，注意要水平翻转，不包含编号和后缀名
 		* @param strOut: 输出的贴图路径，不包含编号和后缀名
 		* @param iType: 不同的叠加方式
+		* @param iTileLevel: 瓦片级别
 		*/
 		void _MixWEETexture(
 			const std::string& strPath0, const std::string& strPath1, const std::string& strOut,
-			const int iType);
+			const int iType, const int iTileLevel);
 
 		/**
 		* @brief 行星发动机喷口偏转后的偏移位置（与垂直向上喷射相比）
@@ -260,7 +269,6 @@ namespace GM
 		osg::ref_ptr<osg::Geode>						m_pEarthGround_2;				//!< 2层级地球地面节点
 		osg::ref_ptr<osg::Geode>						m_pEarthCloud_2;				//!< 2层级地球云层节点
 		osg::ref_ptr<osg::Geode>						m_pEarthAtmos_2;				//!< 2层级地球大气节点
-		osg::ref_ptr<osg::StateSet>						m_pSSEarthGround_1;				//!< 1层级地球地面状态集
 		osg::ref_ptr<osg::StateSet>						m_pSSEarthCloud_1;				//!< 1层级地球云层状态集
 		osg::ref_ptr<osg::StateSet>						m_pSSEarthAtmos_1;				//!< 1层级地球大气状态集
 		osg::ref_ptr<osg::StateSet>						m_pSSEarthGround_2;				//!< 2层级地球地面状态集
@@ -280,10 +288,13 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_fWanderProgressUniform;		//!< 流浪地球计划进展Uniform
 
 		osg::ref_ptr<osgDB::Options>					m_pDDSOptions;					//!< dds的纹理操作
-		osg::ref_ptr<osg::Texture2DArray>				m_aEarthBaseTex;				//!< 地球base color纹理
+		osg::ref_ptr<osg::Texture2DArray>				m_aEarthBaseTex_T0;				//!< 地球0层base color纹理
+		osg::ref_ptr<osg::Texture2DArray>				m_aEarthBaseTex_T1;				//!< 地球1层base color纹理
 		osg::ref_ptr<osg::Texture2DArray>				m_aEarthCloudTex;				//!< 地球云层纹理
-		osg::ref_ptr<osg::Texture2DArray>				m_aIllumTex;					//!< 地球城市自发光+发动机自发光
-		osg::ref_ptr<osg::Texture2DArray>				m_aDEMTex;						//!< 地球DEM
+		osg::ref_ptr<osg::Texture2DArray>				m_aIllumTex_T0;					//!< 地球0层城市自发光+发动机自发光
+		osg::ref_ptr<osg::Texture2DArray>				m_aIllumTex_T1;					//!< 地球1层城市自发光+发动机自发光
+		osg::ref_ptr<osg::Texture2DArray>				m_aDEMTex_T0;					//!< 地球0层DEM
+		osg::ref_ptr<osg::Texture2DArray>				m_aDEMTex_T1;					//!< 地球1层DEM
 		//osg::ref_ptr<osg::Texture2DArray>				m_aAuroraTex;					//!< 极光纹理
 		osg::ref_ptr<osg::Texture>						m_pCloudDetailTex;				//!< 云细节纹理
 		osg::ref_ptr<osg::Texture3D>					m_pInscatteringTex;
