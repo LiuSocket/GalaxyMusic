@@ -7,6 +7,9 @@ uniform float unit;
 uniform vec4 coordScale_Earth;
 uniform sampler2DArray DEMTex;
 #endif // EARTH
+#ifdef TERRAIN
+uniform vec3 tileOffset;
+#endif // TERRAIN
 
 out vec2 texCoord_0;
 out vec3 texCoord_1;
@@ -24,18 +27,22 @@ void main()
 	viewNormal = normalize(gl_NormalMatrix*gl_Normal);
 	vec4 modelVertex = gl_Vertex;
 
+	vec3 coord1 = gl_MultiTexCoord1.xyz;
+#ifdef TERRAIN
+	if(TERRAIN>0) coord1.z += (coord1.z < 15.5) ? ((abs(coord1.z - 1.5) > 1.0) ? tileOffset.x : tileOffset.y) : tileOffset.z;
+#endif // TERRAIN
+
 #ifdef EARTH
-	vec3 DEMCoord = gl_MultiTexCoord1.xyz;
+	vec3 DEMCoord = coord1;
 	DEMCoord.xy = (DEMCoord.xy - 0.5)*coordScale_Earth.w + 0.5;
 	float elev = DEM(texture(DEMTex, DEMCoord).r); // meter
 	modelVertex.xyz += max(0, elev/unit)*gl_Normal;
 	gl_Position = gl_ModelViewProjectionMatrix*modelVertex;
-
 #else // not EARTH
 	gl_Position = ftransform();
 #endif // EARTH or not
 
 	viewPos = gl_ModelViewMatrix*modelVertex;
 	texCoord_0 = gl_MultiTexCoord0.xy;
-	texCoord_1 = gl_MultiTexCoord1.xyz;
+	texCoord_1 = coord1;
 }

@@ -121,10 +121,14 @@ namespace GM
 		SGMConfigData*		m_pConfigData = nullptr;		//!< 配置数据
 		CGMCommonUniform*	m_pCommonUniform = nullptr;		//!< 公共Uniform
 
+		osg::ref_ptr<osg::Uniform> m_vTileOffsetUniform;						//!< tile1瓦片的索引偏移
+
 		std::string m_strGalaxyShaderPath = "Shaders/GalaxyShader/";			//!< galaxy shader 路径
 		std::string m_strTerrainShaderPath = "Shaders/TerrainShader/";			//!< Terrain shader 路径
 
-		std::vector<osg::ref_ptr<osg::Group>>		m_pHieTerrainRootVector;	//!< 01空间层级的根节点
+		std::vector<osg::ref_ptr<osg::Group>>		m_pHieTerrainRootVector;	//!< 0/1空间层级的根节点
+		osg::ref_ptr<osg::Group>					m_pTileRoot_0;				//!< 0级瓦片根节点
+		osg::ref_ptr<osg::Group>					m_pTileRoot_1;				//!< 1级瓦片根节点
 		CGMCelestialScaleVisitor*	m_pCelestialScaleVisitor = nullptr;			//!< 用于控制天体大小
 
 	private:

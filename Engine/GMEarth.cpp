@@ -213,14 +213,23 @@ bool CGMEarth::Load()
 	std::string strGalaxyShader = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	std::string strEarthShader = m_pConfigData->strCorePath + m_strEarthShaderPath;
 
-	if (m_pHieTerrainRootVector.at(1).valid())
+	if (m_pTileRoot_0.valid())
 	{
-		CGMKit::LoadShaderWithCommonFrag(m_pHieTerrainRootVector.at(1)->getStateSet(),
+		CGMKit::LoadShaderWithCommonFrag(m_pTileRoot_0->getStateSet(),
 			strGalaxyShader + "CelestialGround.vert",
 			strGalaxyShader + "CelestialGround.frag",
 			strGalaxyShader + "CelestialCommon.frag",
-			"EarthTerrain_1");
+			"EarthTerrain_T0");
 	}
+	if (m_pTileRoot_1.valid())
+	{
+		CGMKit::LoadShaderWithCommonFrag(m_pTileRoot_1->getStateSet(),
+			strGalaxyShader + "CelestialGround.vert",
+			strGalaxyShader + "CelestialGround.frag",
+			strGalaxyShader + "CelestialCommon.frag",
+			"EarthTerrain_T1");
+	}
+
 	if (m_pSSEarthGround_2.valid())
 	{
 		CGMKit::LoadShaderWithCommonFrag(m_pSSEarthGround_2,
@@ -398,7 +407,8 @@ bool CGMEarth::CreateEarth()
 
 	_CreateGlobalCloudShadow();
 	// 给地形添加材质，必须等全球阴影创建后才能给地形添加材质
-	_CreateTerrainMaterial(m_pHieTerrainRootVector.at(1)->getOrCreateStateSet(), 1);
+	_CreateTerrainMaterial(m_pTileRoot_0->getOrCreateStateSet(), 0);
+	_CreateTerrainMaterial(m_pTileRoot_1->getOrCreateStateSet(), 1);
 	// 创建地球，用于1级空间
 	_CreateEarth_1();
 	// 创建地球，用于2级空间
@@ -685,26 +695,18 @@ void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS, const int iTileLevel) 
 	pSS->setRenderBinDetails(BIN_ROCKSPHERE, "DepthSortedBin");
 
 	// 地形宏定义
-	pSS->setDefine("TERRAIN", osg::StateAttribute::ON);
+	pSS->setDefine("TERRAIN", std::to_string(iTileLevel), osg::StateAttribute::ON);
 	// 地球宏定义
 	pSS->setDefine("EARTH", osg::StateAttribute::ON);
 	pSS->setDefine("ATMOS", osg::StateAttribute::ON);
 
 	int iGroundUnit = 0;
 	// 基础贴图
-	if(0 == iTileLevel)
-		pSS->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex_T0, iOnOverride);
-	else if(1 == iTileLevel)
-		pSS->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex_T1, iOnOverride);
-	else{}
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_aEarthBaseTex_T1, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGrundBaseUniform = new osg::Uniform("baseTex", iGroundUnit++);
 	pSS->addUniform(pGrundBaseUniform.get());
 	// 自发光贴图
-	if (0 == iTileLevel)
-		pSS->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex_T0, iOnOverride);
-	else if (1 == iTileLevel)
-		pSS->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex_T1, iOnOverride);
-	else {}
+	pSS->setTextureAttributeAndModes(iGroundUnit, m_aIllumTex_T1, iOnOverride);
 	osg::ref_ptr<osg::Uniform> pGrundIllumUniform = new osg::Uniform("illumTex", iGroundUnit++);
 	pSS->addUniform(pGrundIllumUniform.get());
 	// DEM贴图
@@ -732,6 +734,7 @@ void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS, const int iTileLevel) 
 		pSS->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
+	pSS->addUniform(m_vTileOffsetUniform.get());
 	pSS->addUniform(m_pCommonUniform->GetViewUp());
 	pSS->addUniform(m_vViewLightUniform.get());
 	pSS->addUniform(m_fAtmosHeightUniform.get());

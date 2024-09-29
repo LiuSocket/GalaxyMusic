@@ -28,7 +28,7 @@ CGMTerrain Methods
 *************************************************************************/
 
 /** @brief 构造 */
-CGMTerrain::CGMTerrain()
+CGMTerrain::CGMTerrain(): m_vTileOffsetUniform(new osg::Uniform("tileOffset", osg::Vec3f(0.0f, 0.0f, 0.0f)))
 {
 	m_pCelestialScaleVisitor = new CGMCelestialScaleVisitor();
 
@@ -193,6 +193,15 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 		osg::Vec3d vCore2EyeDir = vEye;
 		vCore2EyeDir.normalize();
 
+		osg::Vec3f vTileOffset = osg::Vec3f(0.0f, 0.0f, 0.0f);
+		m_vTileOffsetUniform->get(vTileOffset);
+
+		for (int i = 0; i < m_pTileRoot_0->getNumChildren(); i++)
+		{
+			// 先全部显示
+			m_pTileRoot_0->getChild(i)->setNodeMask(~0);
+		}
+
 		// 同时看到的地形块可以有如下情况：
 		// 1个：1赤道、1极地
 		// 2个：2赤道、1赤道+1极地、2极地
@@ -201,6 +210,7 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 		// 遍历所有地形块，根据相机位置和朝向，决定哪些地形块需要显示，哪些地形块需要旋转
 		for (auto& itr : m_sTileVec_1)
 		{
+			int iID = itr.iTileID;
 			bool bVisible = false;
 			for (int k = 0; k < itr.vTileDirVec.size(); k++)
 			{
@@ -212,6 +222,8 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 					if (itr.bPolar)
 					{
 						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI*k, osg::Vec3d(0, 1, 0)));
+						vTileOffset.z() = k*4;
+						iID += 16 + vTileOffset.z();
 					}
 					else
 					{
@@ -231,7 +243,20 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 						{
 							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI * 1.5, osg::Vec3d(0, 0, 1)));
 						}
+
+						if (0 == itr.iTileID || 3 == itr.iTileID)
+						{
+							vTileOffset.x() = k * 4;
+							iID += vTileOffset.x();
+						}
+						else
+						{
+							vTileOffset.y() = k * 4;
+							iID += vTileOffset.y();
+						}
 					}
+					// 瓦片体贴图的偏移
+					m_vTileOffsetUniform->set(vTileOffset);
 					break;
 				}
 			}
@@ -239,16 +264,16 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 			if (bVisible)
 			{
 				if (0 == itr.pTileTrans->getNodeMask())
-				{
 					itr.pTileTrans->setNodeMask(~0);
-				}
+
+				osg::Node* pNode = m_pTileRoot_0->getChild(iID);
+				if (pNode && 0 != pNode->getNodeMask())
+					pNode->setNodeMask(0);
 			}
 			else
 			{
 				if (0 != itr.pTileTrans->getNodeMask())
-				{
 					itr.pTileTrans->setNodeMask(0);
-				}
 			}
 		}
 	}
@@ -345,13 +370,16 @@ bool CGMTerrain::_CreateTerrain_0()
 bool CGMTerrain::_CreateTerrain_1()
 {
 	_CreateTile_0();
-	//_CreateTile_1();
+	_CreateTile_1();
 
 	return true;
 }
 
 bool CGMTerrain::_CreateTile_0()
 {
+	m_pTileRoot_0 = new osg::Group();
+	m_pHieTerrainRootVector.at(1)->addChild(m_pTileRoot_0);
+
 	m_sTileVec_0.reserve(24);
 	for (int j = 0; j < 6; j++)
 	{
@@ -367,7 +395,7 @@ bool CGMTerrain::_CreateTile_0()
 			m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit, osg::WGS_84_RADIUS_POLAR / fUnit);
 			pTerrainQuaterGeom->accept(*m_pCelestialScaleVisitor);	// 改变大小
 
-			m_pHieTerrainRootVector.at(1)->addChild(pTerrainQuaterGeode.get());
+			m_pTileRoot_0->addChild(pTerrainQuaterGeode.get());
 			pTerrainQuaterGeode->addDrawable(pTerrainQuaterGeom.get());
 
 			STileData sTile;
@@ -381,6 +409,9 @@ bool CGMTerrain::_CreateTile_0()
 
 bool CGMTerrain::_CreateTile_1()
 {
+	m_pTileRoot_1 = new osg::Group();
+	m_pHieTerrainRootVector.at(1)->addChild(m_pTileRoot_1);
+
 	m_sTileVec_1.reserve(8);
 	for (int j = 0; j < 2; j++)
 	{
@@ -400,7 +431,7 @@ bool CGMTerrain::_CreateTile_1()
 			m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit, osg::WGS_84_RADIUS_POLAR / fUnit);
 			pTerrainQuaterGeom->accept(*m_pCelestialScaleVisitor);	// 改变大小
 
-			m_pHieTerrainRootVector.at(1)->addChild(pTerrainQuaterTrans.get());
+			m_pTileRoot_1->addChild(pTerrainQuaterTrans.get());
 			pTerrainQuaterTrans->addChild(pTerrainQuaterGeode.get());
 			pTerrainQuaterGeode->addDrawable(pTerrainQuaterGeom.get());
 

@@ -4,13 +4,11 @@ uniform sampler2DArray baseTex;
 uniform vec2 planetRadius;
 
 #ifdef EARTH
-
 uniform vec3 screenSize;
 uniform vec4 coordScale_Earth;
 uniform sampler2DArray DEMTex;
 uniform sampler2DArray illumTex;
 uniform sampler2D globalShadowTex;
-
 #else // not EARTH
 uniform vec4 coordScale;
 #endif // EARTH
@@ -147,7 +145,4 @@ void main()
 #endif // EARTH
 
 	gl_FragColor = vec4(color, 1);
-#ifdef TERRAIN
-	gl_FragColor = vec4(color, 1); 
-#endif // TERRAIN
 }
