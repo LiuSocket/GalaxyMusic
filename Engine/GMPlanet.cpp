@@ -379,9 +379,9 @@ void CGMPlanet::Panorama2CubeMap()
 {
 	// È«¾°Í¼×ªCubemap
 	std::string strPanoPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/DEM_bed.tif";
-	std::string strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tile0/Earth_DEM_";
+	std::string strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/DEM/Earth_DEM_";
 	//_Panorama_2_CubeDEM(strPanoPath, strCubemapPath, 1024);
-	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tile1/Earth_DEM_";
+	//strCubemapPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/DEM/Earth_DEM_";
 	//_Panorama_2_CubeDEM(strPanoPath, strCubemapPath, 1024, 1);
 
 	//strPanoPath = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Earth_base.tif";

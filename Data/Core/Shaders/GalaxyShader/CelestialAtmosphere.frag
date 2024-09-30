@@ -1,4 +1,4 @@
-#version 400 compatibility
+#version 450 compatibility
 #pragma import_defines(AURORA, SATURN, EARTH, WANDERING)
 
 const float M_PI = 3.141592654;

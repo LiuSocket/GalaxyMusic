@@ -1080,7 +1080,7 @@ osg::Texture2DArray* CGMEarth::_CreateDEMTex2DArray(const std::string& filePreNa
 	{
 		std::string filenameInDir = dirContents[i];
 		if (filenameInDir == "." || filenameInDir == ".." ||
-			filenameInDir.npos == filenameInDir.find(".raw") ||
+			filenameInDir.npos == filenameInDir.find(".dds") ||
 			filenameInDir.npos == filenameInDir.find(strName))
 			continue;
 		// 统计图片的数量
@@ -1095,12 +1095,11 @@ osg::Texture2DArray* CGMEarth::_CreateDEMTex2DArray(const std::string& filePreNa
 	{
 		std::string filenameInDir = dirContents[i];
 		if (filenameInDir == "." || filenameInDir == ".." ||
-			filenameInDir.npos == filenameInDir.find(".raw") ||
+			filenameInDir.npos == filenameInDir.find(".dds") ||
 			filenameInDir.npos == filenameInDir.find(strName))
 			continue;
 
 		osg::ref_ptr<osg::Image> pImg = osgDB::readImageFile(strPath + filenameInDir);
-		pImg->setImage(iImgWidth, iImgHeight, 1, GL_R16F, GL_RED, GL_UNSIGNED_SHORT, pImg->data(), osg::Image::NO_DELETE);
 		texture->setImage(j++, pImg.get());
 	}
 
@@ -1108,9 +1107,7 @@ osg::Texture2DArray* CGMEarth::_CreateDEMTex2DArray(const std::string& filePreNa
 	texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
 	texture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
 	texture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-	texture->setInternalFormat(GL_R16F);
-	texture->setSourceFormat(GL_RED);
+	texture->setWrap(osg::Texture::WRAP_R, osg::Texture::CLAMP_TO_EDGE);
 	texture->setSourceType(GL_UNSIGNED_SHORT);
 	return texture.release();
 }

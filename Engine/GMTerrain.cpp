@@ -30,6 +30,11 @@ CGMTerrain Methods
 /** @brief 构造 */
 CGMTerrain::CGMTerrain(): m_vTileOffsetUniform(new osg::Uniform("tileOffset", osg::Vec3f(0.0f, 0.0f, 0.0f)))
 {
+	m_pTileRoot_0 = new osg::Group();
+	m_pTileRoot_0->setName("TileRoot_0");
+	m_pTileRoot_1 = new osg::Group();
+	m_pTileRoot_1->setName("TileRoot_1");
+
 	m_pCelestialScaleVisitor = new CGMCelestialScaleVisitor();
 
 	// 初始化1级瓦片中心点方向
@@ -196,9 +201,9 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 		osg::Vec3f vTileOffset = osg::Vec3f(0.0f, 0.0f, 0.0f);
 		m_vTileOffsetUniform->get(vTileOffset);
 
+		// 先全部显示
 		for (int i = 0; i < m_pTileRoot_0->getNumChildren(); i++)
 		{
-			// 先全部显示
 			m_pTileRoot_0->getChild(i)->setNodeMask(~0);
 		}
 
@@ -377,7 +382,6 @@ bool CGMTerrain::_CreateTerrain_1()
 
 bool CGMTerrain::_CreateTile_0()
 {
-	m_pTileRoot_0 = new osg::Group();
 	m_pHieTerrainRootVector.at(1)->addChild(m_pTileRoot_0);
 
 	m_sTileVec_0.reserve(24);
@@ -409,7 +413,6 @@ bool CGMTerrain::_CreateTile_0()
 
 bool CGMTerrain::_CreateTile_1()
 {
-	m_pTileRoot_1 = new osg::Group();
 	m_pHieTerrainRootVector.at(1)->addChild(m_pTileRoot_1);
 
 	m_sTileVec_1.reserve(8);
@@ -507,7 +510,7 @@ osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int 
 			osg::Vec3 vDir = vCenter + vAxisX * x / fSize + vAxisY * y / fSize;
 			vDir.normalize();
 
-			// 默认为临界值的点，防止三角函数失效
+			// 默认的经纬度为临界值，防止三角函数失效
 			float fLon = bPolar ? osg::PI_2 : 0.0f;// 弧度
 			float fLat = bPolar ? osg::PI_2 : 0.0f;// 弧度
 			if (vCenter != vDir)
@@ -520,7 +523,7 @@ osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int 
 			// 0层纹理单元 xy = WGS84对应的UV，[0.0, 1.0]
 			// 1层纹理单元 xy = 瓦片体贴图UV，[0.0, 1.0]; z = 面对应的编号0-23
 			coords0->push_back(osg::Vec2(0.5f + fLon / (osg::PI * 2), 0.5f + fLat / (osg::PI)));
-			coords1->push_back(osg::Vec3(float(x) / float(iSegment), float(y) / float(iSegment), 0));
+			coords1->push_back(osg::Vec3(float(x) / float(iSegment), float(y) / float(iSegment), 0.0f));
 			normals->push_back(vDir);
 			if (x < iSegment && y < iSegment)
 			{

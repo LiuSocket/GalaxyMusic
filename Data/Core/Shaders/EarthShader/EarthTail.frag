@@ -1,4 +1,4 @@
-#version 400 compatibility
+#version 450 compatibility
 
 #pragma import_defines(BRAKE_TIME, TORQUE_TIME_0, TORQUE_TIME_1)
 #pragma import_defines(RAYS_2, RAYS_3)

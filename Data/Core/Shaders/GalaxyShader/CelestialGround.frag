@@ -70,7 +70,8 @@ void main()
 	float rockMask = 1 - baseColor.a;
 
 	vec3 DEMCoord = texCoord_1;
-	DEMCoord.xy = (DEMCoord.xy - 0.5)*celestialCoordScale.w + 0.5;
+	DEMCoord.xy = (DEMCoord.xy - 0.5)*1023.0/1024.0 + 0.5;
+	//	DEMCoord.xy = (DEMCoord.xy - 0.5)*celestialCoordScale.w + 0.5;
 	vertAlt = DEM(texture(DEMTex, DEMCoord).r); // meter
 
 	vec3 viewHalf = normalize(viewLight - viewDir);

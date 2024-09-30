@@ -1,4 +1,4 @@
-#version 400 compatibility
+#version 450 compatibility
 
 #pragma import_defines(EARTH, TERRAIN)
 
