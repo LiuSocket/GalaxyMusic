@@ -79,7 +79,7 @@ namespace GM
 					std::string strImgNum = std::to_string(_iCountVec.at(0));
 
 					osgDB::writeImageFile(*(_pImage),
-						"../../Data/Core/Textures/Sphere/Earth/Tmp/Tile0/" + _strImgName + strImgNum + ".tif");
+						"../../Data/Core/Textures/Sphere/Earth/DOM/Tile0/" + _strImgName + strImgNum + ".tif");
 				}
 				else if (1 == iTileLevel)
 				{
@@ -87,7 +87,7 @@ namespace GM
 					strImgNum += std::to_string(_iCountVec.at(1));
 
 					osgDB::writeImageFile(*(_pImage),
-						"../../Data/Core/Textures/Sphere/Earth/Tmp/Tile1/" + _strImgName + strImgNum + ".tif");
+						"../../Data/Core/Textures/Sphere/Earth/DOM/Tile1/" + _strImgName + strImgNum + ".tif");
 				}
 				else {}
 

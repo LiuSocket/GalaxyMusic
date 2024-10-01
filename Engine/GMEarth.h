@@ -295,6 +295,7 @@ namespace GM
 		osg::ref_ptr<osg::Texture2DArray>				m_aIllumTex_T1;					//!< 地球1层城市自发光+发动机自发光
 		osg::ref_ptr<osg::Texture2DArray>				m_aDEMTex_T0;					//!< 地球0层DEM
 		osg::ref_ptr<osg::Texture2DArray>				m_aDEMTex_T1;					//!< 地球1层DEM
+		osg::ref_ptr<osg::Texture2DArray>				m_aDEMTex_T2;					//!< 地球2层DEM
 		//osg::ref_ptr<osg::Texture2DArray>				m_aAuroraTex;					//!< 极光纹理
 		osg::ref_ptr<osg::Texture>						m_pCloudDetailTex;				//!< 云细节纹理
 		osg::ref_ptr<osg::Texture3D>					m_pInscatteringTex;

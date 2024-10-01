@@ -88,10 +88,10 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 	}
 
 	// 地球地面贴图
-	m_aEarthBaseTex_T0 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Tile0/Earth_base_");
-	m_aEarthBaseTex_T1 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Tile1/Earth_base_");
+	m_aEarthBaseTex_T0 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/DOM/Tile0/Earth_base_");
+	m_aEarthBaseTex_T1 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/DOM/Tile1/Earth_base_");
 	// 地球云层贴图
-	m_aEarthCloudTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Tile0/Earth_cloud_");
+	m_aEarthCloudTex = _CreateDDSTex2DArray(strSphereTexPath + "Earth/DOM/Tile0/Earth_cloud_");
 	if (m_pConfigData->bWanderingEarth)
 	{
 		// 流浪地球地面贴图
@@ -101,12 +101,13 @@ bool CGMEarth::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMC
 		_AddTex2DArray(m_aEarthCloudTex, strSphereTexPath + "Earth/WanderingEarth/Tile0/wanderingEarth_cloud_", 0);
 	}
 
-	m_aIllumTex_T0 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Tile0/Earth_illum_");
-	m_aIllumTex_T1 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/Tile1/Earth_illum_");
+	m_aIllumTex_T0 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/DOM/Tile0/Earth_illum_");
+	m_aIllumTex_T1 = _CreateDDSTex2DArray(strSphereTexPath + "Earth/DOM/Tile1/Earth_illum_");
 
 	// 加载DEM
-	m_aDEMTex_T0 = _CreateDEMTex2DArray(strSphereTexPath + "Earth/Tile0/Earth_DEM_");
-	m_aDEMTex_T1 = _CreateDEMTex2DArray(strSphereTexPath + "Earth/Tile1/Earth_DEM_");
+	m_aDEMTex_T0 = _CreateDEMTex2DArray(strSphereTexPath + "Earth/DEM/Tile0/Earth_DEM_");
+	m_aDEMTex_T1 = _CreateDEMTex2DArray(strSphereTexPath + "Earth/DEM/Tile1/Earth_DEM_");
+	m_aDEMTex_T2 = _CreateDEMTex2DArray(strSphereTexPath + "Earth/DEM/Tile2/Earth_DEM_");
 
 	//// 极光
 	//m_aAuroraTex = _CreateDDSTex2DArray(strSphereTexPath + "aurora.dds");
@@ -645,29 +646,29 @@ bool CGMEarth::_CreateEarth_2()
 bool CGMEarth::_CreateWanderingEarth()
 {
 	//// 临时添加的生成流浪地球版本的各个贴图的工具函数
-	//std::string strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/wanderingEarth_base_real_";
-	//std::string strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/engineBody";
-	//std::string strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tif2DDS/wanderingEarth_base_";
+	//std::string strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/DOM/Tile0/wanderingEarth_base_real_";
+	//std::string strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/DOM/Tile0/engineBody";
+	//std::string strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/Tif2DDS/wanderingEarth_base_";
 	//_MixWEETexture(strPath_0, strPath_1, strOut, 0, 0);
 
-	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile1/wanderingEarth_base_real_";
-	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile1/engineBody";
-	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tif2DDS/wanderingEarth_base_";
+	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/DOM/Tile1/wanderingEarth_base_real_";
+	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/DOM/Tile1/engineBody";
+	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/Tif2DDS/wanderingEarth_base_";
 	//_MixWEETexture(strPath_0, strPath_1, strOut, 0, 1);
 
-	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/wanderingEarth_cloud_real_";
-	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/bloom";
-	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/WanderingEarth/Tile0/wanderingEarth_cloud_";
+	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/DOM/Tile0/wanderingEarth_cloud_real_";
+	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/DOM/Tile0/bloom";
+	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/Tif2DDS/wanderingEarth_cloud_";
 	//_MixWEETexture(strPath_0, strPath_1, strOut, 1, 0);
 
-	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/Earth_illum_real_";
-	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile0/bloom";
-	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tif2DDS/Earth_illum_";
+	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/DOM/Tile0/Earth_illum_real_";
+	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/DOM/Tile0/bloom";
+	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/Tif2DDS/Earth_illum_";
 	//_MixWEETexture(strPath_0, strPath_1, strOut, 2, 0);
 
-	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile1/Earth_illum_real_";
-	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tmp/Tile1/bloom";
-	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/Tif2DDS/Earth_illum_";
+	//strPath_0 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/DOM/Tile1/Earth_illum_real_";
+	//strPath_1 = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/DOM/Tile1/bloom";
+	//strOut = m_pConfigData->strCorePath + "Textures/Sphere/Earth/SourceTif/Tif2DDS/Earth_illum_";
 	//_MixWEETexture(strPath_0, strPath_1, strOut, 2, 1);
 
 	if ((m_pConfigData->bWanderingEarth))
@@ -1099,7 +1100,7 @@ osg::Texture2DArray* CGMEarth::_CreateDEMTex2DArray(const std::string& filePreNa
 			filenameInDir.npos == filenameInDir.find(strName))
 			continue;
 
-		osg::ref_ptr<osg::Image> pImg = osgDB::readImageFile(strPath + filenameInDir);
+		osg::ref_ptr<osg::Image> pImg = osgDB::readImageFile(strPath + filenameInDir, m_pDDSOptions);
 		texture->setImage(j++, pImg.get());
 	}
 
