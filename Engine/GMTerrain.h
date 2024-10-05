@@ -122,8 +122,11 @@ namespace GM
 		SGMKernelData*		m_pKernelData = nullptr;		//!< 内核数据
 		SGMConfigData*		m_pConfigData = nullptr;		//!< 配置数据
 		CGMCommonUniform*	m_pCommonUniform = nullptr;		//!< 公共Uniform
-
-		osg::ref_ptr<osg::Uniform> m_vTileOffsetUniform;						//!< tile1瓦片的索引偏移
+		
+		//!< tile1瓦片的经纬度偏移
+		osg::ref_ptr<osg::Uniform> m_vTileOffsetLonLatUniform;
+		//!< tile1瓦片的索引偏移
+		osg::ref_ptr<osg::Uniform> m_vTileOffsetIDUniform;
 
 		std::string m_strGalaxyShaderPath = "Shaders/GalaxyShader/";			//!< galaxy shader 路径
 		std::string m_strTerrainShaderPath = "Shaders/TerrainShader/";			//!< Terrain shader 路径

@@ -9,7 +9,6 @@ in vec3 shadowVertPos;
 #ifdef EARTH
 
 #ifdef WANDERING
-uniform vec3 screenSize;
 uniform sampler2DArray illumTex;
 #endif // WANDERING
 
@@ -121,6 +120,7 @@ void main()
 	color += AtmosColor(cloudTop*unit, viewDir, viewVertUp, Rg);
 	color = ToneMapping(color*(1 - 0.9*shadow));
 	color = pow(color,vec3(1.0/2.2));
+	color += mix(-NOISE_GRANULARITY, NOISE_GRANULARITY, Random(gl_FragCoord.xy/screenSize.xy));
 
 #ifdef EARTH
 #ifdef WANDERING

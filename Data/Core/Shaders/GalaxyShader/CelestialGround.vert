@@ -1,15 +1,16 @@
 #version 450 compatibility
 
-#pragma import_defines(EARTH, TERRAIN)
+#pragma import_defines(EARTH, TILE)
 
 #ifdef EARTH
 uniform float unit;
 uniform vec4 coordScale_Earth;
 uniform sampler2DArray DEMTex;
 #endif // EARTH
-#ifdef TERRAIN
-uniform vec3 tileOffset;
-#endif // TERRAIN
+#ifdef TILE
+uniform vec3 tileOffsetLonLat;
+uniform vec3 tileOffsetID;
+#endif // TILE
 
 out vec2 texCoord_0;
 out vec3 texCoord_1;
@@ -27,10 +28,24 @@ void main()
 	viewNormal = normalize(gl_NormalMatrix*gl_Normal);
 	vec4 modelVertex = gl_Vertex;
 
+	vec2 coord0 = gl_MultiTexCoord0.xy;
 	vec3 coord1 = gl_MultiTexCoord1.xyz;
-#ifdef TERRAIN
-	if(TERRAIN>0) coord1.z += (coord1.z < 15.5) ? ((abs(coord1.z - 1.5) > 1.0) ? tileOffset.x : tileOffset.y) : tileOffset.z;
-#endif // TERRAIN
+#ifdef TILE
+	if(TILE>0)
+	{
+		bool isEquator = coord1.z < 15.5;
+		bool isEquator03 = abs(coord1.z - 1.5) > 1.0;
+		bool isPolar03 = abs(coord1.z - 17.5) > 1.0;
+		bool isSouth = tileOffsetLonLat.z > 0.0;
+		// coord 0
+		coord0.x = isEquator ?
+			isEquator03 ? coord0.x + tileOffsetLonLat.x : coord0.x + tileOffsetLonLat.y :
+			isSouth ? (isPolar03 ? (1.5 - coord0.x) : (0.5 - coord0.x)) : coord0.x;
+		coord0.y = isEquator ? coord0.y : (isSouth ? 1.0 - coord0.y : coord0.y);
+		// coord 1 	
+		coord1.z += isEquator ? (isEquator03 ? tileOffsetID.x : tileOffsetID.y) : tileOffsetID.z;
+	}
+#endif // TILE
 
 #ifdef EARTH
 	vec3 DEMCoord = coord1;
@@ -43,6 +58,6 @@ void main()
 #endif // EARTH or not
 
 	viewPos = gl_ModelViewMatrix*modelVertex;
-	texCoord_0 = gl_MultiTexCoord0.xy;
+	texCoord_0 = coord0;
 	texCoord_1 = coord1;
 }

@@ -698,7 +698,7 @@ void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS, const int iTileLevel) 
 	pSS->setRenderBinDetails(BIN_ROCKSPHERE, "DepthSortedBin");
 
 	// 地形宏定义
-	pSS->setDefine("TERRAIN", std::to_string(iTileLevel), osg::StateAttribute::ON);
+	pSS->setDefine("TILE", std::to_string(iTileLevel), osg::StateAttribute::ON);
 	// 地球宏定义
 	pSS->setDefine("EARTH", osg::StateAttribute::ON);
 	pSS->setDefine("ATMOS", osg::StateAttribute::ON);
@@ -737,7 +737,8 @@ void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS, const int iTileLevel) 
 		pSS->setDefine("WANDERING", osg::StateAttribute::ON);
 	}
 
-	pSS->addUniform(m_vTileOffsetUniform.get());
+	pSS->addUniform(m_vTileOffsetLonLatUniform.get());
+	pSS->addUniform(m_vTileOffsetIDUniform.get());
 	pSS->addUniform(m_pCommonUniform->GetViewUp());
 	pSS->addUniform(m_vViewLightUniform.get());
 	pSS->addUniform(m_fAtmosHeightUniform.get());
@@ -918,6 +919,7 @@ void CGMEarth::_CreateAtmosphereMaterial(osg::StateSet* pSS) const
 	osg::ref_ptr<osg::Uniform> pInscatteringUniform = new osg::Uniform("inscatteringTex", iAtmosUnit++);
 	pSS->addUniform(pInscatteringUniform.get());
 
+	pSS->addUniform(m_pCommonUniform->GetScreenSize());
 	pSS->addUniform(m_pCommonUniform->GetViewUp());
 	pSS->addUniform(m_vViewLightUniform.get());
 	pSS->addUniform(m_fAtmosHeightUniform.get());

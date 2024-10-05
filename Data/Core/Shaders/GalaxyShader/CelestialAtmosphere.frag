@@ -2,7 +2,9 @@
 #pragma import_defines(AURORA, SATURN, EARTH, WANDERING)
 
 const float M_PI = 3.141592654;
+const float NOISE_GRANULARITY = 0.5/255.0;
 
+uniform vec3 screenSize;
 uniform vec3 viewUp;
 uniform vec3 viewLight;
 uniform float atmosHeight;
@@ -32,6 +34,11 @@ in vec3 shadowVertPos;
 
 in vec4 viewPos;
 in vec3 viewNormal;
+
+float Random(vec2 coords)
+{
+	return fract(sin(dot(coords.xy, vec2(12.9898,78.233))) * 43758.5453);
+}
 
 float MiePhase(float dotVS)
 {
@@ -183,5 +190,8 @@ void main()
 	vec3 color = ToneMapping(atmosSum * (1 - shadow));
 	float alpha = 1-exp2(-(atmosSum.r+atmosSum.g+atmosSum.b)*60);
 	alpha *= 1 - shadow;
-	gl_FragColor = vec4(pow(color,vec3(1.0/2.2)), alpha);
+
+	float fragmentNoise = mix(-NOISE_GRANULARITY, NOISE_GRANULARITY, Random(gl_FragCoord.xy / screenSize.xy));
+	color = pow(color,vec3(1.0/2.2)) + vec3(fragmentNoise);
+	gl_FragColor = vec4(color, alpha);
 }

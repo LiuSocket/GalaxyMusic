@@ -1,7 +1,6 @@
 #ifdef EARTH
 
 uniform float wanderProgress;
-uniform vec3 screenSize;
 uniform sampler2D baseColorTex;
 uniform sampler2D tailTex;
 
@@ -42,6 +41,7 @@ void main()
 
 	color.rgb = ToneMapping(color.rgb);
 	color.rgb = pow(color.rgb,vec3(1.0/2.2));
+	color.rgb += mix(-NOISE_GRANULARITY, NOISE_GRANULARITY, Random(gl_FragCoord.xy/screenSize.xy));
 
 	gl_FragColor = color;
 }

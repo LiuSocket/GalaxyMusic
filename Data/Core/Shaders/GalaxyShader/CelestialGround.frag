@@ -1,10 +1,9 @@
-#pragma import_defines(TERRAIN)
+#pragma import_defines(TILE)
 
 uniform sampler2DArray baseTex;
 uniform vec2 planetRadius;
 
 #ifdef EARTH
-uniform vec3 screenSize;
 uniform vec4 coordScale_Earth;
 uniform sampler2DArray DEMTex;
 uniform sampler2DArray illumTex;
@@ -70,8 +69,7 @@ void main()
 	float rockMask = 1 - baseColor.a;
 
 	vec3 DEMCoord = texCoord_1;
-	DEMCoord.xy = (DEMCoord.xy - 0.5)*1023.0/1024.0 + 0.5;
-	//	DEMCoord.xy = (DEMCoord.xy - 0.5)*celestialCoordScale.w + 0.5;
+	DEMCoord.xy = (DEMCoord.xy - 0.5)*celestialCoordScale.w + 0.5;
 	vertAlt = DEM(texture(DEMTex, DEMCoord).r); // meter
 
 	vec3 viewHalf = normalize(viewLight - viewDir);
@@ -104,7 +102,7 @@ void main()
 	illumCity = max((0.2+0.04*baseColor.rgb)*darkness*engineMask, rockMask*(illumCity - seaLevelAddProgress));
 
 	color = mix(vec3(0.0,0.1,0.0), baseColor.rgb, clamp(elev2Sea*0.1, 1-0.7*seaLevelAddProgress, 1.0));
-	color *= 0.01 + ambient + diffuse;
+	color *= 0.002 + ambient + diffuse;
 
 	vec3 specualr = specualrColor*pow(dotNH, max(50, 200-max(-elev2Sea*0.015, 0)))*clamp(-elev2Sea*0.01, 0, 1);
 	vec3 oceanColor = mix(vec3(0.01,0.03,0.06), vec3(0.05,0.15,0.15), seaLevelAddProgress*exp2(min(0, elev2Sea)*0.01));
@@ -131,6 +129,7 @@ void main()
 #endif // EARTH
 	color = ToneMapping(color);
 	color = pow(color,vec3(1.0/2.2));
+	color += mix(-NOISE_GRANULARITY, NOISE_GRANULARITY, Random(gl_FragCoord.xy/screenSize.xy));
 
 #ifdef EARTH
 	color = mix(color, vec3(1), illumCity);

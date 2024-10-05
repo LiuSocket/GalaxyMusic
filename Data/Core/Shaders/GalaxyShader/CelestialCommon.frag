@@ -3,6 +3,7 @@
 #pragma import_defines(ATMOS, EARTH, WANDERING)
 
 const float M_PI = 3.141592654;
+const float NOISE_GRANULARITY = 0.5/255.0;
 
 const float PROGRESS_0 =	0.005;
 const float PROGRESS_1 =	0.03; // end of brake time
@@ -12,6 +13,7 @@ const float PROGRESS_2_1 =	0.1;
 const float PROGRESS_3 =	0.15; // end of torque time
 const float PROGRESS_3_1 =	0.152;
 
+uniform vec3 screenSize;
 uniform vec3 viewUp;
 uniform vec3 viewLight;
 uniform float minDotUL;
@@ -22,6 +24,11 @@ uniform sampler2D tailTex;
 uniform vec3 engineStartRatio;
 uniform float wanderProgress;
 #endif // WANDERING
+
+float Random(vec2 coords)
+{
+	return fract(sin(dot(coords.xy, vec2(12.9898,78.233))) * 43758.5453);
+}
 
 float MiePhase(float dotVS)
 {

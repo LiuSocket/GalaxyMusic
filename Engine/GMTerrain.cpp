@@ -28,7 +28,9 @@ CGMTerrain Methods
 *************************************************************************/
 
 /** @brief 构造 */
-CGMTerrain::CGMTerrain(): m_vTileOffsetUniform(new osg::Uniform("tileOffset", osg::Vec3f(0.0f, 0.0f, 0.0f)))
+CGMTerrain::CGMTerrain():
+	m_vTileOffsetLonLatUniform(new osg::Uniform("tileOffsetLonLat", osg::Vec3f(0.0f, 0.0f, 0.0f))),
+	m_vTileOffsetIDUniform(new osg::Uniform("tileOffsetID", osg::Vec3f(0.0f, 0.0f, 0.0f)))
 {
 	for (int i = 0; i < 2; i++)
 	{
@@ -200,8 +202,10 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 		osg::Vec3d vCore2EyeDir = vEye;
 		vCore2EyeDir.normalize();
 
-		osg::Vec3f vTileOffset = osg::Vec3f(0.0f, 0.0f, 0.0f);
-		m_vTileOffsetUniform->get(vTileOffset);
+		osg::Vec3f vTileOffsetLonLat = osg::Vec3f(0.0f, 0.0f, 0.0f);
+		osg::Vec3f vTileOffsetID = osg::Vec3f(0.0f, 0.0f, 0.0f);
+		m_vTileOffsetLonLatUniform->get(vTileOffsetLonLat);
+		m_vTileOffsetIDUniform->get(vTileOffsetID);
 
 		// 先全部显示
 		for (int i = 0; i < m_pHie1_TileVector.at(0)->getNumChildren(); i++)
@@ -229,41 +233,58 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 					if (itr.bPolar)
 					{
 						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI*k, osg::Vec3d(0, 1, 0)));
-						vTileOffset.z() = k*4;
-						iID += 16 + vTileOffset.z();
+						vTileOffsetLonLat.z() = (0 == k) ? -1.0f : 1.0f;// 北极-1，南极1
+						vTileOffsetID.z() = k*4;
+						iID += 16 + vTileOffsetID.z();
 					}
 					else
 					{
+						// 是否是1或4象限，ID == 0或3
+						bool b0or3 = (0 == itr.iTileID || 3 == itr.iTileID);
+
 						if (0 == k) // posX
 						{
+							if (b0or3) vTileOffsetLonLat.x() = 0.0f; 
+							else vTileOffsetLonLat.y() = 0.0f;
+
 							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(0, osg::Vec3d(0, 0, 1)));
 						}
 						else if (1 == k) // negX
 						{
+							if (b0or3) vTileOffsetLonLat.x() = -0.5f;
+							else vTileOffsetLonLat.y() = 0.5f;
+
 							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI, osg::Vec3d(0, 0, 1)));
 						}
 						else if (2 == k) // posY
 						{
+							if (b0or3) vTileOffsetLonLat.x() = 0.25f;
+							else vTileOffsetLonLat.y() = 0.25f;
+
 							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI_2, osg::Vec3d(0, 0, 1)));
 						}
 						else // if (3 == k) negY
 						{
+							if (b0or3) vTileOffsetLonLat.x() = -0.25f;
+							else vTileOffsetLonLat.y() = -0.25f;
+
 							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI * 1.5, osg::Vec3d(0, 0, 1)));
 						}
 
-						if (0 == itr.iTileID || 3 == itr.iTileID)
+						if (b0or3)
 						{
-							vTileOffset.x() = k * 4;
-							iID += vTileOffset.x();
+							vTileOffsetID.x() = k * 4;
+							iID += vTileOffsetID.x();
 						}
 						else
 						{
-							vTileOffset.y() = k * 4;
-							iID += vTileOffset.y();
+							vTileOffsetID.y() = k * 4;
+							iID += vTileOffsetID.y();
 						}
 					}
 					// 瓦片体贴图的偏移
-					m_vTileOffsetUniform->set(vTileOffset);
+					m_vTileOffsetLonLatUniform->set(vTileOffsetLonLat);
+					m_vTileOffsetIDUniform->set(vTileOffsetID);
 					break;
 				}
 			}
