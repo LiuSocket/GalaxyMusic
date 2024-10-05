@@ -87,11 +87,13 @@ namespace GM
 
 		/**
 		* @brief 创建0/1级瓦片
-		*	0级瓦片是六面体细分后的球体的一个面的四分之一，1级瓦片是0级瓦片细分一次的结果
+		*	0级瓦片是六面体细分后的球体的一个面的四分之一，1级瓦片是0级瓦片细分一次的结果，以此类推
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateTile_0();
 		bool _CreateTile_1();
+		bool _CreateTile_2();
+
 		/**
 		* @brief 创建六面体细分后的球体的一个面的四分之一的部分，每个顶点都有法线和UV
 		* UV0.xy = WGS84对应的UV，[0.0, 1.0]
@@ -99,10 +101,10 @@ namespace GM
 		* UV1.z = 六面体ID，0,1,2,3,4,5
 		* @param bPolar:			是否是极地区域
 		* @param iHalfSegment:		瓦片体的边长的分段数，也就是一个六面体的半边长的分段数
-		*							特意设置成2^n-1是为了保证高程图的分辨率是2^n
+		*							建议设置成2^n-1是为了保证高程图的分辨率是2^n
 		* @return Geometry:			返回几何体指针
 		*/
-		osg::Geometry* _MakeHexahedronQuaterGeometry(const bool bPolar, int iHalfSegment = 63) const;
+		osg::Geometry* _MakeHexahedronQuaterGeometry(const bool bPolar, int iHalfSegment) const;
 
 		/**
 		* @brief 根据顶点的信息获取顶点的索引，会特殊处理国际日期变更线上的顶点
@@ -126,9 +128,8 @@ namespace GM
 		std::string m_strGalaxyShaderPath = "Shaders/GalaxyShader/";			//!< galaxy shader 路径
 		std::string m_strTerrainShaderPath = "Shaders/TerrainShader/";			//!< Terrain shader 路径
 
-		std::vector<osg::ref_ptr<osg::Group>>		m_pHieTerrainRootVector;	//!< 0/1空间层级的根节点
-		osg::ref_ptr<osg::Group>					m_pTileRoot_0;				//!< 0级瓦片根节点
-		osg::ref_ptr<osg::Group>					m_pTileRoot_1;				//!< 1级瓦片根节点
+		std::vector<osg::ref_ptr<osg::Group>>		m_pHieRootVector;			//!< 0/1空间层级的根节点
+		std::vector<osg::ref_ptr<osg::Group>>		m_pHie1_TileVector;			//!< 1层空间的各级瓦片根节点
 		CGMCelestialScaleVisitor*	m_pCelestialScaleVisitor = nullptr;			//!< 用于控制天体大小
 
 	private:

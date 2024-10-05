@@ -23,12 +23,14 @@ namespace GM
 	public:
 		CGMCelestialScaleVisitor(): NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN){}
 
-		void SetQuatorFace(const bool bQuator, const int iQuatorFaceID = 0)
+		void SetTileLevel(const int iTileLevel)
 		{
-			_bQuator = bQuator;
+			_iTileLevel = iTileLevel;
+		}
+		void SetQuatorFace(const int iQuatorFaceID)
+		{
 			_iQuatorFaceID = iQuatorFaceID;
 		}
-
 		void SetRadius(const double fEquator, const double fPolar)
 		{
 			ellipsoid.setRadiusEquator(fEquator);
@@ -56,9 +58,8 @@ namespace GM
 			int iVertEdgeNum = sqrt(float(pVert->size()));
 			for (int i = 0; i < pVert->size(); i++)
 			{
-				double fLat = (pCoord0->at(i).y() - 0.5) * osg::PI;
-				double fLon = (pCoord0->at(i).x() - 0.5) * osg::PI * 2;
-				if (_bQuator)
+				osg::Vec2d vCoord = pCoord0->at(i) - osg::Vec2d(0.5, 0.5);
+				if (0 <= _iTileLevel)
 				{
 					int iX = i % iVertEdgeNum;
 					int iY = i / iVertEdgeNum;
@@ -80,106 +81,97 @@ namespace GM
 					//	2/6/10/14/18/22		|		3/7/11/15/19/23
 					switch (_iQuatorFaceID)
 					{
-					case 1: // 第二象限 posX 赤道大西洋
-						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
-						fLon = (0.5 - pCoord0->at(iInvX).x()) * osg::PI * 2;
+					case 4: // 第一象限 negX 赤道太平洋
+						vCoord = pCoord0->at(i) - osg::Vec2d(1.0, 0.5);
 						break;
-					case 2: // 第三象限 posX 赤道大西洋
-						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
-						fLon = (0.5 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
+					case 8: // 第一象限 posY 赤道印尼
+						vCoord = pCoord0->at(i) - osg::Vec2d(0.25, 0.5);
 						break;
-					case 3: // 第四象限 posX 赤道大西洋
-						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
-						fLon = (pCoord0->at(iInvY).x() - 0.5) * osg::PI * 2;
+					case 12: // 第一象限 negY 赤道美洲
+						vCoord = pCoord0->at(i) - osg::Vec2d(0.75, 0.5);
+						break;
+					case 20: // 第一象限 negZ 南极
+						vCoord = -pCoord0->at(i) + osg::Vec2d(1.0, 0.5);
 						break;
 					///////////////////////////////////////////////////////////
-					case 4: // 第一象限 negX 赤道太平洋
-						fLat = (pCoord0->at(i).y() - 0.5) * osg::PI;
-						fLon = (pCoord0->at(i).x() - 1.0) * osg::PI * 2;
+					case 1: // 第二象限 posX 赤道大西洋
+						vCoord.x() = -pCoord0->at(iInvX).x() + 0.5;
+						vCoord.y() = pCoord0->at(iInvX).y() - 0.5;
 						break;
 					case 5: // 第二象限 negX 赤道太平洋
-						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
-						fLon = (1.0-pCoord0->at(iInvX).x()) * osg::PI * 2;
-						break;
-					case 6: // 第三象限 negX 赤道太平洋
-						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
-						fLon = (1.0 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
-						break;
-					case 7: // 第四象限 negX 赤道太平洋
-						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
-						fLon = (pCoord0->at(iInvY).x() - 1.0) * osg::PI * 2;
-						break;
-					///////////////////////////////////////////////////////////
-					case 8: // 第一象限 posY 赤道印尼
-						fLat = (pCoord0->at(i).y() - 0.5) * osg::PI;
-						fLon = (pCoord0->at(i).x() - 0.25) * osg::PI * 2;
+						vCoord.x() = -pCoord0->at(iInvX).x() + 1.0;
+						vCoord.y() = pCoord0->at(iInvX).y() - 0.5;
 						break;
 					case 9: // 第二象限 posY 赤道印尼
-						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
-						fLon = (0.75 - pCoord0->at(iInvX).x()) * osg::PI * 2;
-						break;
-					case 10: // 第三象限 posY 赤道印尼
-						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
-						fLon = (0.75 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
-						break;
-					case 11: // 第四象限 posY 赤道印尼
-						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
-						fLon = (pCoord0->at(iInvY).x() - 0.25) * osg::PI * 2;
-						break;
-					///////////////////////////////////////////////////////////
-					case 12: // 第一象限 negY 赤道美洲
-						fLat = (pCoord0->at(i).y() - 0.5) * osg::PI;
-						fLon = (pCoord0->at(i).x() - 0.75) * osg::PI * 2;
+						vCoord.x() = -pCoord0->at(iInvX).x() + 0.75;
+						vCoord.y() = pCoord0->at(iInvX).y() - 0.5;
 						break;
 					case 13: // 第二象限 negY 赤道美洲
-						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
-						fLon = (0.25 - pCoord0->at(iInvX).x()) * osg::PI * 2;
+						vCoord.x() = -pCoord0->at(iInvX).x() + 0.25;
+						vCoord.y() = pCoord0->at(iInvX).y() - 0.5;
 						break;
-					case 14: // 第三象限 negY 赤道美洲
-						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
-						fLon = (0.25 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
-						break;
-					case 15: // 第四象限 negY 赤道美洲
-						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
-						fLon = (pCoord0->at(iInvY).x() - 0.75) * osg::PI * 2;
-						break;
-					///////////////////////////////////////////////////////////
 					case 17: // 第二象限 posZ 北极
-						fLat = (pCoord0->at(iInvX).y() - 0.5) * osg::PI;
-						fLon = (0.5 - pCoord0->at(iInvX).x()) * osg::PI * 2;
-						break;
-					case 18: // 第三象限 posZ 北极
-						fLat = (pCoord0->at(iInvXY).y() - 0.5) * osg::PI;
-						fLon = (pCoord0->at(iInvXY).x() - 1.0) * osg::PI * 2;
-						break;
-					case 19: // 第四象限 posZ 北极
-						fLat = (pCoord0->at(iInvY).y() - 0.5) * osg::PI;
-						fLon = (1.0 - pCoord0->at(iInvY).x()) * osg::PI * 2;
-						break;
-					///////////////////////////////////////////////////////////
-					case 20: // 第一象限 negZ 南极
-						fLat = (0.5 - pCoord0->at(i).y()) * osg::PI;
-						fLon = (1.0 - pCoord0->at(i).x()) * osg::PI * 2;
+						vCoord.x() = -pCoord0->at(iInvX).x() + 0.5;
+						vCoord.y() = pCoord0->at(iInvX).y() - 0.5;
 						break;
 					case 21: // 第二象限 negZ 南极
-						fLat = (0.5 - pCoord0->at(iInvX).y()) * osg::PI;
-						fLon = (pCoord0->at(iInvX).x()-1.0) * osg::PI * 2;
+						vCoord.x() = pCoord0->at(iInvX).x() - 1.0;
+						vCoord.y() = -pCoord0->at(iInvX).y() + 0.5;
+						break;
+					///////////////////////////////////////////////////////////
+					case 2: // 第三象限 posX 赤道大西洋
+						vCoord = -pCoord0->at(iInvXY) + osg::Vec2d(0.5, 0.5);
+						break;
+					case 6: // 第三象限 negX 赤道太平洋
+						vCoord = -pCoord0->at(iInvXY) + osg::Vec2d(1.0, 0.5);
+						break;
+					case 10: // 第三象限 posY 赤道印尼
+						vCoord = -pCoord0->at(iInvXY) + osg::Vec2d(0.75, 0.5);
+						break;
+					case 14: // 第三象限 negY 赤道美洲
+						vCoord = -pCoord0->at(iInvXY) + osg::Vec2d(0.25, 0.5);
+						break;
+					case 18: // 第三象限 posZ 北极
+						vCoord = pCoord0->at(iInvXY) - osg::Vec2d(1.0, 0.5);
 						break;
 					case 22: // 第三象限 negZ 南极
-						fLat = (0.5 - pCoord0->at(iInvXY).y()) * osg::PI;
-						fLon = (0.5 - pCoord0->at(iInvXY).x()) * osg::PI * 2;
+						vCoord = -pCoord0->at(iInvXY) + osg::Vec2d(0.5, 0.5);
+						break;
+					///////////////////////////////////////////////////////////
+					case 3: // 第四象限 posX 赤道大西洋
+						vCoord.x() = pCoord0->at(iInvY).x() - 0.5;
+						vCoord.y() = -pCoord0->at(iInvY).y() + 0.5;
+						break;
+					case 7: // 第四象限 negX 赤道太平洋
+						vCoord.x() = pCoord0->at(iInvY).x() - 1.0;
+						vCoord.y() = -pCoord0->at(iInvY).y() + 0.5;
+						break;
+					case 11: // 第四象限 posY 赤道印尼
+						vCoord.x() = pCoord0->at(iInvY).x() - 0.25;
+						vCoord.y() = -pCoord0->at(iInvY).y() + 0.5;
+						break;
+					case 15: // 第四象限 negY 赤道美洲
+						vCoord.x() = pCoord0->at(iInvY).x() - 0.75;
+						vCoord.y() = -pCoord0->at(iInvY).y() + 0.5;
+						break;
+					case 19: // 第四象限 posZ 北极
+						vCoord.x() = -pCoord0->at(iInvY).x() + 1.0;
+						vCoord.y() = pCoord0->at(iInvY).y() - 0.5;
 						break;
 					case 23: // 第四象限 negZ 南极
-						fLat = (0.5 - pCoord0->at(iInvY).y()) * osg::PI;
-						fLon = (pCoord0->at(iInvY).x()-0.5) * osg::PI * 2;
+						vCoord.x() = pCoord0->at(iInvY).x() - 0.5;
+						vCoord.y() = -pCoord0->at(iInvY).y() + 0.5;
 						break;
 					///////////////////////////////////////////////////////////
 					default:
 						break;
 					}
-					pNewCoord0->at(i) = osg::Vec2(0.5f + fLon / (osg::PI * 2), 0.5f + fLat / osg::PI);
+					pNewCoord0->at(i) = vCoord + osg::Vec2(0.5f, 0.5f);
 					pCoord1->at(i).z() = _iQuatorFaceID;
 				}
+
+				double fLon = vCoord.x() * osg::PI * 2;
+				double fLat = vCoord.y() * osg::PI;
 				double fCosLat = cos(fLat);
 				// 经纬度转椭球面上的位置
 				double fX, fY, fZ;
@@ -195,7 +187,7 @@ namespace GM
 
 			pVert->dirty();
 			pNorm->dirty();
-			if (_bQuator)
+			if (0 <= _iTileLevel)
 			{
 				geom.setTexCoordArray(0, pNewCoord0);
 				pCoord1->dirty();
@@ -207,8 +199,11 @@ namespace GM
 
 	private:
 		osg::EllipsoidModel ellipsoid;
-		bool _bQuator = false; // 是否是瓦片体
-		int _iQuatorFaceID = 0; // 瓦片体对应的编号 0-23
+		// 瓦片层级，-1表示六面体的一个面
+		// 0级瓦片是六面体细分后的球体的一个面的四分之一，1级瓦片是0级瓦片细分一次的结果，以此类推
+		int _iTileLevel = -1;
+		// 瓦片体对应的编号 0-23
+		int _iQuatorFaceID = 0;
 	};
 
 }	// GM

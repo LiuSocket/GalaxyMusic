@@ -30,10 +30,12 @@ CGMTerrain Methods
 /** @brief 构造 */
 CGMTerrain::CGMTerrain(): m_vTileOffsetUniform(new osg::Uniform("tileOffset", osg::Vec3f(0.0f, 0.0f, 0.0f)))
 {
-	m_pTileRoot_0 = new osg::Group();
-	m_pTileRoot_0->setName("TileRoot_0");
-	m_pTileRoot_1 = new osg::Group();
-	m_pTileRoot_1->setName("TileRoot_1");
+	for (int i = 0; i < 2; i++)
+	{
+		osg::ref_ptr<osg::Group> pRoot = new osg::Group();
+		pRoot->setName("TileRoot_" + std::to_string(i));
+		m_pHie1_TileVector.push_back(pRoot);
+	}
 
 	m_pCelestialScaleVisitor = new CGMCelestialScaleVisitor();
 
@@ -147,7 +149,7 @@ bool CGMTerrain::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CG
 	for (int i = 0; i < 2; i++)
 	{
 		osg::ref_ptr<osg::Group> pRoot = new osg::Group();
-		m_pHieTerrainRootVector.push_back(pRoot);
+		m_pHieRootVector.push_back(pRoot);
 	}
 
 	return true;
@@ -202,9 +204,9 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 		m_vTileOffsetUniform->get(vTileOffset);
 
 		// 先全部显示
-		for (int i = 0; i < m_pTileRoot_0->getNumChildren(); i++)
+		for (int i = 0; i < m_pHie1_TileVector.at(0)->getNumChildren(); i++)
 		{
-			m_pTileRoot_0->getChild(i)->setNodeMask(~0);
+			m_pHie1_TileVector.at(0)->getChild(i)->setNodeMask(~0);
 		}
 
 		// 同时看到的地形块可以有如下情况：
@@ -271,7 +273,7 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 				if (0 == itr.pTileTrans->getNodeMask())
 					itr.pTileTrans->setNodeMask(~0);
 
-				osg::Node* pNode = m_pTileRoot_0->getChild(iID);
+				osg::Node* pNode = m_pHie1_TileVector.at(0)->getChild(iID);
 				if (pNode && 0 != pNode->getNodeMask())
 					pNode->setNodeMask(0);
 			}
@@ -298,18 +300,18 @@ void CGMTerrain::SetVisible(const bool bVisible)
 {
 	if (bVisible)
 	{
-		if (0 == m_pHieTerrainRootVector.at(0)->getNodeMask())
+		if (0 == m_pHieRootVector.at(0)->getNodeMask())
 		{
-			m_pHieTerrainRootVector.at(0)->setNodeMask(~0);
-			m_pHieTerrainRootVector.at(1)->setNodeMask(~0);
+			m_pHieRootVector.at(0)->setNodeMask(~0);
+			m_pHieRootVector.at(1)->setNodeMask(~0);
 		}
 	}
 	else
 	{
-		if (0 != m_pHieTerrainRootVector.at(0)->getNodeMask())
+		if (0 != m_pHieRootVector.at(0)->getNodeMask())
 		{
-			m_pHieTerrainRootVector.at(0)->setNodeMask(0);
-			m_pHieTerrainRootVector.at(1)->setNodeMask(0);
+			m_pHieRootVector.at(0)->setNodeMask(0);
+			m_pHieRootVector.at(1)->setNodeMask(0);
 		}
 	}
 }
@@ -330,33 +332,33 @@ bool CGMTerrain::UpdateHierarchy(int iHieNew)
 	{
 	case 0:
 	{
-		if (!(GM_Root->containsNode(m_pHieTerrainRootVector.at(0))))
+		if (!(GM_Root->containsNode(m_pHieRootVector.at(0))))
 		{
-			GM_Root->addChild(m_pHieTerrainRootVector.at(0));
+			GM_Root->addChild(m_pHieRootVector.at(0));
 		}
-		if (GM_Root->containsNode(m_pHieTerrainRootVector.at(1)))
+		if (GM_Root->containsNode(m_pHieRootVector.at(1)))
 		{
-			GM_Root->removeChild(m_pHieTerrainRootVector.at(1));
+			GM_Root->removeChild(m_pHieRootVector.at(1));
 		}
 	}
 	break;
 	case 1:
 	{
-		if (GM_Root->containsNode(m_pHieTerrainRootVector.at(0)))
+		if (GM_Root->containsNode(m_pHieRootVector.at(0)))
 		{
-			GM_Root->removeChild(m_pHieTerrainRootVector.at(0));
+			GM_Root->removeChild(m_pHieRootVector.at(0));
 		}
-		if (!(GM_Root->containsNode(m_pHieTerrainRootVector.at(1))))
+		if (!(GM_Root->containsNode(m_pHieRootVector.at(1))))
 		{
-			GM_Root->addChild(m_pHieTerrainRootVector.at(1));
+			GM_Root->addChild(m_pHieRootVector.at(1));
 		}
 	}
 	break;
 	case 2:
 	{
-		if (GM_Root->containsNode(m_pHieTerrainRootVector.at(1)))
+		if (GM_Root->containsNode(m_pHieRootVector.at(1)))
 		{
-			GM_Root->removeChild(m_pHieTerrainRootVector.at(1));
+			GM_Root->removeChild(m_pHieRootVector.at(1));
 		}
 	}
 	break;
@@ -382,7 +384,7 @@ bool CGMTerrain::_CreateTerrain_1()
 
 bool CGMTerrain::_CreateTile_0()
 {
-	m_pHieTerrainRootVector.at(1)->addChild(m_pTileRoot_0);
+	m_pHieRootVector.at(1)->addChild(m_pHie1_TileVector.at(0));
 
 	m_sTileVec_0.reserve(24);
 	for (int j = 0; j < 6; j++)
@@ -395,11 +397,12 @@ bool CGMTerrain::_CreateTile_0()
 
 			double fUnit = m_pKernelData->fUnitArray->at(1);
 			// 赤道地形块的ID为0-15，北极地形块的ID为16-19，南极地形块的ID为20-23
-			m_pCelestialScaleVisitor->SetQuatorFace(true, j * 4 + i);
+			m_pCelestialScaleVisitor->SetTileLevel(0);
+			m_pCelestialScaleVisitor->SetQuatorFace(j * 4 + i);
 			m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit, osg::WGS_84_RADIUS_POLAR / fUnit);
 			pTerrainQuaterGeom->accept(*m_pCelestialScaleVisitor);	// 改变大小
 
-			m_pTileRoot_0->addChild(pTerrainQuaterGeode.get());
+			m_pHie1_TileVector.at(0)->addChild(pTerrainQuaterGeode.get());
 			pTerrainQuaterGeode->addDrawable(pTerrainQuaterGeom.get());
 
 			STileData sTile;
@@ -413,7 +416,7 @@ bool CGMTerrain::_CreateTile_0()
 
 bool CGMTerrain::_CreateTile_1()
 {
-	m_pHieTerrainRootVector.at(1)->addChild(m_pTileRoot_1);
+	m_pHieRootVector.at(1)->addChild(m_pHie1_TileVector.at(1));
 
 	m_sTileVec_1.reserve(8);
 	for (int j = 0; j < 2; j++)
@@ -426,15 +429,16 @@ bool CGMTerrain::_CreateTile_1()
 		{
 			osg::ref_ptr<osg::PositionAttitudeTransform> pTerrainQuaterTrans = new osg::PositionAttitudeTransform();
 			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode = new osg::Geode();
-			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom = _MakeHexahedronQuaterGeometry(bPolar);
+			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom = _MakeHexahedronQuaterGeometry(bPolar, 63);
 
 			double fUnit = m_pKernelData->fUnitArray->at(1);
 			// 赤道地形块的ID为0-15，北极地形块的ID为16-19，南极地形块的ID为20-23
-			m_pCelestialScaleVisitor->SetQuatorFace(true, bPolar ? 16 + i : i);
+			m_pCelestialScaleVisitor->SetTileLevel(1);
+			m_pCelestialScaleVisitor->SetQuatorFace(bPolar ? 16 + i : i);
 			m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit, osg::WGS_84_RADIUS_POLAR / fUnit);
 			pTerrainQuaterGeom->accept(*m_pCelestialScaleVisitor);	// 改变大小
 
-			m_pTileRoot_1->addChild(pTerrainQuaterTrans.get());
+			m_pHie1_TileVector.at(1)->addChild(pTerrainQuaterTrans.get());
 			pTerrainQuaterTrans->addChild(pTerrainQuaterGeode.get());
 			pTerrainQuaterGeode->addDrawable(pTerrainQuaterGeom.get());
 
@@ -462,6 +466,11 @@ bool CGMTerrain::_CreateTile_1()
 		}
 	}
 	return true;
+}
+
+bool CGMTerrain::_CreateTile_2()
+{
+	return false;
 }
 
 osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int iSegment) const

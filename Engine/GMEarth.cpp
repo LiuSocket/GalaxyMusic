@@ -214,17 +214,17 @@ bool CGMEarth::Load()
 	std::string strGalaxyShader = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	std::string strEarthShader = m_pConfigData->strCorePath + m_strEarthShaderPath;
 
-	if (m_pTileRoot_0.valid())
+	if (m_pHie1_TileVector.at(0).valid())
 	{
-		CGMKit::LoadShaderWithCommonFrag(m_pTileRoot_0->getStateSet(),
+		CGMKit::LoadShaderWithCommonFrag(m_pHie1_TileVector.at(0)->getStateSet(),
 			strGalaxyShader + "CelestialGround.vert",
 			strGalaxyShader + "CelestialGround.frag",
 			strGalaxyShader + "CelestialCommon.frag",
 			"EarthTerrain_T0");
 	}
-	if (m_pTileRoot_1.valid())
+	if (m_pHie1_TileVector.at(1).valid())
 	{
-		CGMKit::LoadShaderWithCommonFrag(m_pTileRoot_1->getStateSet(),
+		CGMKit::LoadShaderWithCommonFrag(m_pHie1_TileVector.at(1)->getStateSet(),
 			strGalaxyShader + "CelestialGround.vert",
 			strGalaxyShader + "CelestialGround.frag",
 			strGalaxyShader + "CelestialCommon.frag",
@@ -407,9 +407,11 @@ bool CGMEarth::CreateEarth()
 	CGMPlanet::CreatePlanet();
 
 	_CreateGlobalCloudShadow();
-	// 给地形添加材质，必须等全球阴影创建后才能给地形添加材质
-	_CreateTerrainMaterial(m_pTileRoot_0->getOrCreateStateSet(), 0);
-	_CreateTerrainMaterial(m_pTileRoot_1->getOrCreateStateSet(), 1);
+	for (int i = 0; i < 2; i++)
+	{
+		// 给地形添加材质，必须等全球阴影创建后才能给地形添加材质
+		_CreateTerrainMaterial(m_pHie1_TileVector.at(i)->getOrCreateStateSet(), i);
+	}
 	// 创建地球，用于1级空间
 	_CreateEarth_1();
 	// 创建地球，用于2级空间
@@ -507,7 +509,7 @@ bool CGMEarth::_CreateGlobalCloudShadow()
 		if (!pShadowEarthGeom.valid()) return false;
 
 		double fUnit = m_pKernelData->fUnitArray->at(i);
-		m_pCelestialScaleVisitor->SetQuatorFace(false);
+		m_pCelestialScaleVisitor->SetTileLevel(-1);
 		m_pCelestialScaleVisitor->SetRadius(
 			(osg::WGS_84_RADIUS_EQUATOR + m_fCloudTop) / fUnit,
 			(osg::WGS_84_RADIUS_POLAR + m_fCloudTop) / fUnit);
@@ -577,7 +579,7 @@ bool CGMEarth::_CreateEarth_1()
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	unsigned int iOnOverride = osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE;
 	double fUnit1 = m_pKernelData->fUnitArray->at(1);
-	m_pCelestialScaleVisitor->SetQuatorFace(false);
+	m_pCelestialScaleVisitor->SetTileLevel(-1);
 	m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit1, osg::WGS_84_RADIUS_POLAR / fUnit1);
 	// 改变大小
 	m_pEarthGeom_1->accept(*m_pCelestialScaleVisitor);
@@ -609,7 +611,7 @@ bool CGMEarth::_CreateEarth_2()
 	if (!m_pEarthGeom_2.valid()) return false;
 
 	double fUnit2 = m_pKernelData->fUnitArray->at(2);
-	m_pCelestialScaleVisitor->SetQuatorFace(false);
+	m_pCelestialScaleVisitor->SetTileLevel(-1);
 	m_pCelestialScaleVisitor->SetRadius(6378137.0 / fUnit2, 6356752.0 / fUnit2);
 	// 改变大小
 	m_pEarthGeom_2->accept(*m_pCelestialScaleVisitor);
