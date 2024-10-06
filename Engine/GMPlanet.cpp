@@ -190,12 +190,24 @@ osg::Geometry* CGMPlanet::MakeHexahedronSphereGeometry(int iSegment)
 						+ vAxisY * (y + 0.5 - fHalfSize) / fHalfSize;
 					bool bEast = vFragOut.y() > 0;
 
-					el->push_back(_GetVertIndex(i, x, y, iSegment, bEast));
-					el->push_back(_GetVertIndex(i, x + 1, y, iSegment, bEast));
-					el->push_back(_GetVertIndex(i, x, y + 1, iSegment, bEast));
-					el->push_back(_GetVertIndex(i, x + 1, y, iSegment, bEast));
-					el->push_back(_GetVertIndex(i, x + 1, y + 1, iSegment, bEast));
-					el->push_back(_GetVertIndex(i, x, y + 1, iSegment, bEast));
+					if ((x + y) % 2)
+					{
+						el->push_back(_GetVertIndex(i, x, y, iSegment, bEast));
+						el->push_back(_GetVertIndex(i, x + 1, y, iSegment, bEast));
+						el->push_back(_GetVertIndex(i, x, y + 1, iSegment, bEast));
+						el->push_back(_GetVertIndex(i, x + 1, y, iSegment, bEast));
+						el->push_back(_GetVertIndex(i, x + 1, y + 1, iSegment, bEast));
+						el->push_back(_GetVertIndex(i, x, y + 1, iSegment, bEast));
+					}
+					else
+					{
+						el->push_back(_GetVertIndex(i, x, y, iSegment, bEast));
+						el->push_back(_GetVertIndex(i, x + 1, y + 1, iSegment, bEast));
+						el->push_back(_GetVertIndex(i, x, y + 1, iSegment, bEast));
+						el->push_back(_GetVertIndex(i, x, y, iSegment, bEast));
+						el->push_back(_GetVertIndex(i, x + 1, y, iSegment, bEast));
+						el->push_back(_GetVertIndex(i, x + 1, y + 1, iSegment, bEast));
+					}
 				}
 			}
 		}

@@ -23,9 +23,9 @@ namespace GM
 	public:
 		CGMCelestialScaleVisitor(): NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN){}
 
-		void SetTileLevel(const int iTileLevel)
+		void SetTileLevel(const float fTileLevel)
 		{
-			_iTileLevel = iTileLevel;
+			_fTileLevel = fTileLevel;
 		}
 		void SetQuatorFace(const int iQuatorFaceID)
 		{
@@ -59,7 +59,7 @@ namespace GM
 			for (int i = 0; i < pVert->size(); i++)
 			{
 				osg::Vec2d vCoord = pCoord0->at(i);
-				if (0 <= _iTileLevel)
+				if (0.0f < _fTileLevel)
 				{
 					int iX = i % iVertEdgeNum;
 					int iY = i / iVertEdgeNum;
@@ -205,7 +205,7 @@ namespace GM
 
 			pVert->dirty();
 			pNorm->dirty();
-			if (0 <= _iTileLevel)
+			if (0.0f < _fTileLevel)
 			{
 				geom.setTexCoordArray(0, pNewCoord0);
 				pCoord1->dirty();
@@ -217,9 +217,11 @@ namespace GM
 
 	private:
 		osg::EllipsoidModel ellipsoid;
-		// 瓦片层级，-1表示六面体的一个面
-		// 0级瓦片是六面体细分后的球体的一个面的四分之一，1级瓦片是0级瓦片细分一次的结果，以此类推
-		int _iTileLevel = -1;
+		// 瓦片层级（0.5、1.0、1.5、2.0、2.5...）
+		// 0.0级瓦片是六面体细分后的球体的一个面
+		// 0.5级瓦片是0.0级瓦片的四分之一，1.0级瓦片是0.5级瓦片细分一次
+		// 1.5级瓦片是1.0级瓦片的四分之一，2.0级瓦片是1.5级瓦片细分一次
+		float _fTileLevel = 0.0f;
 		// 瓦片体对应的编号 0-23
 		int _iQuatorFaceID = 0;
 	};

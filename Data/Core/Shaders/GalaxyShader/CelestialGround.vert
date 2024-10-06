@@ -31,7 +31,7 @@ void main()
 	vec2 coord0 = gl_MultiTexCoord0.xy;
 	vec3 coord1 = gl_MultiTexCoord1.xyz;
 #ifdef TILE
-	if(TILE>0)
+	if(TILE>0.5)
 	{
 		bool isEquator = coord1.z < 15.5;
 		bool isEquator03 = abs(coord1.z - 1.5) > 1.0;

@@ -214,17 +214,17 @@ bool CGMEarth::Load()
 	std::string strGalaxyShader = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	std::string strEarthShader = m_pConfigData->strCorePath + m_strEarthShaderPath;
 
-	if (m_pHie1_TileVector.at(0).valid())
+	if (m_pHie1_TileMap.at(0.5).valid())
 	{
-		CGMKit::LoadShaderWithCommonFrag(m_pHie1_TileVector.at(0)->getStateSet(),
+		CGMKit::LoadShaderWithCommonFrag(m_pHie1_TileMap.at(0.5)->getStateSet(),
 			strGalaxyShader + "CelestialGround.vert",
 			strGalaxyShader + "CelestialGround.frag",
 			strGalaxyShader + "CelestialCommon.frag",
 			"EarthTerrain_T0");
 	}
-	if (m_pHie1_TileVector.at(1).valid())
+	if (m_pHie1_TileMap.at(1.0).valid())
 	{
-		CGMKit::LoadShaderWithCommonFrag(m_pHie1_TileVector.at(1)->getStateSet(),
+		CGMKit::LoadShaderWithCommonFrag(m_pHie1_TileMap.at(1.0)->getStateSet(),
 			strGalaxyShader + "CelestialGround.vert",
 			strGalaxyShader + "CelestialGround.frag",
 			strGalaxyShader + "CelestialCommon.frag",
@@ -404,14 +404,15 @@ void CGMEarth::SetWanderingEarthProgress(const float fProgress)
 
 bool CGMEarth::CreateEarth()
 {
+	// 创建基础行星数据
 	CGMPlanet::CreatePlanet();
-
+	// 创建全球云对地阴影
 	_CreateGlobalCloudShadow();
-	for (int i = 0; i < 2; i++)
-	{
-		// 给地形添加材质，必须等全球阴影创建后才能给地形添加材质
-		_CreateTerrainMaterial(m_pHie1_TileVector.at(i)->getOrCreateStateSet(), i);
-	}
+	// 给地形添加材质，必须等全球阴影创建后才能给地形添加材质
+	_CreateTerrainMaterial(m_pHie1_TileMap.at(0.5)->getOrCreateStateSet(), 0.5);
+	_CreateTerrainMaterial(m_pHie1_TileMap.at(1.0)->getOrCreateStateSet(), 1.0);
+	//_CreateTerrainMaterial(m_pHie1_TileMap.at(1.5)->getOrCreateStateSet(), 1.5);
+
 	// 创建地球，用于1级空间
 	_CreateEarth_1();
 	// 创建地球，用于2级空间
@@ -684,7 +685,7 @@ bool CGMEarth::_CreateWanderingEarth()
 	return true;
 }
 
-void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS, const int iTileLevel) const
+void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS, const float fTileLevel) const
 {
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	unsigned int iOnOverride = osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE;
@@ -697,8 +698,8 @@ void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS, const int iTileLevel) 
 	pSS->setAttributeAndModes(new osg::CullFace());
 	pSS->setRenderBinDetails(BIN_ROCKSPHERE, "DepthSortedBin");
 
-	// 地形宏定义
-	pSS->setDefine("TILE", std::to_string(iTileLevel), osg::StateAttribute::ON);
+	// 瓦片宏定义，0.5/1.0/1.5/2.0 ...
+	pSS->setDefine("TILE", std::to_string(fTileLevel), osg::StateAttribute::ON);
 	// 地球宏定义
 	pSS->setDefine("EARTH", osg::StateAttribute::ON);
 	pSS->setDefine("ATMOS", osg::StateAttribute::ON);
@@ -1131,7 +1132,7 @@ bool CGMEarth::_AddTex2DArray(osg::Texture2DArray* pTex, const std::string& file
 	if (!pImg) return false;
 	if (pTex->getTextureWidth() != pImg->s()) return false;
 	if (pTex->getTextureHeight() != pImg->t()) return false;
-	pTex->setTextureDepth(pTex->getTextureDepth()+6);
+	pTex->setTextureDepth(pTex->getTextureDepth()*2);
 
 	for (int i = 0; i < 6; i++)
 	{
@@ -1146,8 +1147,8 @@ bool CGMEarth::_AddTex2DArray(osg::Texture2DArray* pTex, const std::string& file
 			for (int j = 0; j < 4; j++)
 			{
 				std::string fileName = filePreName + std::to_string(i) + "_" + std::to_string(j) + ".dds";
-				if (bFlip) pTex->setImage(6 + i * 4 + j, osgDB::readImageFile(fileName, m_pDDSOptions));
-				else pTex->setImage(6 + i * 4 + j, osgDB::readImageFile(fileName));
+				if (bFlip) pTex->setImage(6*4 + i * 4 + j, osgDB::readImageFile(fileName, m_pDDSOptions));
+				else pTex->setImage(6*4 + i * 4 + j, osgDB::readImageFile(fileName));
 			}
 		}
 		else

@@ -79,7 +79,11 @@ void main()
 #ifdef WANDERING
 	float seaLevelAddProgress = clamp(wanderProgress/PROGRESS_0, 0, 1);
 	vec3 wanderingBaseCoord = baseCoord;
+#ifdef TILE
+	wanderingBaseCoord.z += 6 * pow(4, ceil(TILE));
+#else // not TILE
 	wanderingBaseCoord.z += 6;
+#endif // TILE
 	vec4 wanderingColor = texture(baseTex, wanderingBaseCoord);
 	wanderingColor.rgb *= wanderingColor.rgb;
 	float engineMask = (1-wanderingColor.a)*seaLevelAddProgress;

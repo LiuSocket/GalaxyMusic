@@ -32,12 +32,15 @@ CGMTerrain::CGMTerrain():
 	m_vTileOffsetLonLatUniform(new osg::Uniform("tileOffsetLonLat", osg::Vec3f(0.0f, 0.0f, 0.0f))),
 	m_vTileOffsetIDUniform(new osg::Uniform("tileOffsetID", osg::Vec3f(0.0f, 0.0f, 0.0f)))
 {
-	for (int i = 0; i < 2; i++)
-	{
-		osg::ref_ptr<osg::Group> pRoot = new osg::Group();
-		pRoot->setName("TileRoot_" + std::to_string(i));
-		m_pHie1_TileVector.push_back(pRoot);
-	}
+	osg::ref_ptr<osg::Group> pRoot_0h = new osg::Group();	// 0h = 0+half
+	osg::ref_ptr<osg::Group> pRoot_1 = new osg::Group();	// 1 = 1
+	osg::ref_ptr<osg::Group> pRoot_1h = new osg::Group();	// 1h = 1+half
+	pRoot_0h->setName("TileRoot_0.5");
+	pRoot_1->setName("TileRoot_1.0");
+	pRoot_1h->setName("TileRoot_1.5");
+	m_pHie1_TileMap[0.5] = pRoot_0h;
+	m_pHie1_TileMap[1.0] = pRoot_1;
+	m_pHie1_TileMap[1.5] = pRoot_1h;
 
 	m_pCelestialScaleVisitor = new CGMCelestialScaleVisitor();
 
@@ -108,25 +111,17 @@ CGMTerrain::CGMTerrain():
 			switch (j)
 			{
 			case 0:
-			{
 				vECEFDir += vAxisX + vAxisY;
-			}
-			break;
+				break;
 			case 1:
-			{
 				vECEFDir -= vAxisX - vAxisY;
-			}
-			break;
+				break;
 			case 2:
-			{
 				vECEFDir -= vAxisX + vAxisY;
-			}
-			break;
+				break;
 			case 3:
-			{
 				vECEFDir += vAxisX - vAxisY;
-			}
-			break;
+				break;
 			default:
 				break;
 			}
@@ -208,9 +203,9 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 		m_vTileOffsetIDUniform->get(vTileOffsetID);
 
 		// 先全部显示
-		for (int i = 0; i < m_pHie1_TileVector.at(0)->getNumChildren(); i++)
+		for (int i = 0; i < m_pHie1_TileMap.at(0.5)->getNumChildren(); i++)
 		{
-			m_pHie1_TileVector.at(0)->getChild(i)->setNodeMask(~0);
+			m_pHie1_TileMap.at(0.5)->getChild(i)->setNodeMask(~0);
 		}
 
 		// 同时看到的地形块可以有如下情况：
@@ -219,9 +214,9 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 		// 3个：2赤道+1极地
 		// 4个：4赤道、2赤道+2极地、4极地
 		// 遍历所有地形块，根据相机位置和朝向，决定哪些地形块需要显示，哪些地形块需要旋转
-		for (auto& itr : m_sTileVec_1)
+		for (auto& itr : m_sTileVec)
 		{
-			int iID = itr.iTileID;
+			int iID = itr.iTileQuadVec.at(1);// 获取第1层瓦片的象限编号
 			bool bVisible = false;
 			for (int k = 0; k < itr.vTileDirVec.size(); k++)
 			{
@@ -230,7 +225,7 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 				{
 					bVisible = true;
 					//旋转
-					if (itr.bPolar)
+					if (4 <= itr.iTileQuadVec.at(0))
 					{
 						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI*k, osg::Vec3d(0, 1, 0)));
 						vTileOffsetLonLat.z() = (0 == k) ? -1.0f : 1.0f;// 北极-1，南极1
@@ -239,39 +234,39 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 					}
 					else
 					{
-						// 是否是1或4象限，ID == 0或3
-						bool b0or3 = (0 == itr.iTileID || 3 == itr.iTileID);
+						// 是否是1或4象限, iID == 0或3
+						bool b1or4 = (0 == iID || 3 == iID);
 
 						if (0 == k) // posX
 						{
-							if (b0or3) vTileOffsetLonLat.x() = 0.0f; 
+							if (b1or4) vTileOffsetLonLat.x() = 0.0f;
 							else vTileOffsetLonLat.y() = 0.0f;
 
 							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(0, osg::Vec3d(0, 0, 1)));
 						}
 						else if (1 == k) // negX
 						{
-							if (b0or3) vTileOffsetLonLat.x() = -0.5f;
+							if (b1or4) vTileOffsetLonLat.x() = -0.5f;
 							else vTileOffsetLonLat.y() = 0.5f;
 
 							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI, osg::Vec3d(0, 0, 1)));
 						}
 						else if (2 == k) // posY
 						{
-							if (b0or3) vTileOffsetLonLat.x() = 0.25f;
+							if (b1or4) vTileOffsetLonLat.x() = 0.25f;
 							else vTileOffsetLonLat.y() = 0.25f;
 
 							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI_2, osg::Vec3d(0, 0, 1)));
 						}
 						else // if (3 == k) negY
 						{
-							if (b0or3) vTileOffsetLonLat.x() = -0.25f;
+							if (b1or4) vTileOffsetLonLat.x() = -0.25f;
 							else vTileOffsetLonLat.y() = -0.25f;
 
 							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI * 1.5, osg::Vec3d(0, 0, 1)));
 						}
 
-						if (b0or3)
+						if (b1or4)
 						{
 							vTileOffsetID.x() = k * 4;
 							iID += vTileOffsetID.x();
@@ -294,7 +289,7 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 				if (0 == itr.pTileTrans->getNodeMask())
 					itr.pTileTrans->setNodeMask(~0);
 
-				osg::Node* pNode = m_pHie1_TileVector.at(0)->getChild(iID);
+				osg::Node* pNode = m_pHie1_TileMap.at(0.5)->getChild(iID);
 				if (pNode && 0 != pNode->getNodeMask())
 					pNode->setNodeMask(0);
 			}
@@ -397,81 +392,55 @@ bool CGMTerrain::_CreateTerrain_0()
 
 bool CGMTerrain::_CreateTerrain_1()
 {
-	_CreateTile_0();
-	_CreateTile_1();
+	m_pHieRootVector.at(1)->addChild(m_pHie1_TileMap.at(0.5));//0.5级地形块
+	m_pHieRootVector.at(1)->addChild(m_pHie1_TileMap.at(1.0));//1.0级地形块
+	m_pHieRootVector.at(1)->addChild(m_pHie1_TileMap.at(1.5));//1.5级地形块
+	m_sTileVec.reserve(8);
 
-	return true;
-}
-
-bool CGMTerrain::_CreateTile_0()
-{
-	m_pHieRootVector.at(1)->addChild(m_pHie1_TileVector.at(0));
-
-	m_sTileVec_0.reserve(24);
-	for (int j = 0; j < 6; j++)
+	for (int iFace = 0; iFace < 6; iFace++)
 	{
-		bool bPolar = (4 <= j);
-		for (int i = 0; i < 4; i++)
+		bool bPolar = (4 <= iFace);
+		for (int iQuad1 = 0; iQuad1 < 4; iQuad1++)
 		{
-			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode = new osg::Geode();
-			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom = _MakeHexahedronQuaterGeometry(bPolar, 31);
+			// 创建0.5级地形块
+			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode_0h = new osg::Geode();
+			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom_0h = _MakeHexahedronQuaterGeometry(bPolar, 31);
+			pTerrainQuaterGeode_0h->addDrawable(pTerrainQuaterGeom_0h.get());
+			m_pHie1_TileMap.at(0.5)->addChild(pTerrainQuaterGeode_0h.get());
 
 			double fUnit = m_pKernelData->fUnitArray->at(1);
 			// 赤道地形块的ID为0-15，北极地形块的ID为16-19，南极地形块的ID为20-23
-			m_pCelestialScaleVisitor->SetTileLevel(0);
-			m_pCelestialScaleVisitor->SetQuatorFace(j * 4 + i);
+			m_pCelestialScaleVisitor->SetTileLevel(0.5f);
+			m_pCelestialScaleVisitor->SetQuatorFace(iFace * 4 + iQuad1);
 			m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit, osg::WGS_84_RADIUS_POLAR / fUnit);
-			pTerrainQuaterGeom->accept(*m_pCelestialScaleVisitor);	// 改变大小
+			pTerrainQuaterGeom_0h->accept(*m_pCelestialScaleVisitor);	// 改变大小
 
-			m_pHie1_TileVector.at(0)->addChild(pTerrainQuaterGeode.get());
-			pTerrainQuaterGeode->addDrawable(pTerrainQuaterGeom.get());
+			// 0: 赤道，4: 极地，每个地形块分为4个四分之一地形块，总共需要4个赤道和4个极地
+			// 同时看到的地形块最多4个，可以有三种组合：4赤道，2赤道+2极地，4极地
+			// 所以只需要创建4个赤道和4个极地地形块，然后根据需要旋转和显隐
+			if (0 != iFace && 4 != iFace) continue;
 
-			STileData sTile;
-			sTile.iTileID = i;
-			sTile.bPolar = bPolar;
-			m_sTileVec_0.push_back(sTile);
-		}
-	}
-	return true;
-}
+			// 创建1.0级地形块
+			osg::ref_ptr<osg::PositionAttitudeTransform> pTerrainQuaterTrans_1 = new osg::PositionAttitudeTransform();
+			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode_1 = new osg::Geode();
+			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom_1 = _MakeHexahedronQuaterGeometry(bPolar, 63);
+			pTerrainQuaterGeode_1->addDrawable(pTerrainQuaterGeom_1.get());
+			pTerrainQuaterTrans_1->addChild(pTerrainQuaterGeode_1.get());
+			m_pHie1_TileMap.at(1.0)->addChild(pTerrainQuaterTrans_1.get());
 
-bool CGMTerrain::_CreateTile_1()
-{
-	m_pHieRootVector.at(1)->addChild(m_pHie1_TileVector.at(1));
-
-	m_sTileVec_1.reserve(8);
-	for (int iPolar = 0; iPolar < 2; iPolar++)
-	{
-		// 0: 赤道，1: 极地，每个地形块分为4个四分之一地形块，总共需要4个赤道和4个极地
-		// 同时看到的地形块最多4个，可以有三种组合：4赤道，2赤道+2极地，4极地
-		// 所以只需要创建4个赤道和4个极地地形块，然后根据需要旋转和显隐
-		bool bPolar = (1 == iPolar);
-		for (int iTile1 = 0; iTile1 < 4; iTile1++)
-		{
-			osg::ref_ptr<osg::PositionAttitudeTransform> pTerrainQuaterTrans = new osg::PositionAttitudeTransform();
-			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode = new osg::Geode();
-			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom = _MakeHexahedronQuaterGeometry(bPolar, 63);
-
-			double fUnit = m_pKernelData->fUnitArray->at(1);
 			// 赤道地形块的ID为0-15，北极地形块的ID为16-19，南极地形块的ID为20-23
-			m_pCelestialScaleVisitor->SetTileLevel(1);
-			m_pCelestialScaleVisitor->SetQuatorFace(bPolar ? 16 + iTile1 : iTile1);
-			m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit, osg::WGS_84_RADIUS_POLAR / fUnit);
-			pTerrainQuaterGeom->accept(*m_pCelestialScaleVisitor);	// 改变大小
-
-			m_pHie1_TileVector.at(1)->addChild(pTerrainQuaterTrans.get());
-			pTerrainQuaterTrans->addChild(pTerrainQuaterGeode.get());
-			pTerrainQuaterGeode->addDrawable(pTerrainQuaterGeom.get());
+			m_pCelestialScaleVisitor->SetTileLevel(1.0f);
+			pTerrainQuaterGeom_1->accept(*m_pCelestialScaleVisitor);	// 改变大小
 
 			STileData sTile;
-			sTile.pTileTrans = pTerrainQuaterTrans;
-			sTile.iTileID = iTile1;
-			sTile.bPolar = bPolar;
-			if (bPolar)// 极地，有2*4种可能
+			sTile.pTileTrans = pTerrainQuaterTrans_1;
+			sTile.iTileQuadVec.push_back(iFace);	// 0级瓦片的6个面，0-5
+			sTile.iTileQuadVec.push_back(iQuad1);	// 1级瓦片的4个象限，0-3
+			if (bPolar) // 极地，有2*4种可能
 			{
 				for (int k = 0; k < 2; k++)
 				{
-					int iID = 16 + k * 4 + iTile1;
+					int iID = 16 + k * 4 + iQuad1;
 					sTile.vTileDirVec.push_back(vTileDirVec_1.at(iID));
 				}
 			}
@@ -479,19 +448,15 @@ bool CGMTerrain::_CreateTile_1()
 			{
 				for (int k = 0; k < 4; k++)
 				{
-					int iID = k * 4 + iTile1;
+					int iID = k * 4 + iQuad1;
 					sTile.vTileDirVec.push_back(vTileDirVec_1.at(iID));
 				}
 			}
-			m_sTileVec_1.push_back(sTile);
+			m_sTileVec.push_back(sTile);
 		}
 	}
-	return true;
-}
 
-bool CGMTerrain::_CreateTile_2()
-{
-	return false;
+	return true;
 }
 
 osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int iSegment) const
@@ -557,14 +522,31 @@ osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int 
 			normals->push_back(vDir);
 			if (x < iSegment && y < iSegment)
 			{
-				el->push_back(_GetVertIndex(x, y, iSegment));
-				el->push_back(_GetVertIndex(x + 1, y, iSegment));
-				el->push_back(_GetVertIndex(x, y + 1, iSegment));
-				el->push_back(_GetVertIndex(x + 1, y, iSegment));
-				el->push_back(_GetVertIndex(x + 1, y + 1, iSegment));
-				el->push_back(_GetVertIndex(x, y + 1, iSegment));
+				if ((x + y) % 2)
+				{
+					el->push_back(_GetVertIndex(x, y, iSegment));
+					el->push_back(_GetVertIndex(x + 1, y, iSegment));
+					el->push_back(_GetVertIndex(x, y + 1, iSegment));
+					el->push_back(_GetVertIndex(x + 1, y, iSegment));
+					el->push_back(_GetVertIndex(x + 1, y + 1, iSegment));
+					el->push_back(_GetVertIndex(x, y + 1, iSegment));
+				}
+				else
+				{
+					el->push_back(_GetVertIndex(x, y, iSegment));
+					el->push_back(_GetVertIndex(x + 1, y, iSegment));
+					el->push_back(_GetVertIndex(x + 1, y + 1, iSegment));
+					el->push_back(_GetVertIndex(x, y, iSegment));
+					el->push_back(_GetVertIndex(x + 1, y + 1, iSegment));
+					el->push_back(_GetVertIndex(x, y + 1, iSegment));
+				}
 			}
 		}
 	}
 	return geom;
+}
+
+osg::Geometry* CGMTerrain::_MakeTileGeometry(const std::vector<int>& iTileVec, int iSegment) const
+{
+	return nullptr;
 }

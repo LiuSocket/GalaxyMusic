@@ -23,8 +23,9 @@ namespace GM
 	{
 		osg::ref_ptr<osg::Transform> pTileTrans;	// 瓦片的位置节点
 		std::vector<osg::Vec3d> vTileDirVec;		// 所有可能的中心点方向的vector
-		int iTileID = 0;		// 瓦片象限，0123
-		bool bPolar = false;	// 是否是极地区域
+		// 数组的0位存储第0层瓦片的6个面（0、1、2、3、4、5），组成一个球体
+		// 后面依次存储第1/2/3/4...层瓦片的4象限（0/1/2/3）
+		std::vector<int> iTileQuadVec;				
 	};
 
 	/*!
@@ -80,19 +81,13 @@ namespace GM
 		*/
 		bool _CreateTerrain_0();
 		/**
-		* @brief 创建第1层级空间的地形
+		* @brief 创建第1层级空间的地形的瓦片（0.5、1.0、1.5、2.0、2.5...）
+		*	0.0级瓦片是六面体细分后的球体的一个面，在行星模块已经创建，不需要在这里创建了，这个瓦片用6张Tile0的纹理
+		*	0.5级瓦片是0.0级瓦片的四分之一，1.0级瓦片是0.5级瓦片细分一次，这两个瓦片用24张Tile1的纹理
+		*	1.5级瓦片是1.0级瓦片的四分之一，2.0级瓦片是1.5级瓦片细分一次，这两个瓦片用96张Tile1的纹理
 		* @return bool:			成功true，失败false
 		*/
 		bool _CreateTerrain_1();
-
-		/**
-		* @brief 创建0/1级瓦片
-		*	0级瓦片是六面体细分后的球体的一个面的四分之一，1级瓦片是0级瓦片细分一次的结果，以此类推
-		* @return bool:			成功true，失败false
-		*/
-		bool _CreateTile_0();
-		bool _CreateTile_1();
-		bool _CreateTile_2();
 
 		/**
 		* @brief 创建六面体细分后的球体的一个面的四分之一的部分，每个顶点都有法线和UV
@@ -107,7 +102,18 @@ namespace GM
 		osg::Geometry* _MakeHexahedronQuaterGeometry(const bool bPolar, int iHalfSegment) const;
 
 		/**
-		* @brief 根据顶点的信息获取顶点的索引，会特殊处理国际日期变更线上的顶点
+		* @brief 创建对应层级瓦片的几何体，每个顶点都有法线和UV，瓦片中心点在瓦片中心的四边形上
+		* UV0.xy = WGS84对应的UV，[0.0, 1.0]
+		* UV1.xy = 六面体贴图UV，[0.0, 1.0]
+		* UV1.z = 六面体ID，0,1,2,3,4,5
+		* @param iTileVec：			瓦片的数据
+		* @param iHalfSegment:		瓦片体的边长的分段数，建议设置成2^n-1是为了保证高程图的分辨率是2^n
+		* @return Geometry:			返回几何体指针
+		*/
+		osg::Geometry* _MakeTileGeometry(const std::vector<int>& iTileVec, int iSegment) const;
+
+		/**
+		* @brief 根据顶点的信息获取顶点的索引
 		* @param iX，iY: 顶点的XY位置
 		* @param iHalfSeg: 瓦片体的边长的分段数，也就是一个六面体的半边长的分段数
 		* @return int: 顶点的索引
@@ -132,12 +138,11 @@ namespace GM
 		std::string m_strTerrainShaderPath = "Shaders/TerrainShader/";			//!< Terrain shader 路径
 
 		std::vector<osg::ref_ptr<osg::Group>>		m_pHieRootVector;			//!< 0/1空间层级的根节点
-		std::vector<osg::ref_ptr<osg::Group>>		m_pHie1_TileVector;			//!< 1层空间的各级瓦片根节点
+		std::map<float,osg::ref_ptr<osg::Group>>	m_pHie1_TileMap;			//!< 1层空间的各级瓦片根节点
 		CGMCelestialScaleVisitor*	m_pCelestialScaleVisitor = nullptr;			//!< 用于控制天体大小
 
 	private:
-		std::vector<STileData>						m_sTileVec_0;				//!< 0级瓦片数据vector
-		std::vector<STileData>						m_sTileVec_1;				//!< 1级瓦片数据vector
+		std::vector<STileData>						m_sTileVec;					//!< 瓦片数据vector
 		std::vector<osg::Vec3d>						vTileDirVec_1;				//!< 1级瓦片中心点方向的vector	
 	};
 }	// GM

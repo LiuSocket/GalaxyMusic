@@ -166,9 +166,9 @@ namespace GM
 		/**
 		* @brief 创建地形的材质，专门用于地球的地形（只有近处有，精度高）
 		* @param pSS: 状态集
-		* @param iTileLevel: 瓦片层级，01234...
+		* @param fTileLevel: 瓦片层级，0.5/1.0/1.5/2.0/2.5/3.0 ...
 		*/
-		void _CreateTerrainMaterial(osg::StateSet* pSS, const int iTileLevel) const;
+		void _CreateTerrainMaterial(osg::StateSet* pSS, const float fTileLevel) const;
 		/**
 		* @brief 创建地面（整个球面，面数少，精度低）、云层、大气的材质
 		* @param pSS: 状态集
