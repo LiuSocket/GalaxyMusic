@@ -440,13 +440,13 @@ bool CGMTerrain::_CreateTile_1()
 	m_pHieRootVector.at(1)->addChild(m_pHie1_TileVector.at(1));
 
 	m_sTileVec_1.reserve(8);
-	for (int j = 0; j < 2; j++)
+	for (int iPolar = 0; iPolar < 2; iPolar++)
 	{
 		// 0: 赤道，1: 极地，每个地形块分为4个四分之一地形块，总共需要4个赤道和4个极地
 		// 同时看到的地形块最多4个，可以有三种组合：4赤道，2赤道+2极地，4极地
 		// 所以只需要创建4个赤道和4个极地地形块，然后根据需要旋转和显隐
-		bool bPolar = (1 == j);
-		for (int i = 0; i < 4; i++)
+		bool bPolar = (1 == iPolar);
+		for (int iTile1 = 0; iTile1 < 4; iTile1++)
 		{
 			osg::ref_ptr<osg::PositionAttitudeTransform> pTerrainQuaterTrans = new osg::PositionAttitudeTransform();
 			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode = new osg::Geode();
@@ -455,7 +455,7 @@ bool CGMTerrain::_CreateTile_1()
 			double fUnit = m_pKernelData->fUnitArray->at(1);
 			// 赤道地形块的ID为0-15，北极地形块的ID为16-19，南极地形块的ID为20-23
 			m_pCelestialScaleVisitor->SetTileLevel(1);
-			m_pCelestialScaleVisitor->SetQuatorFace(bPolar ? 16 + i : i);
+			m_pCelestialScaleVisitor->SetQuatorFace(bPolar ? 16 + iTile1 : iTile1);
 			m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit, osg::WGS_84_RADIUS_POLAR / fUnit);
 			pTerrainQuaterGeom->accept(*m_pCelestialScaleVisitor);	// 改变大小
 
@@ -465,13 +465,13 @@ bool CGMTerrain::_CreateTile_1()
 
 			STileData sTile;
 			sTile.pTileTrans = pTerrainQuaterTrans;
-			sTile.iTileID = i;
+			sTile.iTileID = iTile1;
 			sTile.bPolar = bPolar;
 			if (bPolar)// 极地，有2*4种可能
 			{
 				for (int k = 0; k < 2; k++)
 				{
-					int iID = 16 + k * 4 + i;
+					int iID = 16 + k * 4 + iTile1;
 					sTile.vTileDirVec.push_back(vTileDirVec_1.at(iID));
 				}
 			}
@@ -479,7 +479,7 @@ bool CGMTerrain::_CreateTile_1()
 			{
 				for (int k = 0; k < 4; k++)
 				{
-					int iID = k * 4 + i;
+					int iID = k * 4 + iTile1;
 					sTile.vTileDirVec.push_back(vTileDirVec_1.at(iID));
 				}
 			}

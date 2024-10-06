@@ -86,7 +86,7 @@ void main()
 	alpha *= mix(spiralAcceGrowSpace*spiralAcceFallSpace, spiralDeceGrowSpace*spiralDeceFallSpace, float(v>1));
 
 	// ambient color
-	vec3 ambient = vec3(0.2, 0.35, 0.5)*exp2(-max(0, v-float(v>1))*20);
+	vec3 ambient = vec3(0.2, 0.3, 0.5)*exp2(-max(0, v-float(v>1))*20);
 #else // not SPIRAL
 	const float v0 = 1;
 	const float v1 = 4;
@@ -105,7 +105,7 @@ void main()
 	alpha *= (4>gl_TexCoord[0].y) ? dotNV*dotNV : edgeFade;
 
 	// ambient color
-	vec3 ambient = vec3(0.2, 0.35, 0.5)*exp2(-v*5);
+	vec3 ambient = vec3(0.2, 0.3, 0.5)*exp2(-v*5);
 #endif // SPIRAL or not
 
 	alpha *= exp2(-lenV*unit*1e-9) * (1 - exp2(min(0, 1e-3-lenV)*unit*2e-7));
