@@ -510,7 +510,7 @@ bool CGMEarth::_CreateGlobalCloudShadow()
 		if (!pShadowEarthGeom.valid()) return false;
 
 		double fUnit = m_pKernelData->fUnitArray->at(i);
-		m_pCelestialScaleVisitor->SetTileLevel(-1);
+		m_pCelestialScaleVisitor->SetTileLevel(0);
 		m_pCelestialScaleVisitor->SetRadius(
 			(osg::WGS_84_RADIUS_EQUATOR + m_fCloudTop) / fUnit,
 			(osg::WGS_84_RADIUS_POLAR + m_fCloudTop) / fUnit);
@@ -580,7 +580,7 @@ bool CGMEarth::_CreateEarth_1()
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	unsigned int iOnOverride = osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE;
 	double fUnit1 = m_pKernelData->fUnitArray->at(1);
-	m_pCelestialScaleVisitor->SetTileLevel(-1);
+	m_pCelestialScaleVisitor->SetTileLevel(0);
 	m_pCelestialScaleVisitor->SetRadius(osg::WGS_84_RADIUS_EQUATOR / fUnit1, osg::WGS_84_RADIUS_POLAR / fUnit1);
 	// 改变大小
 	m_pEarthGeom_1->accept(*m_pCelestialScaleVisitor);
@@ -612,7 +612,7 @@ bool CGMEarth::_CreateEarth_2()
 	if (!m_pEarthGeom_2.valid()) return false;
 
 	double fUnit2 = m_pKernelData->fUnitArray->at(2);
-	m_pCelestialScaleVisitor->SetTileLevel(-1);
+	m_pCelestialScaleVisitor->SetTileLevel(0);
 	m_pCelestialScaleVisitor->SetRadius(6378137.0 / fUnit2, 6356752.0 / fUnit2);
 	// 改变大小
 	m_pEarthGeom_2->accept(*m_pCelestialScaleVisitor);

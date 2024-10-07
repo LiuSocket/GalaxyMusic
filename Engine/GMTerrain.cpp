@@ -43,92 +43,92 @@ CGMTerrain::CGMTerrain():
 	m_pHie1_TileMap[1.5] = pRoot_1h;
 
 	m_pCelestialScaleVisitor = new CGMCelestialScaleVisitor();
+	// 初始化6个面XYZ方向
+	m_vFaceXYZVec.reserve(6);
+	m_vFaceXYZVec.push_back(SFaceXYZ(osg::Vec3d(0, 1, 0), osg::Vec3d(0, 0, 1), osg::Vec3d(1, 0, 0)));		// 0
+	m_vFaceXYZVec.push_back(SFaceXYZ(osg::Vec3d(0, -1, 0), osg::Vec3d(0, 0, 1), osg::Vec3d(-1, 0, 0)));	// 1
+	m_vFaceXYZVec.push_back(SFaceXYZ(osg::Vec3d(-1, 0, 0), osg::Vec3d(0, 0, 1), osg::Vec3d(0, 1, 0)));	// 2
+	m_vFaceXYZVec.push_back(SFaceXYZ(osg::Vec3d(1, 0, 0), osg::Vec3d(0, 0, 1), osg::Vec3d(0, -1, 0)));	// 3
+	m_vFaceXYZVec.push_back(SFaceXYZ(osg::Vec3d(0, 1, 0), osg::Vec3d(-1, 0, 0), osg::Vec3d(0, 0, 1)));	// 4
+	m_vFaceXYZVec.push_back(SFaceXYZ(osg::Vec3d(0, 1, 0), osg::Vec3d(1, 0, 0), osg::Vec3d(0, 0, -1)));	// 5
 
-	// 初始化1级瓦片中心点方向
-	vTileDirVec_1.reserve(24);
-	osg::Vec3d vCenter = osg::Vec3d(0, 1, 0);
-	osg::Vec3d vAxisX = osg::Vec3d(1, 0, 0);
-	osg::Vec3d vAxisY = osg::Vec3d(0, 0, 1);
-	for (int i = 0; i < 6; i++)
+	// 初始化所有瓦片的中心点方向
+	std::vector<osg::Vec3d> vTileDirVec_0;
+	std::vector<osg::Vec3d> vTileDirVec_1;
+	std::vector<osg::Vec3d> vTileDirVec_2;
+	std::vector<osg::Vec3d> vTileDirVec_3;
+	std::vector<osg::Vec3d> vTileDirVec_4;
+	std::vector<osg::Vec3d> vTileDirVec_5;
+	vTileDirVec_0.reserve(6);
+	vTileDirVec_1.reserve(6 * 4);
+	vTileDirVec_2.reserve(6 * 4 * 4);
+	vTileDirVec_3.reserve(6 * 4 * 4 * 4);
+	vTileDirVec_4.reserve(6 * 4 * 4 * 4 * 4);
+	vTileDirVec_5.reserve(6 * 4 * 4 * 4 * 4 * 4);
+
+	for (int i0 = 0; i0 < 6; i0++)
 	{
-		switch (i)
+		// 初始化0层瓦片的6个面的中心点方向
+		std::vector<int> iTileVec0;
+		iTileVec0.push_back(i0);
+		vTileDirVec_0.push_back(_GetTileCenterDir(iTileVec0));
+		for (int i1 = 0; i1 < 4; i1++)
 		{
-		case 0:
-		{
-			// posX
-			vCenter = osg::Vec3d(1, 0, 0);
-			vAxisX = osg::Vec3d(0, 1, 0);
-			vAxisY = osg::Vec3d(0, 0, 1);
-		}
-		break;
-		case 1:
-		{
-			// negX
-			vCenter = osg::Vec3d(-1, 0, 0);
-			vAxisX = osg::Vec3d(0, -1, 0);
-			vAxisY = osg::Vec3d(0, 0, 1);
-		}
-		break;
-		case 2:
-		{
-			// posY
-			vCenter = osg::Vec3d(0, 1, 0);
-			vAxisX = osg::Vec3d(-1, 0, 0);
-			vAxisY = osg::Vec3d(0, 0, 1);
-		}
-		break;
-		case 3:
-		{
-			// negY
-			vCenter = osg::Vec3d(0, -1, 0);
-			vAxisX = osg::Vec3d(1, 0, 0);
-			vAxisY = osg::Vec3d(0, 0, 1);
-		}
-		break;
-		case 4:
-		{
-			// posZ
-			vCenter = osg::Vec3d(0, 0, 1);
-			vAxisX = osg::Vec3d(0, 1, 0);
-			vAxisY = osg::Vec3d(-1, 0, 0);
-		}
-		break;
-		case 5:
-		{
-			// negZ
-			vCenter = osg::Vec3d(0, 0, -1);
-			vAxisX = osg::Vec3d(0, 1, 0);
-			vAxisY = osg::Vec3d(1, 0, 0);
-		}
-		break;
-		default:
-			break;
-		}
-
-		for (int j = 0; j < 4; j++)
-		{
-			osg::Vec3d vECEFDir = vCenter * 2;
-			switch (j)
+			// 初始化1层瓦片的4象限的中心点方向
+			std::vector<int> iTileVec1;
+			iTileVec1.push_back(i0);
+			iTileVec1.push_back(i1);
+			vTileDirVec_1.push_back(_GetTileCenterDir(iTileVec1));
+			for (int i2 = 0; i2 < 4; i2++)
 			{
-			case 0:
-				vECEFDir += vAxisX + vAxisY;
-				break;
-			case 1:
-				vECEFDir -= vAxisX - vAxisY;
-				break;
-			case 2:
-				vECEFDir -= vAxisX + vAxisY;
-				break;
-			case 3:
-				vECEFDir += vAxisX - vAxisY;
-				break;
-			default:
-				break;
+				// 初始化2层瓦片的16象限的中心点方向
+				std::vector<int> iTileVec2;
+				iTileVec2.push_back(i0);
+				iTileVec2.push_back(i1);
+				iTileVec2.push_back(i2);
+				vTileDirVec_2.push_back(_GetTileCenterDir(iTileVec2));
+				for (int i3 = 0; i3 < 4; i3++)
+				{
+					// 初始化3层瓦片的64象限的中心点方向
+					std::vector<int> iTileVec3;
+					iTileVec3.push_back(i0);
+					iTileVec3.push_back(i1);
+					iTileVec3.push_back(i2);
+					iTileVec3.push_back(i3);
+					vTileDirVec_3.push_back(_GetTileCenterDir(iTileVec3));
+					for (int i4 = 0; i4 < 4; i4++)
+					{
+						// 初始化4层瓦片的256象限的中心点方向
+						std::vector<int> iTileVec4;
+						iTileVec4.push_back(i0);
+						iTileVec4.push_back(i1);
+						iTileVec4.push_back(i2);
+						iTileVec4.push_back(i3);
+						iTileVec4.push_back(i4);
+						vTileDirVec_4.push_back(_GetTileCenterDir(iTileVec4));
+						for (int i5 = 0; i5 < 4; i5++)
+						{
+							// 初始化5层瓦片的1024象限的中心点方向
+							std::vector<int> iTileVec5;
+							iTileVec5.push_back(i0);
+							iTileVec5.push_back(i1);
+							iTileVec5.push_back(i2);
+							iTileVec5.push_back(i3);
+							iTileVec5.push_back(i4);
+							iTileVec5.push_back(i5);
+							vTileDirVec_5.push_back(_GetTileCenterDir(iTileVec5));
+						}
+					}
+				}
 			}
-			vECEFDir.normalize();
-			vTileDirVec_1.push_back(vECEFDir);
 		}
 	}
+	m_vTileDirVec.push_back(vTileDirVec_0);
+	m_vTileDirVec.push_back(vTileDirVec_1);
+	m_vTileDirVec.push_back(vTileDirVec_2);
+	m_vTileDirVec.push_back(vTileDirVec_3);
+	m_vTileDirVec.push_back(vTileDirVec_4);
+	m_vTileDirVec.push_back(vTileDirVec_5);
 }
 
 /** @brief 析构 */
@@ -202,93 +202,146 @@ bool CGMTerrain::UpdateLater(double dDeltaTime)
 		m_vTileOffsetLonLatUniform->get(vTileOffsetLonLat);
 		m_vTileOffsetIDUniform->get(vTileOffsetID);
 
-		// 先全部显示
+		// 先全部显示0.5级地形块
 		for (int i = 0; i < m_pHie1_TileMap.at(0.5)->getNumChildren(); i++)
 		{
 			m_pHie1_TileMap.at(0.5)->getChild(i)->setNodeMask(~0);
 		}
 
+		const double fDotThreshold = 0.6;
 		// 同时看到的地形块可以有如下情况：
 		// 1个：1赤道、1极地
 		// 2个：2赤道、1赤道+1极地、2极地
 		// 3个：2赤道+1极地
 		// 4个：4赤道、2赤道+2极地、4极地
-		// 遍历所有地形块，根据相机位置和朝向，决定哪些地形块需要显示，哪些地形块需要旋转
+		// 遍历所有地形块，根据相机位置和朝向，决定地形块的显示、隐藏、旋转
 		for (auto& itr : m_sTileVec)
 		{
-			int iID = itr.iTileQuadVec.at(1);// 获取第1层瓦片的象限编号
+			// 目前只有0号和4号面
+			bool bPolar = (4 <= itr.iTileQuadVec.at(0));
+			// iID是第1.0级瓦片的象限编号，这里只是初始化，后面会根据方向和位置调整
+			int iID = itr.iTileQuadVec.at(1);
 			bool bVisible = false;
-			for (int k = 0; k < itr.vTileDirVec.size(); k++)
+			int iFace = bPolar ? 4 : 0;// 距离最近的面
+			double fMaxDot = -1.0;
+			// 计算相机朝向和0级瓦片中心点方向的点积
+			if (bPolar)
 			{
-				double fDot = vCore2EyeDir * itr.vTileDirVec.at(k);
-				if (fDot > 0.7)// 显示并旋转
+				for (int i = 4; i < 6; i++)
 				{
-					bVisible = true;
-					//旋转
-					if (4 <= itr.iTileQuadVec.at(0))
+					osg::Vec3d vTile0Dir = m_vTileDirVec.at(0).at(i);
+					double fDot = vCore2EyeDir * vTile0Dir;
+					if (fDot > fMaxDot)
 					{
-						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI*k, osg::Vec3d(0, 1, 0)));
-						vTileOffsetLonLat.z() = (0 == k) ? -1.0f : 1.0f;// 北极-1，南极1
-						vTileOffsetID.z() = k*4;
-						iID += 16 + vTileOffsetID.z();
+						fMaxDot = fDot;
+						iFace = i;
 					}
-					else
-					{
-						// 是否是1或4象限, iID == 0或3
-						bool b1or4 = (0 == iID || 3 == iID);
-
-						if (0 == k) // posX
-						{
-							if (b1or4) vTileOffsetLonLat.x() = 0.0f;
-							else vTileOffsetLonLat.y() = 0.0f;
-
-							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(0, osg::Vec3d(0, 0, 1)));
-						}
-						else if (1 == k) // negX
-						{
-							if (b1or4) vTileOffsetLonLat.x() = -0.5f;
-							else vTileOffsetLonLat.y() = 0.5f;
-
-							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI, osg::Vec3d(0, 0, 1)));
-						}
-						else if (2 == k) // posY
-						{
-							if (b1or4) vTileOffsetLonLat.x() = 0.25f;
-							else vTileOffsetLonLat.y() = 0.25f;
-
-							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI_2, osg::Vec3d(0, 0, 1)));
-						}
-						else // if (3 == k) negY
-						{
-							if (b1or4) vTileOffsetLonLat.x() = -0.25f;
-							else vTileOffsetLonLat.y() = -0.25f;
-
-							itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI * 1.5, osg::Vec3d(0, 0, 1)));
-						}
-
-						if (b1or4)
-						{
-							vTileOffsetID.x() = k * 4;
-							iID += vTileOffsetID.x();
-						}
-						else
-						{
-							vTileOffsetID.y() = k * 4;
-							iID += vTileOffsetID.y();
-						}
-					}
-					// 瓦片体贴图的偏移
-					m_vTileOffsetLonLatUniform->set(vTileOffsetLonLat);
-					m_vTileOffsetIDUniform->set(vTileOffsetID);
-					break;
 				}
+				// 计算相机朝向和1级瓦片中心点方向的点积
+				osg::Vec3d vTile1Dir = m_vTileDirVec.at(1).at(iFace * 4 + itr.iTileQuadVec.at(1));
+				if ((vCore2EyeDir * vTile1Dir) > fDotThreshold) bVisible = true;
 			}
+			else
+			{
+				int iFace2 = 2;// 距离第二近的面
+				for (int i = 0; i < 4; i++)
+				{
+					osg::Vec3d vTile0Dir = m_vTileDirVec.at(0).at(i);
+					double fDotTmp = vCore2EyeDir * vTile0Dir;
+					if (fDotTmp > fMaxDot)
+					{
+						fMaxDot = fDotTmp;
+						iFace2 = iFace;
+						iFace = i;
+					}
+				}
+				// 计算相机朝向和1级瓦片中心点方向的点积
+				// 赤道地区需要判断两个面
+				osg::Vec3d vTile1Dir = m_vTileDirVec.at(1).at(iFace * 4 + itr.iTileQuadVec.at(1));
+				osg::Vec3d vTile1Dir2 = m_vTileDirVec.at(1).at(iFace2 * 4 + itr.iTileQuadVec.at(1));
+				double fDot = vCore2EyeDir * vTile1Dir;
+				double fDot2 = vCore2EyeDir * vTile1Dir2;
+				if (fDot < fDot2)
+				{
+					iFace = iFace2;
+					fDot = fDot2;
+				}
+				if (fDot > fDotThreshold) bVisible = true;
+			}
+
 			// 显示或隐藏
 			if (bVisible)
 			{
+				//旋转
+				if (bPolar) // 如果是极地区域
+				{
+					if (4 == iFace) // 北极
+					{
+						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(0, osg::Vec3d(0, 1, 0)));
+						vTileOffsetLonLat.z() = -1.0f;// 北极-1
+						vTileOffsetID.z() = 0;
+					}
+					else // 南极
+					{
+						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI, osg::Vec3d(0, 1, 0)));
+						vTileOffsetLonLat.z() = 1.0f;// 南极1
+						vTileOffsetID.z() = 4;
+					}
+					iID += 16 + vTileOffsetID.z();
+				}
+				else // 如果是赤道区域
+				{
+					// 是否是1或4象限, iID == 0或3
+					bool b1or4 = (0 == iID || 3 == iID);
+
+					if (0 == iFace) // posX
+					{
+						if (b1or4) vTileOffsetLonLat.x() = 0.0f;
+						else vTileOffsetLonLat.y() = 0.0f;
+
+						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(0, osg::Vec3d(0, 0, 1)));
+					}
+					else if (1 == iFace) // negX
+					{
+						if (b1or4) vTileOffsetLonLat.x() = -0.5f;
+						else vTileOffsetLonLat.y() = 0.5f;
+
+						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI, osg::Vec3d(0, 0, 1)));
+					}
+					else if (2 == iFace) // posY
+					{
+						if (b1or4) vTileOffsetLonLat.x() = 0.25f;
+						else vTileOffsetLonLat.y() = 0.25f;
+
+						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI_2, osg::Vec3d(0, 0, 1)));
+					}
+					else // if (3 == iFace) negY
+					{
+						if (b1or4) vTileOffsetLonLat.x() = -0.25f;
+						else vTileOffsetLonLat.y() = -0.25f;
+
+						itr.pTileTrans->asPositionAttitudeTransform()->setAttitude(osg::Quat(osg::PI * 1.5, osg::Vec3d(0, 0, 1)));
+					}
+
+					if (b1or4)
+					{
+						vTileOffsetID.x() = iFace * 4;
+						iID += vTileOffsetID.x();
+					}
+					else
+					{
+						vTileOffsetID.y() = iFace * 4;
+						iID += vTileOffsetID.y();
+					}
+				}
+				// 瓦片体贴图的偏移
+				m_vTileOffsetLonLatUniform->set(vTileOffsetLonLat);
+				m_vTileOffsetIDUniform->set(vTileOffsetID);
+
+				// 显示1.0级地形块
 				if (0 == itr.pTileTrans->getNodeMask())
 					itr.pTileTrans->setNodeMask(~0);
-
+				// 隐藏0.5级地形块
 				osg::Node* pNode = m_pHie1_TileMap.at(0.5)->getChild(iID);
 				if (pNode && 0 != pNode->getNodeMask())
 					pNode->setNodeMask(0);
@@ -436,22 +489,6 @@ bool CGMTerrain::_CreateTerrain_1()
 			sTile.pTileTrans = pTerrainQuaterTrans_1;
 			sTile.iTileQuadVec.push_back(iFace);	// 0级瓦片的6个面，0-5
 			sTile.iTileQuadVec.push_back(iQuad1);	// 1级瓦片的4个象限，0-3
-			if (bPolar) // 极地，有2*4种可能
-			{
-				for (int k = 0; k < 2; k++)
-				{
-					int iID = 16 + k * 4 + iQuad1;
-					sTile.vTileDirVec.push_back(vTileDirVec_1.at(iID));
-				}
-			}
-			else // 赤道，有4*4种可能
-			{
-				for (int k = 0; k < 4; k++)
-				{
-					int iID = k * 4 + iQuad1;
-					sTile.vTileDirVec.push_back(vTileDirVec_1.at(iID));
-				}
-			}
 			m_sTileVec.push_back(sTile);
 		}
 	}
@@ -548,5 +585,71 @@ osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int 
 
 osg::Geometry* CGMTerrain::_MakeTileGeometry(const std::vector<int>& iTileVec, int iSegment) const
 {
-	return nullptr;
+	// 为了效率，限制iSegment的上限，以防element超过65536，特意设置成2^n-1是为了保证高程图的分辨率是2^n
+	iSegment = osg::clampBetween(iSegment, 3, 255);
+	float fSize = float(iSegment);
+	int iVertPerEdge = iSegment + 1;
+	int iVertPerFace = iVertPerEdge * iVertPerEdge;
+	osg::Geometry* geom = new osg::Geometry();
+	geom->setUseVertexBufferObjects(true);
+
+	osg::Vec3Array* verts = new osg::Vec3Array();
+	osg::Vec2Array* coords0 = new osg::Vec2Array();
+	osg::Vec3Array* coords1 = new osg::Vec3Array();
+	osg::Vec3Array* normals = new osg::Vec3Array();
+	osg::DrawElementsUShort* el = new osg::DrawElementsUShort(GL_TRIANGLES);
+
+	verts->reserve(iVertPerFace);
+	coords0->reserve(iVertPerFace);
+	coords1->reserve(iVertPerFace);
+	normals->reserve(iVertPerFace);
+	el->reserve(iSegment * iSegment * 6);
+
+	geom->setTexCoordArray(0, coords0);
+	geom->setTexCoordArray(1, coords1);
+	geom->setNormalArray(normals);
+	geom->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+	geom->setVertexArray(verts);
+	geom->addPrimitiveSet(el);
+
+	osg::Vec3 vCenter = osg::Vec3(1, 0, 0);
+	osg::Vec3 vAxisX = osg::Vec3(0, 1, 0);
+	osg::Vec3 vAxisY = osg::Vec3(0, 0, 1);
+
+	return geom;
+}
+
+osg::Vec3d CGMTerrain::_GetTileCenterDir(const std::vector<int>& iTileVec) const
+{
+	if(iTileVec.empty()) return osg::Vec3d(0,0,0);
+	// 0级瓦片的信息
+	if(1 == iTileVec.size()) return m_vFaceXYZVec.at(iTileVec.at(0)).vZ;
+
+	osg::Vec3d vAxisX = m_vFaceXYZVec.at(iTileVec.at(0)).vX;
+	osg::Vec3d vAxisY = m_vFaceXYZVec.at(iTileVec.at(0)).vY;
+	osg::Vec3d vECEFDir = m_vFaceXYZVec.at(iTileVec.at(0)).vZ;
+	for (int iTileLevel = 1 ; iTileLevel < iTileVec.size() ; iTileLevel++)
+	{
+		double fXYScale = exp2(-iTileLevel);
+		switch (iTileVec.at(iTileLevel))
+		{
+		case 0:
+			vECEFDir += (vAxisX + vAxisY) * fXYScale;
+			break;
+		case 1:
+			vECEFDir -= (vAxisX - vAxisY) * fXYScale;
+			break;
+		case 2:
+			vECEFDir -= (vAxisX + vAxisY) * fXYScale;
+			break;
+		case 3:
+			vECEFDir += (vAxisX - vAxisY) * fXYScale;
+			break;
+		default:
+			return osg::Vec3d(0, 0, 0);
+		}
+	}
+
+	vECEFDir.normalize();
+	return vECEFDir;
 }

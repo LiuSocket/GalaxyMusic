@@ -17,12 +17,23 @@
 namespace GM
 {
 	/*!
+	*  @brief 6个面的XYZ向量信息的结构体
+	*/
+	struct SFaceXYZ
+	{
+		SFaceXYZ(const osg::Vec3d& x, const osg::Vec3d& y, const osg::Vec3d& z) : vX(x), vY(y), vZ(z) {}
+
+		osg::Vec3d vX = osg::Vec3d(1, 0, 0);			// X轴的方向
+		osg::Vec3d vY = osg::Vec3d(0, 1, 0);			// Y轴的方向
+		osg::Vec3d vZ = osg::Vec3d(0, 0, 1);			// Z轴的方向
+	};
+
+	/*!
 	*  @brief 瓦片的数据结构体
 	*/
 	struct STileData
 	{
 		osg::ref_ptr<osg::Transform> pTileTrans;	// 瓦片的位置节点
-		std::vector<osg::Vec3d> vTileDirVec;		// 所有可能的中心点方向的vector
 		// 数组的0位存储第0层瓦片的6个面（0、1、2、3、4、5），组成一个球体
 		// 后面依次存储第1/2/3/4...层瓦片的4象限（0/1/2/3）
 		std::vector<int> iTileQuadVec;				
@@ -113,6 +124,13 @@ namespace GM
 		osg::Geometry* _MakeTileGeometry(const std::vector<int>& iTileVec, int iSegment) const;
 
 		/**
+		* @brief 获取瓦片中心点在ECEF坐标系中的方向
+		* @param iTileVec：			瓦片的各级数据
+		* @return osg::Vec3d:		返回瓦片的中心点在ECEF坐标系中的方向，出错返回(0,0,0)
+		*/
+		osg::Vec3d _GetTileCenterDir(const std::vector<int>& iTileVec) const;
+
+		/**
 		* @brief 根据顶点的信息获取顶点的索引
 		* @param iX，iY: 顶点的XY位置
 		* @param iHalfSeg: 瓦片体的边长的分段数，也就是一个六面体的半边长的分段数
@@ -143,6 +161,7 @@ namespace GM
 
 	private:
 		std::vector<STileData>						m_sTileVec;					//!< 瓦片数据vector
-		std::vector<osg::Vec3d>						vTileDirVec_1;				//!< 1级瓦片中心点方向的vector	
+		std::vector<std::vector<osg::Vec3d>>		m_vTileDirVec;				//!< 所有瓦片中心点方向的vector
+		std::vector<SFaceXYZ>						m_vFaceXYZVec;				//!< 6个面XYZ方向信息的vector
 	};
 }	// GM
