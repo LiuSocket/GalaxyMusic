@@ -456,8 +456,11 @@ bool CGMTerrain::_CreateTerrain_1()
 		for (int iQuad1 = 0; iQuad1 < 4; iQuad1++)
 		{
 			// 创建0.5级地形块
+			std::vector<int> iTileVec;
+			iTileVec.push_back(bPolar ? 4 : 0); // iFace to do
+			iTileVec.push_back(0); // iQuad1 to do
+			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom_0h = _MakeTileGeometry(iTileVec, 31);
 			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode_0h = new osg::Geode();
-			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom_0h = _MakeHexahedronQuaterGeometry(bPolar, 31);
 			pTerrainQuaterGeode_0h->addDrawable(pTerrainQuaterGeom_0h.get());
 			m_pHie1_TileMap.at(0.5)->addChild(pTerrainQuaterGeode_0h.get());
 
@@ -474,9 +477,9 @@ bool CGMTerrain::_CreateTerrain_1()
 			if (0 != iFace && 4 != iFace) continue;
 
 			// 创建1.0级地形块
+			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom_1 = _MakeTileGeometry(iTileVec, 63);
 			osg::ref_ptr<osg::PositionAttitudeTransform> pTerrainQuaterTrans_1 = new osg::PositionAttitudeTransform();
 			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode_1 = new osg::Geode();
-			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom_1 = _MakeHexahedronQuaterGeometry(bPolar, 63);
 			pTerrainQuaterGeode_1->addDrawable(pTerrainQuaterGeom_1.get());
 			pTerrainQuaterTrans_1->addChild(pTerrainQuaterGeode_1.get());
 			m_pHie1_TileMap.at(1.0)->addChild(pTerrainQuaterTrans_1.get());
@@ -496,11 +499,11 @@ bool CGMTerrain::_CreateTerrain_1()
 	return true;
 }
 
-osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int iSegment) const
+osg::Geometry* CGMTerrain::_MakeTileGeometry(const std::vector<int>& iTileVec, int iSegment) const
 {
 	// 为了效率，限制iSegment的上限，以防element超过65536，特意设置成2^n-1是为了保证高程图的分辨率是2^n
 	iSegment = osg::clampBetween(iSegment, 3, 255);
-	float fSize = float(iSegment);
+	double fSize = double(iSegment);
 	int iVertPerEdge = iSegment + 1;
 	int iVertPerFace = iVertPerEdge * iVertPerEdge;
 	osg::Geometry* geom = new osg::Geometry();
@@ -525,27 +528,39 @@ osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int 
 	geom->setVertexArray(verts);
 	geom->addPrimitiveSet(el);
 
-	osg::Vec3 vCenter = osg::Vec3(1, 0, 0);
-	osg::Vec3 vAxisX = osg::Vec3(0, 1, 0);
-	osg::Vec3 vAxisY = osg::Vec3(0, 0, 1);
-	if (bPolar)
+	osg::Vec3d vAxisX = m_vFaceXYZVec.at(iTileVec.at(0)).vX;
+	osg::Vec3d vAxisY = m_vFaceXYZVec.at(iTileVec.at(0)).vY;
+	bool bPolar = (4 <= iTileVec.at(0));
+	// 瓦片中心点在ECEF坐标系中的方向投影到边长为2的正方体上的坐标
+	osg::Vec3 vCenterInBox = _GetTileCenterInBox(iTileVec);
+	double fLenInBox = 2.0 * exp2(1.0 - iTileVec.size());
+	int iID = 0;
+	switch (iTileVec.size())
 	{
-		vCenter = osg::Vec3(0, 0, 1);
-		vAxisX = osg::Vec3(0, 1, 0);
-		vAxisY = osg::Vec3(-1, 0, 0);
+	case 1:
+		iID = iTileVec.at(0);
+		break;
+	case 2:
+		iID = iTileVec.at(0) * 4 + iTileVec.at(1);
+		break;
+	case 3:
+		iID = iTileVec.at(0) * 4 * 4 + iTileVec.at(1) * 4 + iTileVec.at(2);
+		break;
+	default:
+		break;
 	}
 
 	for (int y = 0; y <= iSegment; ++y)
 	{
 		for (int x = 0; x <= iSegment; ++x)
 		{
-			osg::Vec3 vDir = vCenter + vAxisX * x / fSize + vAxisY * y / fSize;
+			osg::Vec3d vDir = vCenterInBox + (vAxisX * (x / fSize - 0.5) + vAxisY * (y / fSize - 0.5)) * fLenInBox;
 			vDir.normalize();
 
 			// 默认的经纬度为临界值，防止三角函数失效
-			float fLon = bPolar ? osg::PI_2 : 0.0f;// 弧度
-			float fLat = bPolar ? osg::PI_2 : 0.0f;// 弧度
-			if (vCenter != vDir)
+			double fLon = bPolar ? osg::PI_2 : 0;// 弧度
+			double fLat = bPolar ? ((4 == iTileVec.at(0)) ? osg::PI_2 : -osg::PI_2) : 0.0;// 弧度
+			if (0 != vDir.x() || 0 != vDir.y())
 			{
 				fLon = atan2(vDir.y(), vDir.x());// 弧度 (-PI, PI]
 				fLat = asin(vDir.z());// 弧度 [-PI/2, PI/2]
@@ -553,9 +568,10 @@ osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int 
 
 			verts->push_back(vDir);
 			// 0层纹理单元 xy = WGS84对应的UV，[0.0, 1.0]
-			// 1层纹理单元 xy = 瓦片体贴图UV，[0.0, 1.0]; z = 面对应的编号0-23
-			coords0->push_back(osg::Vec2(0.5f + fLon / (osg::PI * 2), 0.5f + fLat / (osg::PI)));
-			coords1->push_back(osg::Vec3(float(x) / float(iSegment), float(y) / float(iSegment), 0.0f));
+			// 1层纹理单元 xy = 瓦片体贴图UV，[0.0, 1.0];
+			// z = 面对应的编号, 1层瓦片[0,23]，2层瓦片[0,95]
+			coords0->push_back(osg::Vec2(0.5 + fLon / (osg::PI * 2), 0.5 + fLat / (osg::PI)));
+			coords1->push_back(osg::Vec3(double(x) / double(iSegment), double(y) / double(iSegment), iID));
 			normals->push_back(vDir);
 			if (x < iSegment && y < iSegment)
 			{
@@ -583,73 +599,42 @@ osg::Geometry* CGMTerrain::_MakeHexahedronQuaterGeometry(const bool bPolar, int 
 	return geom;
 }
 
-osg::Geometry* CGMTerrain::_MakeTileGeometry(const std::vector<int>& iTileVec, int iSegment) const
-{
-	// 为了效率，限制iSegment的上限，以防element超过65536，特意设置成2^n-1是为了保证高程图的分辨率是2^n
-	iSegment = osg::clampBetween(iSegment, 3, 255);
-	float fSize = float(iSegment);
-	int iVertPerEdge = iSegment + 1;
-	int iVertPerFace = iVertPerEdge * iVertPerEdge;
-	osg::Geometry* geom = new osg::Geometry();
-	geom->setUseVertexBufferObjects(true);
-
-	osg::Vec3Array* verts = new osg::Vec3Array();
-	osg::Vec2Array* coords0 = new osg::Vec2Array();
-	osg::Vec3Array* coords1 = new osg::Vec3Array();
-	osg::Vec3Array* normals = new osg::Vec3Array();
-	osg::DrawElementsUShort* el = new osg::DrawElementsUShort(GL_TRIANGLES);
-
-	verts->reserve(iVertPerFace);
-	coords0->reserve(iVertPerFace);
-	coords1->reserve(iVertPerFace);
-	normals->reserve(iVertPerFace);
-	el->reserve(iSegment * iSegment * 6);
-
-	geom->setTexCoordArray(0, coords0);
-	geom->setTexCoordArray(1, coords1);
-	geom->setNormalArray(normals);
-	geom->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-	geom->setVertexArray(verts);
-	geom->addPrimitiveSet(el);
-
-	osg::Vec3 vCenter = osg::Vec3(1, 0, 0);
-	osg::Vec3 vAxisX = osg::Vec3(0, 1, 0);
-	osg::Vec3 vAxisY = osg::Vec3(0, 0, 1);
-
-	return geom;
-}
-
 osg::Vec3d CGMTerrain::_GetTileCenterDir(const std::vector<int>& iTileVec) const
 {
-	if(iTileVec.empty()) return osg::Vec3d(0,0,0);
+	osg::Vec3d vECEFDir = _GetTileCenterInBox(iTileVec);
+	vECEFDir.normalize();
+	return vECEFDir;
+}
+
+osg::Vec3d CGMTerrain::_GetTileCenterInBox(const std::vector<int>& iTileVec) const
+{
+	if (iTileVec.empty()) return osg::Vec3d(0, 0, 0);
 	// 0级瓦片的信息
-	if(1 == iTileVec.size()) return m_vFaceXYZVec.at(iTileVec.at(0)).vZ;
+	if (1 == iTileVec.size()) return m_vFaceXYZVec.at(iTileVec.at(0)).vZ;
 
 	osg::Vec3d vAxisX = m_vFaceXYZVec.at(iTileVec.at(0)).vX;
 	osg::Vec3d vAxisY = m_vFaceXYZVec.at(iTileVec.at(0)).vY;
-	osg::Vec3d vECEFDir = m_vFaceXYZVec.at(iTileVec.at(0)).vZ;
-	for (int iTileLevel = 1 ; iTileLevel < iTileVec.size() ; iTileLevel++)
+	osg::Vec3d vECEFPosInBox = m_vFaceXYZVec.at(iTileVec.at(0)).vZ;
+	for (int iTileLevel = 1; iTileLevel < iTileVec.size(); iTileLevel++)
 	{
 		double fXYScale = exp2(-iTileLevel);
 		switch (iTileVec.at(iTileLevel))
 		{
 		case 0:
-			vECEFDir += (vAxisX + vAxisY) * fXYScale;
+			vECEFPosInBox += (vAxisX + vAxisY) * fXYScale;
 			break;
 		case 1:
-			vECEFDir -= (vAxisX - vAxisY) * fXYScale;
+			vECEFPosInBox -= (vAxisX - vAxisY) * fXYScale;
 			break;
 		case 2:
-			vECEFDir -= (vAxisX + vAxisY) * fXYScale;
+			vECEFPosInBox -= (vAxisX + vAxisY) * fXYScale;
 			break;
 		case 3:
-			vECEFDir += (vAxisX - vAxisY) * fXYScale;
+			vECEFPosInBox += (vAxisX - vAxisY) * fXYScale;
 			break;
 		default:
 			return osg::Vec3d(0, 0, 0);
 		}
 	}
-
-	vECEFDir.normalize();
-	return vECEFDir;
+	return vECEFPosInBox;
 }

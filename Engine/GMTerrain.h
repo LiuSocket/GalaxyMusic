@@ -101,25 +101,13 @@ namespace GM
 		bool _CreateTerrain_1();
 
 		/**
-		* @brief 创建六面体细分后的球体的一个面的四分之一的部分，每个顶点都有法线和UV
+		* @brief 创建对应层级瓦片的几何体，每个顶点都有法线和UV
 		* UV0.xy = WGS84对应的UV，[0.0, 1.0]
 		* UV1.xy = 六面体贴图UV，[0.0, 1.0]
 		* UV1.z = 六面体ID，0,1,2,3,4,5
-		* @param bPolar:			是否是极地区域
-		* @param iHalfSegment:		瓦片体的边长的分段数，也就是一个六面体的半边长的分段数
-		*							建议设置成2^n-1是为了保证高程图的分辨率是2^n
-		* @return Geometry:			返回几何体指针
-		*/
-		osg::Geometry* _MakeHexahedronQuaterGeometry(const bool bPolar, int iHalfSegment) const;
-
-		/**
-		* @brief 创建对应层级瓦片的几何体，每个顶点都有法线和UV，瓦片中心点在瓦片中心的四边形上
-		* UV0.xy = WGS84对应的UV，[0.0, 1.0]
-		* UV1.xy = 六面体贴图UV，[0.0, 1.0]
-		* UV1.z = 六面体ID，0,1,2,3,4,5
-		* @param iTileVec：			瓦片的数据
-		* @param iHalfSegment:		瓦片体的边长的分段数，建议设置成2^n-1是为了保证高程图的分辨率是2^n
-		* @return Geometry:			返回几何体指针
+		* @param iTileVec:		瓦片的各级数据
+		* @param iSegment:		瓦片体的边长的分段数，建议设置成2^n-1是为了保证高程图的分辨率是2^n
+		* @return Geometry:		返回几何体指针
 		*/
 		osg::Geometry* _MakeTileGeometry(const std::vector<int>& iTileVec, int iSegment) const;
 
@@ -129,6 +117,13 @@ namespace GM
 		* @return osg::Vec3d:		返回瓦片的中心点在ECEF坐标系中的方向，出错返回(0,0,0)
 		*/
 		osg::Vec3d _GetTileCenterDir(const std::vector<int>& iTileVec) const;
+
+		/**
+		* @brief 获取瓦片中心点在ECEF坐标系中的方向投影到边长为2的正方体上的坐标
+		* @param iTileVec：			瓦片的各级数据
+		* @return osg::Vec3d:		返回瓦片的中心点在ECEF坐标系中的方向投影到边长为2的正方体上的坐标，出错返回(0,0,0)
+		*/
+		osg::Vec3d _GetTileCenterInBox(const std::vector<int>& iTileVec) const;
 
 		/**
 		* @brief 根据顶点的信息获取顶点的索引
