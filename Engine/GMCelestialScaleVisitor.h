@@ -50,146 +50,15 @@ namespace GM
 
 			if (!pVert || !pNorm || !pCoord0 || !pCoord1) return;
 
-			// 如果是瓦片体，重新计算顶点位置和纹理坐标
-			osg::Vec2Array* pNewCoord0 =  new osg::Vec2Array();
-			pNewCoord0->resize(pVert->size());
-
 			// 每条边上的顶点数
 			int iVertEdgeNum = sqrt(float(pVert->size()));
 			for (int i = 0; i < pVert->size(); i++)
 			{
-				osg::Vec2d vCoord = pCoord0->at(i);
-				if (0.0f < _fTileLevel)
-				{
-					int iX = i % iVertEdgeNum;
-					int iY = i / iVertEdgeNum;
-					int iAddX = 2 * (iVertEdgeNum / 2 - iX) - 1;
-					// X轴对称点的索引
-					int iInvX = i + iAddX;
-					// Y轴对称点的索引
-					int iInvY = (iY + 2 * (iVertEdgeNum / 2 - iY) - 1) * iVertEdgeNum + iX;
-					// 中心对称点的索引
-					int iInvXY = iInvY + iAddX;
-
-					// 四分之面体的0层纹理单元不是WGS84对应的最终UV，会根据ID变化，所以这里要重新计算
-					// 赤道地形块的ID为0-15，北极地形块的ID为16-19，南极地形块的ID为20-23
-					// 6个面一共24块地形，每个面内部，按照一二三四象限顺序依次编号
-					//	1/5/9/13/17/21		|		0/4/8/12/16/20
-					//		第二象限		|			第一象限
-					//----------------------+-----------------------
-					//		第三象限		|			第四象限
-					//	2/6/10/14/18/22		|		3/7/11/15/19/23
-					switch (_iQuatorFaceID)
-					{
-					case 0: // 第一象限 posX 赤道非洲
-						vCoord.x() = pCoord0->at(i).x();
-						vCoord.y() = pCoord0->at(i).y();
-						break;
-					case 4: // 第一象限 negX 赤道太平洋
-						vCoord.x() = pCoord0->at(i).x() - 0.5;
-						vCoord.y() = pCoord0->at(i).y();
-						break;
-					case 8: // 第一象限 posY 赤道印尼
-						vCoord.x() = pCoord0->at(i).x() + 0.25;
-						vCoord.y() = pCoord0->at(i).y();
-						break;
-					case 12: // 第一象限 negY 赤道美洲
-						vCoord.x() = pCoord0->at(i).x() - 0.25;
-						vCoord.y() = pCoord0->at(i).y();
-						break;
-					case 16: // 第一象限 posZ 北极
-						vCoord.x() = pCoord0->at(i).x();
-						vCoord.y() = pCoord0->at(i).y();
-						break;
-					case 20: // 第一象限 negZ 南极
-						vCoord.x() = 1.5 - pCoord0->at(i).x();
-						vCoord.y() = 1.0 - pCoord0->at(i).y();
-						break;
-					///////////////////////////////////////////////////////////
-					case 1: // 第二象限 posX 赤道大西洋
-						vCoord.x() = 1.0 - pCoord0->at(iInvX).x();
-						vCoord.y() = pCoord0->at(iInvX).y();
-						break;
-					case 5: // 第二象限 negX 赤道太平洋
-						vCoord.x() = 1.5 - pCoord0->at(iInvX).x();
-						vCoord.y() = pCoord0->at(iInvX).y();
-						break;
-					case 9: // 第二象限 posY 赤道印尼
-						vCoord.x() = 1.25 - pCoord0->at(iInvX).x();
-						vCoord.y() = pCoord0->at(iInvX).y();
-						break;
-					case 13: // 第二象限 negY 赤道美洲
-						vCoord.x() = 0.75 - pCoord0->at(iInvX).x();
-						vCoord.y() = pCoord0->at(iInvX).y();
-						break;
-					case 17: // 第二象限 posZ 北极
-						vCoord.x() = 1.0 - pCoord0->at(iInvX).x();
-						vCoord.y() = pCoord0->at(iInvX).y();
-						break;
-					case 21: // 第二象限 negZ 南极
-						vCoord.x() = pCoord0->at(iInvX).x() - 0.5;
-						vCoord.y() = 1.0 - pCoord0->at(iInvX).y();
-						break;
-					///////////////////////////////////////////////////////////
-					case 2: // 第三象限 posX 赤道大西洋
-						vCoord.x() = 1.0 - pCoord0->at(iInvXY).x();
-						vCoord.y() = 1.0 - pCoord0->at(iInvXY).y();
-						break;
-					case 6: // 第三象限 negX 赤道太平洋
-						vCoord.x() = 1.5 - pCoord0->at(iInvXY).x();
-						vCoord.y() = 1.0 - pCoord0->at(iInvXY).y();
-						break;
-					case 10: // 第三象限 posY 赤道印尼
-						vCoord.x() = 1.25 - pCoord0->at(iInvXY).x();
-						vCoord.y() = 1.0 - pCoord0->at(iInvXY).y();
-						break;
-					case 14: // 第三象限 negY 赤道美洲
-						vCoord.x() = 0.75 - pCoord0->at(iInvXY).x();
-						vCoord.y() = 1.0 - pCoord0->at(iInvXY).y();
-						break;
-					case 18: // 第三象限 posZ 北极
-						vCoord.x() = pCoord0->at(iInvXY).x() - 0.5;
-						vCoord.y() = pCoord0->at(iInvXY).y();
-						break;
-					case 22: // 第三象限 negZ 南极
-						vCoord.x() = 1.0 - pCoord0->at(iInvXY).x();
-						vCoord.y() = 1.0 - pCoord0->at(iInvXY).y();
-						break;
-					///////////////////////////////////////////////////////////
-					case 3: // 第四象限 posX 赤道大西洋
-						vCoord.x() = pCoord0->at(iInvY).x();
-						vCoord.y() = 1.0 - pCoord0->at(iInvY).y();
-						break;
-					case 7: // 第四象限 negX 赤道太平洋
-						vCoord.x() = pCoord0->at(iInvY).x() - 0.5;
-						vCoord.y() = 1.0 - pCoord0->at(iInvY).y();
-						break;
-					case 11: // 第四象限 posY 赤道印尼
-						vCoord.x() = pCoord0->at(iInvY).x() + 0.25;
-						vCoord.y() = 1.0 - pCoord0->at(iInvY).y();
-						break;
-					case 15: // 第四象限 negY 赤道美洲
-						vCoord.x() = pCoord0->at(iInvY).x() - 0.25;
-						vCoord.y() = 1.0 - pCoord0->at(iInvY).y();
-						break;
-					case 19: // 第四象限 posZ 北极
-						vCoord.x() = 1.5 - pCoord0->at(iInvY).x();
-						vCoord.y() = pCoord0->at(iInvY).y();
-						break;
-					case 23: // 第四象限 negZ 南极
-						vCoord.x() = pCoord0->at(iInvY).x();
-						vCoord.y() = 1.0 - pCoord0->at(iInvY).y();
-						break;
-					///////////////////////////////////////////////////////////
-					default:
-						break;
-					}
-					pNewCoord0->at(i) = vCoord;
+				if (0.0f < _fTileLevel) 
 					pCoord1->at(i).z() = _iQuatorFaceID;
-				}
 
-				double fLon = (vCoord.x() - 0.5) * osg::PI * 2;
-				double fLat = (vCoord.y() - 0.5) * osg::PI;
+				double fLon = (pCoord0->at(i).x() - 0.5) * osg::PI * 2;
+				double fLat = (pCoord0->at(i).y() - 0.5) * osg::PI;
 				double fCosLat = cos(fLat);
 				// 经纬度转椭球面上的位置
 				double fX, fY, fZ;
@@ -205,11 +74,7 @@ namespace GM
 
 			pVert->dirty();
 			pNorm->dirty();
-			if (0.0f < _fTileLevel)
-			{
-				geom.setTexCoordArray(0, pNewCoord0);
-				pCoord1->dirty();
-			}
+			if (0.0f < _fTileLevel) pCoord1->dirty();
 			geom.dirtyBound();
 
 			traverse(geom);

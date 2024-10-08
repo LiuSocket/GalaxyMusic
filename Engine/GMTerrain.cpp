@@ -457,8 +457,8 @@ bool CGMTerrain::_CreateTerrain_1()
 		{
 			// 创建0.5级地形块
 			std::vector<int> iTileVec;
-			iTileVec.push_back(bPolar ? 4 : 0); // iFace to do
-			iTileVec.push_back(0); // iQuad1 to do
+			iTileVec.push_back(iFace);
+			iTileVec.push_back(iQuad1);
 			osg::ref_ptr<osg::Geometry>	pTerrainQuaterGeom_0h = _MakeTileGeometry(iTileVec, 31);
 			osg::ref_ptr<osg::Geode> pTerrainQuaterGeode_0h = new osg::Geode();
 			pTerrainQuaterGeode_0h->addDrawable(pTerrainQuaterGeom_0h.get());
