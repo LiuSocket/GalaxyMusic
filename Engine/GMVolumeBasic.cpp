@@ -159,14 +159,6 @@ osg::Texture* CGMVolumeBasic::_CreateTexture2D(const std::string & fileName, con
 	return texture.release();
 }
 
-/**
-* 修改屏幕尺寸时,子类调用此函数
-* @author LiuTao
-* @since 2020.12.07
-* @param width: 屏幕宽度
-* @param height: 屏幕高度
-* @return void
-*/
 void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 {
 	m_iScreenWidth = width;
@@ -178,13 +170,8 @@ void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 	{
 		m_rayMarchCamera->resize(iW, iH);
 
-		m_vectorMap_0->setTextureSize(iW, iH);
-		m_vectorMap_0->dirtyTextureObject();
 		m_vectorMap_1->setTextureSize(iW, iH);
 		m_vectorMap_1->dirtyTextureObject();
-
-		m_rayMarchTex->setTextureSize(iW, iH);
-		m_rayMarchTex->dirtyTextureObject();
 	}
 
 	_ResizeScreenTriangle(width, height);
@@ -194,10 +181,8 @@ void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 		m_TAACamera->resize(width, height);
 		m_TAACamera->setProjectionMatrixAsOrtho2D(0, width, 0, height);
 	}
-	if (m_TAATex_0.valid() && m_TAATex_1.valid())
+	if (m_TAATex_1.valid())
 	{
-		m_TAATex_0->setTextureSize(width, height);
-		m_TAATex_0->dirtyTextureObject();
 		m_TAATex_1->setTextureSize(width, height);
 		m_TAATex_1->dirtyTextureObject();
 	}

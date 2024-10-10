@@ -3,8 +3,8 @@
 /// Copyright (c) 2020~2030, LiuTao
 /// All rights reserved.
 ///
-/// @file		GMMain.cpp
-/// @brief		Galaxy-Music Engine - GMMain.cpp
+/// @file		main.cpp
+/// @brief		Galaxy-Music Engine - main.cpp
 /// @version	1.0
 /// @author		LiuTao
 /// @date		2020.12.10

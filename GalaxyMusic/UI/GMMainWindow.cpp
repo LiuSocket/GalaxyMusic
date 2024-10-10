@@ -2,7 +2,7 @@
 #include "GMVolumeWidget.h"
 #include "GMListWidget.h"
 #include "GMWanderingEarthWidget.h"
-#include "UI/GMUIManager.h"
+#include "GMUIManager.h"
 #include "../Engine/GMEngine.h"
 #include <QKeyEvent>
 #include <QScreen>
