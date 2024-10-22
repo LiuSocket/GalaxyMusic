@@ -9,11 +9,11 @@ uniform sampler2D velocityTex;
 void main()
 {
 	vec2 coord = gl_TexCoord[0].xy - shakeVec/screenSize.xy;
-	vec4 currentColor = texture2D(currentTex, coord);
+	vec4 currentColor = texture(currentTex, coord);
 	currentColor.a = smoothstep(0,1,currentColor.a);
-	vec3 posDiff = texture2D(velocityTex, gl_TexCoord[0].xy).xyz;
+	vec3 posDiff = texture(velocityTex, gl_TexCoord[0].xy).xyz;
 	vec2 lastUV = gl_TexCoord[0].xy - posDiff.xy;
-	vec4 lastColor = texture2D(lastTex, lastUV);
+	vec4 lastColor = texture(lastTex, lastUV);
 
 	vec2 isOut = step(-0.5,-abs(lastUV-0.5));
 	float similar = clamp(1-length(posDiff)*5e4, 0, 1)*isOut.x*isOut.y;

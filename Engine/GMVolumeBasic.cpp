@@ -28,6 +28,7 @@ CGMVolumeBasic::CGMVolumeBasic():
 	m_fPixelLengthUniform(new osg::Uniform("pixelLength", 0.01f)),
 	m_vShakeVectorUniform(new osg::Uniform("shakeVec", osg::Vec2f(0.5f, 0.5f))),
 	m_vDeltaShakeUniform(new osg::Uniform("deltaShakeVec", osg::Vec2f(0.0f, 0.0f))),
+	m_pRaymarchDrawFBOCallback(nullptr), m_pTAADrawFBOCallback(nullptr),
 	m_fShakeU(0.0f), m_fShakeV(0.0f), m_vLastShakeVec(osg::Vec2f(0.0f, 0.0f)),
 	m_dTimeLastFrame(0.0), m_iUnitTAA(0), m_iShakeCount(0)
 {
@@ -105,15 +106,6 @@ bool CGMVolumeBasic::ActiveTAA(osg::Texture* pTex, osg::Texture* pVectorTex)
 	return true;
 }
 
-/**
-* _CreateTexture2D
-* 加载2D纹理
-* @author LiuTao
-* @since 2020.06.16
-* @param fileName: 图片文件路径
-* @param iChannelNum: 1、2、3、4分别代表R、RG、RGB、RGBA
-* @return osg::Texture* 返回纹理指针
-*/
 osg::Texture* CGMVolumeBasic::_CreateTexture2D(const std::string & fileName, const int iChannelNum)
 {
 	osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D;
@@ -172,6 +164,8 @@ void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 
 		m_vectorMap_1->setTextureSize(iW, iH);
 		m_vectorMap_1->dirtyTextureObject();
+
+		m_pRaymarchDrawFBOCallback->SetSize(iW, iH);
 	}
 
 	_ResizeScreenTriangle(width, height);
@@ -180,6 +174,8 @@ void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 	{
 		m_TAACamera->resize(width, height);
 		m_TAACamera->setProjectionMatrixAsOrtho2D(0, width, 0, height);
+
+		m_pTAADrawFBOCallback->SetSize(width, height);
 	}
 	if (m_TAATex_1.valid())
 	{
@@ -581,8 +577,8 @@ void CGMVolumeBasic::_InitTAA(std::string strCorePath)
 	m_TAACamera->setProjectionResizePolicy(osg::Camera::FIXED);
 
 	// TAA交换buffer的回调函数指针
-	SwitchFBOCallback* pTAAFBOCallback = new SwitchFBOCallback(m_TAATex_1.get(), m_TAATex_0.get());
-	m_TAACamera->setPostDrawCallback(pTAAFBOCallback);
+	m_pTAADrawFBOCallback = new SwitchFBOCallback(m_TAATex_1.get(), m_TAATex_0.get());
+	m_TAACamera->setPostDrawCallback(m_pTAADrawFBOCallback);
 
 	m_pTAAGeode = new osg::Geode();
 	m_pTAAGeode->addDrawable(_CreateScreenTriangle(iW, iH));

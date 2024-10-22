@@ -41,6 +41,12 @@ namespace GM
 			_height = dynamic_cast<osg::Texture2D*>(_srcTexture.get())->getTextureHeight();
 		}
 
+		void SetSize(unsigned int width, unsigned int height)
+		{
+			_width = width;
+			_height = height;
+		}
+
 		virtual void operator() (osg::RenderInfo& renderInfo) const
 		{
 			osg::GLExtensions* ext = renderInfo.getState()->get<osg::GLExtensions>();
@@ -221,7 +227,10 @@ namespace GM
 		osg::ref_ptr<osg::Texture2D>						m_TAATex_1;						//!< the No.1 switching texture for TAA
 		osg::ref_ptr<osg::Camera>							m_rayMarchCamera;				//!< the camera for raymarch
 		osg::ref_ptr<osg::Camera>							m_TAACamera;					//!< the camera for TAA
-		
+
+		SwitchFBOCallback*									m_pRaymarchDrawFBOCallback;		//!< Raymarch交换buffer的回调函数指针
+		SwitchFBOCallback*									m_pTAADrawFBOCallback;			//!< TAA交换buffer的回调函数指针
+
 		osg::ref_ptr<osg::Uniform>							m_fCountUniform;				//!< 每帧+1 计数器
 		osg::ref_ptr<osg::Uniform>							m_vNoiseUniform;				//!< vec4随机数噪声Uniform：0-1
 		osg::ref_ptr<osg::Uniform>							m_fPixelLengthUniform;			//!< 1米近截面处的像素长度Uniform

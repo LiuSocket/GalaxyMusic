@@ -245,8 +245,8 @@ void CGMOort::MakeOort()
 	m_rayMarchCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
 
 	// Raymarch交换buffer的回调函数指针
-	SwitchFBOCallback* pRaymarchFBOCallback = new SwitchFBOCallback(m_vectorMap_1.get(), m_vectorMap_0.get());
-	m_rayMarchCamera->setPostDrawCallback(pRaymarchFBOCallback);
+	m_pRaymarchDrawFBOCallback = new SwitchFBOCallback(m_vectorMap_1.get(), m_vectorMap_0.get());
+	m_rayMarchCamera->setPostDrawCallback(m_pRaymarchDrawFBOCallback);
 
 	GM_Root->addChild(m_rayMarchCamera.get());
 

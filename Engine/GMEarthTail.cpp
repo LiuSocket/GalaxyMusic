@@ -435,16 +435,16 @@ void CGMEarthTail::MakeEarthTail()
 	m_rayMarchCamera->setViewport(0, 0, iWidth, iHeight);
 	m_rayMarchCamera->setRenderOrder(osg::Camera::PRE_RENDER, 1);
 	m_rayMarchCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
-	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_vectorMap_0);
-	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_rayMarchTex);
+	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_vectorMap_0.get());
+	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_rayMarchTex.get());
 	m_rayMarchCamera->setAllowEventFocus(false);
 	m_rayMarchCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
 
 	// Raymarch交换buffer的回调函数指针
-	SwitchFBOCallback* pRaymarchFBOCallback = new SwitchFBOCallback(m_vectorMap_1, m_vectorMap_0);
-	m_rayMarchCamera->setPostDrawCallback(pRaymarchFBOCallback);
+	m_pRaymarchDrawFBOCallback = new SwitchFBOCallback(m_vectorMap_1.get(), m_vectorMap_0.get());
+	m_rayMarchCamera->setPostDrawCallback(m_pRaymarchDrawFBOCallback);
 
-	GM_Root->addChild(m_rayMarchCamera);
+	GM_Root->addChild(m_rayMarchCamera.get());
 
 	// 正十二面体方法绘制流浪地球尾迹
 	osg::Geometry* pDodecahedronFaceGeom = nullptr;
