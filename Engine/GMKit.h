@@ -119,12 +119,12 @@ namespace GM
 		* The format parameter for the image unit need not exactly match the texture internal format,
 		* but if it is set to 0, the texture internal format will be used.
 		* See http://www.opengl.org/registry/specs/ARB/shader_image_load_store.txt
-		void bindToImageUnit(unsigned int unit, GLenum access, GLenum format = 0, int level = 0, bool layered = false, int layer = 0);
+		void bindToImageUnit(unsigned int unit, GLenum access, GLenum format = 0U, int level = 0, bool layered = false, int layer = 0);
 		*
 		* @return bool： success = true，fail = false
 		*/
 		static bool AddImage(osg::StateSet* pStateSet, osg::Texture* pTex, const char* texName,
-			unsigned int unit, GLenum access, GLenum format = 0, int level = 0, bool layered = false, int layer = 0);
+			const int unit, GLenum access, GLenum format = 0U, int level = 0, bool layered = false, int layer = 0);
 
 		/**
 		* @brief 获取图片的RGBA通道值

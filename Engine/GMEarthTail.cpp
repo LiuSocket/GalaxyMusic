@@ -1078,10 +1078,10 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->addUniform(m_fWanderProgressUniform.get());
 
 	int iUnit = 0;
-	CGMKit::AddTexture(pSS, m_vectorMap_1, "lastVectorTex", iUnit++);
-	CGMKit::AddTexture(pSS, m_blueNoiseTex, "blueNoiseTex", iUnit++);
-	CGMKit::AddTexture(pSS, m_3DShapeTex, "noiseShapeTex", iUnit++);
-	CGMKit::AddTexture(pSS, m_3DErosionTex, "noiseErosionTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_vectorMap_1.get(), "lastVectorTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_blueNoiseTex.get(), "blueNoiseTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_3DShapeTex.get(), "noiseShapeTex", iUnit++);
+	CGMKit::AddTexture(pSS, m_3DErosionTex.get(), "noiseErosionTex", iUnit++);
 
 	std::string strPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
 	CGMKit::LoadShader(pSS, strPath + "EarthTail.vert", strPath + "EarthTail.frag", strShaderName);
