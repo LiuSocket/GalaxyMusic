@@ -11,6 +11,7 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "GMKit.h"
+#include "GMDispatchCompute.h"
 #include <osgDB/ReadFile>
 
 using namespace GM;
@@ -165,6 +166,32 @@ bool CGMKit::AddTexture(osg::StateSet* pStateSet, osg::Texture* pTex, const char
 	return true;
 }
 
+bool CGMKit::AddImage(osg::StateSet* pStateSet, osg::Texture* pTex, const char* texName,
+	unsigned int unit, GLenum access, GLenum format, int level, bool layered, int layer)
+{
+	if (!pStateSet || !pTex || ("" == texName) || (unit < 0)) return false;
+
+	osg::ref_ptr<osg::Uniform> pVoxelUniform = new osg::Uniform(texName, unit);
+	pStateSet->addUniform(pVoxelUniform.get());
+	pTex->bindToImageUnit(unit, access, format, level, layered, layer);
+	pStateSet->setTextureAttribute(unit, pTex, osg::StateAttribute::ON);
+
+	// add a callback to reset the textures after the draw.
+	osg::StateSet::Callback* callback = pStateSet->getUpdateCallback();
+	if (callback && dynamic_cast<ResetTexturesCallback*>(callback))
+	{
+		dynamic_cast<ResetTexturesCallback*>(callback)->addTextureDirtyParams(unit);
+	}
+	else
+	{
+		osg::ref_ptr<ResetTexturesCallback> resetTexturesCallback = new ResetTexturesCallback();
+		resetTexturesCallback->addTextureDirtyParams(unit);
+		pStateSet->setUpdateCallback(resetTexturesCallback.get());
+	}
+
+	return true;
+}
+
 osg::Vec4f CGMKit::GetImageColor(const osg::Image* pImg, const float fX, const float fY, const bool bLinear)
 {
 	if (fX < 0 || fX > 1 || fY < 0 || fY > 1 || !pImg)
@@ -172,29 +199,32 @@ osg::Vec4f CGMKit::GetImageColor(const osg::Image* pImg, const float fX, const f
 		return osg::Vec4f(0, 0, 0, 0);
 	}
 
-	unsigned int iWidth = pImg->s();
-	unsigned int iHeight = pImg->t();
+	unsigned int iW = pImg->s();
+	unsigned int iH = pImg->t();
+	float fS = fmax(0.0f, fX * iW - 0.5f);
+	float fT = fmax(0.0f, fY * iH - 0.5f);
+	unsigned int uS = (unsigned int)fS;
+	unsigned int uT = (unsigned int)fT;
+	float fDeltaS = fS - uS;
+	float fDeltaT = fT - uT;
 
-	float fS = fX * (iWidth - 1) + 0.5f;
-	float fT = fY * (iHeight - 1) + 0.5f;
-
-	float fDeltaS = fS - (int)fS;
-	float fDeltaT = fT - (int)fT;
-	unsigned int s = (unsigned int)fS;
-	unsigned int t = (unsigned int)fT;
-	osg::Vec4f vValue = pImg->getColor(s, t);
-	if (bLinear)
+	if (bLinear) // 双线性插值
 	{
-		unsigned int s_next = (s == iWidth - 1) ? (iWidth - 1) : (s + 1);
-		unsigned int t_next = (t == iHeight - 1) ? (iHeight - 1) : (t + 1);
+		unsigned int uS1 = osg::minimum(iW - 1, uS + 1);
+		unsigned int uT1 = osg::minimum(iH - 1, uT + 1);
 
-		osg::Vec4f vValue_01 = pImg->getColor(s_next, t);
-		osg::Vec4f vValue_10 = pImg->getColor(s, t_next);
-		osg::Vec4f vValue_11 = pImg->getColor(s_next, t_next);
-
-		vValue = Mix(Mix(vValue, vValue_01, fDeltaS), Mix(vValue_10, vValue_11, fDeltaS), fDeltaT);
+		osg::Vec4f vValue00 = pImg->getColor(uS, uT);
+		osg::Vec4f vValue10 = pImg->getColor(uS1, uT);
+		osg::Vec4f vValue01 = pImg->getColor(uS, uT1);
+		osg::Vec4f vValue11 = pImg->getColor(uS1, uT1);
+		return Mix(Mix(vValue00, vValue10, fDeltaS), Mix(vValue01, vValue11, fDeltaS), fDeltaT);
 	}
-	return vValue;
+	else // 临近值
+	{
+		unsigned int uS1 = osg::minimum(iW - 1, uS + unsigned int((fDeltaS>0.5f) ? 1 : 0));
+		unsigned int uT1 = osg::minimum(iH - 1, uT + unsigned int((fDeltaT>0.5f) ? 1 : 0));
+		return pImg->getColor(uS1, uT1);
+	}
 }
 
 float CGMKit::Half_2_Float(const unsigned short x)

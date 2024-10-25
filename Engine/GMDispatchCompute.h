@@ -26,6 +26,51 @@ namespace GM
 	Structs
 	*************************************************************************/
 
+	struct ResetTexturesCallback : public osg::StateSet::Callback
+	{
+		ResetTexturesCallback()
+		{
+		}
+		void addTextureDirty(unsigned int texUnit)
+		{
+			texUnitsDirty.push_back(texUnit);
+		}
+		void addTextureDirtyParams(unsigned int texUnit)
+		{
+			texUnitsDirtyParams.push_back(texUnit);
+		}
+
+		virtual void operator() (osg::StateSet* stateset, osg::NodeVisitor* nv)
+		{
+			for (unsigned int texUnit : texUnitsDirty)
+			{
+				if (texUnit < stateset->getTextureAttributeList().size())
+				{
+					osg::Texture* texture = stateset->getTextureAttribute(texUnit, osg::StateAttribute::TEXTURE)->asTexture();
+					if (texture)
+					{
+						osg::Image* image = texture->getImage(0);
+						if (image)
+						{
+							image->dirty();
+						}
+					}
+				}
+			}
+
+			for (auto texUnit : texUnitsDirtyParams)
+			{
+				osg::Texture* tex = stateset->getTextureAttribute(texUnit, osg::StateAttribute::TEXTURE)->asTexture();
+				if (tex)
+					tex->dirtyTextureParameters();
+			}
+		}
+
+	private:
+		std::vector<unsigned int> texUnitsDirty;
+		std::vector<unsigned int> texUnitsDirtyParams;
+	};
+
 	/*************************************************************************
 	Class
 	*************************************************************************/

@@ -1,12 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Order>
-    <Audio name="陶喆,蔡依林 - 今天你要嫁给我.mp3" />
-    <Audio name="9nine - Re：.mp3" />
-    <Audio name="Poe (CN) - Sailing (Original Mix).mp3" />
-    <Audio name="远藤浩二 - 着信アリ2.mp3" />
-    <Audio name="acane_madder - 庭園にて。.mp3" />
-    <Audio name="CinDy - 鬼怪Beautiful（Cover Crush）.mp3" />
-    <Audio name="Two Steps From Hell - Across The Blood Water.mp3" />
     <Audio name="Tanaki Alison - Get to You.mp3" />
     <Audio name="Academy of St. Martin in the Fields,Neville Marriner - Serenade in G K.525 ＂Eine kleine Nachtmusik＂：1. Allegro.mp3" />
     <Audio name="Amy Winehouse,Tony Bennett - Body and Soul.mp3" />
@@ -50,4 +43,11 @@
     <Audio name="Two Steps From Hell - Ride with Saracen.mp3" />
     <Audio name="Half-blood Kakashi - Stay With Me【鬼怪OST】(Stringed Music Remix)（翻自 朴灿烈／Punch）.mp3" />
     <Audio name="Dr. Dre,Snoop Dogg,Kurupt - The Next Episode.mp3" />
+    <Audio name="Bryan Adams - (Everything I Do) I Do It For You (Album Version).mp3" />
+    <Audio name="Backstreet Boys - I&apos;ll Never Break Your Heart.mp3" />
+    <Audio name="Audiomachine - The Fire Within.mp3" />
+    <Audio name="James Horner,London Symphony Orchestra - Horner： For The Love Of A Princess.mp3" />
+    <Audio name="Will Smith - Prince Ali.mp3" />
+    <Audio name="艾索 - 晚安喵.mp3" />
+    <Audio name="Two Steps From Hell - Sariel.mp3" />
 </Order>

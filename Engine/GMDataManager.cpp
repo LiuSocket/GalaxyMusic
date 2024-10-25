@@ -730,14 +730,7 @@ void CGMDataManager::_InitComputeNearUID()
 	m_pGalaxyCoordTex->setDataVariance(osg::Object::DYNAMIC);
 	m_pGalaxyCoordTex->setTextureSize(LUT_WIDTH, 1);
 	m_pGalaxyCoordTex->setBorderColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
-
-	int iUnit = 0;
-
-	m_pGalaxyCoordTex->bindToImageUnit(iUnit, osg::Texture::READ_ONLY);
 	m_pGalaxyCoordTex->setUnRefImageDataAfterApply(false);
-	pNearSS->setTextureAttribute(iUnit, m_pGalaxyCoordTex.get());
-	pNearSS->addUniform(new osg::Uniform("galaxyCoordImg", iUnit));
-	iUnit++;
 
 	m_pNearUIDTex = new osg::Texture2D();
 	m_pNearUIDTex->setTextureSize(iSize, iSize);
@@ -749,13 +742,11 @@ void CGMDataManager::_InitComputeNearUID()
 	m_pNearUIDTex->setInternalFormat(GL_RGBA8);
 	m_pNearUIDTex->setSourceFormat(GL_RGBA);
 	m_pNearUIDTex->setSourceType(GL_UNSIGNED_BYTE);
-	m_pNearUIDTex->bindToImageUnit(iUnit, osg::Texture::WRITE_ONLY);
 	m_pNearUIDTex->setUnRefImageDataAfterApply(false);
 
-	osg::ref_ptr<osg::Uniform> pTargetUniform = new osg::Uniform("targetImg", iUnit);
-	pNearSS->addUniform(pTargetUniform.get());
-	pNearSS->setTextureAttribute(iUnit, m_pNearUIDTex.get());
-	iUnit++;
+	int iUnit = 0;
+	CGMKit::AddImage(pNearSS.get(), m_pGalaxyCoordTex.get(), "galaxyCoordImg", iUnit++, osg::Texture::READ_ONLY);
+	CGMKit::AddImage(pNearSS.get(), m_pNearUIDTex.get(), "targetImg", iUnit++, osg::Texture::WRITE_ONLY);
 
 	m_pAudioNumUniform->set(float(m_audioDataMap.size()));
 	pNearSS->addUniform(m_pAudioNumUniform.get());
