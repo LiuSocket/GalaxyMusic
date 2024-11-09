@@ -16,3 +16,4 @@
 *.user
 *.psd
 /.vscode/settings.json
+/Out
