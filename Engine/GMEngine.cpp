@@ -242,7 +242,7 @@ bool CGMEngine::Update()
 			// 更新涟漪效果
 			m_pCommonUniform->SetAudioLevel(m_pAudio->GetLevel());
 
-			GM_Viewer->advance(deltaTime);
+			GM_Viewer->advance(USE_REFERENCE_TIME);
 			GM_Viewer->eventTraversal();
 			GM_Viewer->updateTraversal();
 
