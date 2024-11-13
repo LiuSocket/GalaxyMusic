@@ -165,27 +165,17 @@ bool CGMKit::AddTexture(osg::StateSet* pStateSet, osg::Texture* pTex, const char
 	return true;
 }
 
-bool CGMKit::AddImage(osg::StateSet* pStateSet, osg::Texture* pTex, const char* texName,
-	const int unit, GLenum access, GLenum format, int level, bool layered, int layer)
+bool CGMKit::AddImageTexture(CGMDispatchCompute* pCompute, osg::Texture* pTex, const char* texName,
+	const int unit, osg::BindImageTexture::Access access, GLenum format, int level, bool layered, int layer)
 {
-	if (!pStateSet || !pTex || ("" == texName) || (unit < 0)) return false;
+	if (!pCompute || !pTex || ("" == texName) || (unit < 0)) return false;
 
-	pTex->bindToImageUnit(unit, access , format, level, layered, layer);
-	pStateSet->setTextureAttribute(unit, pTex);
+	osg::StateSet* pStateSet = pCompute->getStateSet();
+	if (!pStateSet) return false;
+
 	pStateSet->addUniform(new osg::Uniform(texName, unit));
-
-	// add a callback to reset the textures after the draw.
-	osg::StateSet::Callback* callback = pStateSet->getUpdateCallback();
-	if (callback && dynamic_cast<ResetTexturesCallback*>(callback))
-	{
-		dynamic_cast<ResetTexturesCallback*>(callback)->addTextureDirtyParams(unit);
-	}
-	else
-	{
-		osg::ref_ptr<ResetTexturesCallback> resetTexturesCallback = new ResetTexturesCallback();
-		resetTexturesCallback->addTextureDirtyParams(unit);
-		pStateSet->setUpdateCallback(resetTexturesCallback.get());
-	}
+	pStateSet->setAttributeAndModes(new osg::BindImageTexture(unit, pTex, access, format, level, layered, layer));
+	pCompute->GetTextureMap().insert(std::make_pair(unit, pTex));
 
 	return true;
 }

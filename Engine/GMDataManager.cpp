@@ -745,8 +745,8 @@ void CGMDataManager::_InitComputeNearUID()
 	m_pNearUIDTex->setUnRefImageDataAfterApply(false);
 
 	int iUnit = 0;
-	CGMKit::AddImage(pNearSS.get(), m_pGalaxyCoordTex.get(), "galaxyCoordImg", iUnit++, osg::Texture::READ_ONLY);
-	CGMKit::AddImage(pNearSS.get(), m_pNearUIDTex.get(), "targetImg", iUnit++, osg::Texture::WRITE_ONLY);
+	CGMKit::AddImageTexture(m_pNearComputeNode.get(), m_pGalaxyCoordTex.get(), "galaxyCoordImg", iUnit++, osg::BindImageTexture::READ_ONLY, GL_R32F);
+	CGMKit::AddImageTexture(m_pNearComputeNode.get(), m_pNearUIDTex.get(), "targetImg", iUnit++, osg::BindImageTexture::WRITE_ONLY, GL_RGBA8);
 
 	m_pAudioNumUniform->set(float(m_audioDataMap.size()));
 	pNearSS->addUniform(m_pAudioNumUniform.get());

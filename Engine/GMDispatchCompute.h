@@ -26,51 +26,6 @@ namespace GM
 	Structs
 	*************************************************************************/
 
-	struct ResetTexturesCallback : public osg::StateSet::Callback
-	{
-		ResetTexturesCallback()
-		{
-		}
-		void addTextureDirty(unsigned int texUnit)
-		{
-			texUnitsDirty.push_back(texUnit);
-		}
-		void addTextureDirtyParams(unsigned int texUnit)
-		{
-			texUnitsDirtyParams.push_back(texUnit);
-		}
-
-		virtual void operator() (osg::StateSet* stateset, osg::NodeVisitor* nv)
-		{
-			for (unsigned int texUnit : texUnitsDirty)
-			{
-				if (texUnit < stateset->getTextureAttributeList().size())
-				{
-					osg::Texture* texture = stateset->getTextureAttribute(texUnit, osg::StateAttribute::TEXTURE)->asTexture();
-					if (texture)
-					{
-						osg::Image* image = texture->getImage(0);
-						if (image)
-						{
-							image->dirty();
-						}
-					}
-				}
-			}
-
-			for (auto texUnit : texUnitsDirtyParams)
-			{
-				osg::Texture* tex = stateset->getTextureAttribute(texUnit, osg::StateAttribute::TEXTURE)->asTexture();
-				if (tex)
-					tex->dirtyTextureParameters();
-			}
-		}
-
-	private:
-		std::vector<unsigned int> texUnitsDirty;
-		std::vector<unsigned int> texUnitsDirtyParams;
-	};
-
 	/*************************************************************************
 	Class
 	*************************************************************************/
@@ -91,18 +46,40 @@ namespace GM
 		CGMDispatchCompute(const CGMDispatchCompute&o, const osg::CopyOp& copyop) :
 			Drawable(o, copyop),
 			_numGroupsX(o._numGroupsX), _numGroupsY(o._numGroupsY), _numGroupsZ(o._numGroupsZ),
-			_bDispatch(o._bDispatch), _bDirty(false)
+			_bDispatch(o._bDispatch),  _bDirty(o._bDirty), _bOnce(o._bOnce)
 		{
 			setUseDisplayList(false);
 			setUseVertexBufferObjects(true);
 		}
 
-		virtual void compileGLObjects(osg::RenderInfo&) const {}
-
 		virtual void drawImplementation(osg::RenderInfo& renderInfo) const
 		{
 			if (_bDispatch)
 			{
+				for (auto iter : _textures)
+				{
+					osg::Texture* tex = dynamic_cast<osg::Texture*>(iter.second);
+					if (tex != NULL)
+					{
+						tex->dirtyTextureParameters();
+					}
+					renderInfo.getState()->applyTextureAttribute(iter.first, iter.second);
+				}
+
+				for (auto iter : _images)
+				{
+					osg::Texture* tex = dynamic_cast<osg::Texture*>(iter.second);
+					if (tex == NULL)
+					{
+						continue;
+					}
+					osg::Image* img = tex->getImage(0);
+					if (img != NULL)
+					{
+						img->dirty();
+					}
+				}
+
 				renderInfo.getState()->get<osg::GLExtensions>()->glDispatchCompute(_numGroupsX, _numGroupsY, _numGroupsZ);
 				if (_bOnce)
 				{
@@ -113,7 +90,7 @@ namespace GM
 		}
 
 		/** Set compute shader work groups */
-		void setComputeGroups(const GLint numGroupsX, const GLint numGroupsY, const GLint numGroupsZ)
+		inline void setComputeGroups(const GLint numGroupsX, const GLint numGroupsY, const GLint numGroupsZ)
 		{
 			_numGroupsX = numGroupsX;
 			_numGroupsY = numGroupsY;
@@ -121,23 +98,23 @@ namespace GM
 		}
 
 		/** Get compute shader work groups */
-		void getComputeGroups(GLint& numGroupsX, GLint& numGroupsY, GLint& numGroupsZ) const
+		inline void getComputeGroups(GLint& numGroupsX, GLint& numGroupsY, GLint& numGroupsZ) const
 		{
 			numGroupsX = _numGroupsX;
 			numGroupsY = _numGroupsY;
 			numGroupsZ = _numGroupsZ;
 		}
 
-		void setDispatch(bool bEnabled)
+		inline void setDispatch(bool bEnabled)
 		{
 			_bDispatch = bEnabled;
 		}
 
-		void setDirty(bool bDirty)
+		inline void setDirty(bool bDirty)
 		{
 			_bDirty = bDirty;
 		}
-		bool getDirty()
+		inline bool getDirty() const
 		{
 			return _bDirty;
 		}
@@ -147,8 +124,14 @@ namespace GM
 			_bOnce = bOnce;
 		}
 
+		inline std::map<int, osg::StateAttribute*>& GetTextureMap() { return _textures; }
+		inline std::map<int, osg::StateAttribute*>& GetImageMap() { return _images; }
+
 	protected:
 		GLint _numGroupsX, _numGroupsY, _numGroupsZ;
+
+		std::map<int, osg::StateAttribute*> _textures;
+		std::map<int, osg::StateAttribute*> _images;
 		mutable bool _bDispatch;
 		mutable bool _bDirty;
 		bool _bOnce;// 只计算一次

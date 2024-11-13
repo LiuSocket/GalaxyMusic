@@ -181,6 +181,7 @@
     <ClCompile Include="..\Engine\Assist\tinyxml.cpp" />
     <ClCompile Include="..\Engine\Assist\tinyxmlerror.cpp" />
     <ClCompile Include="..\Engine\Assist\tinyxmlparser.cpp" />
+    <ClCompile Include="..\Engine\BindImageTexture.cpp" />
     <ClCompile Include="..\Engine\GMAtmosphere.cpp" />
     <ClCompile Include="..\Engine\GMAudio.cpp" />
     <ClCompile Include="..\Engine\GMCameraManipulator.cpp" />
@@ -233,6 +234,7 @@
   <ItemGroup>
     <ClInclude Include="..\Engine\Assist\tinystr.h" />
     <ClInclude Include="..\Engine\Assist\tinyxml.h" />
+    <ClInclude Include="..\Engine\BindImageTexture.h" />
     <ClInclude Include="..\Engine\GMAtmosphere.h" />
     <ClInclude Include="..\Engine\GMAudio.h" />
     <ClInclude Include="..\Engine\GMCameraManipulator.h" />

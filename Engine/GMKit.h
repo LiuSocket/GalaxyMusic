@@ -12,6 +12,7 @@
 #pragma once
 
 #include "GMCommon.h"
+#include "BindImageTexture.h"
 #include <osg/StateSet>
 
 namespace GM
@@ -19,6 +20,8 @@ namespace GM
 	/*************************************************************************
 	Class
 	*************************************************************************/
+	class CGMDispatchCompute;
+
 	/*!
 	*  @Class CGMKit
 	*  @brief toolkits for Galaxy-Music
@@ -111,7 +114,7 @@ namespace GM
 
 		/**
 		* @brief Add texture to the compute shader image unit, only for compute shader, will add "ResetTexturesCallback" to the StateSet automatically
-		* @param pStateSet:			osg::StateSet
+		* @param pCompute:			CVREDispatchCompute node
 		* @param pTex:				the textrue
 		* @param texName:			name of texture in glsl
 		*
@@ -119,12 +122,12 @@ namespace GM
 		* The format parameter for the image unit need not exactly match the texture internal format,
 		* but if it is set to 0, the texture internal format will be used.
 		* See http://www.opengl.org/registry/specs/ARB/shader_image_load_store.txt
-		void bindToImageUnit(unsigned int unit, GLenum access, GLenum format = 0U, int level = 0, bool layered = false, int layer = 0);
+		void bindToImageUnit(unsigned int unit, GLenum access, GLenum format = 0, int level = 0, bool layered = false, int layer = 0);
 		*
-		* @return bool： success = true，fail = false
+		* @return EVREErrorCode： success = EVRE_EC_OK，fail = EVRE_EC_Fail
 		*/
-		static bool AddImage(osg::StateSet* pStateSet, osg::Texture* pTex, const char* texName,
-			const int unit, GLenum access, GLenum format = 0U, int level = 0, bool layered = false, int layer = 0);
+		static bool AddImageTexture(CGMDispatchCompute* pCompute, osg::Texture* pTex, const char* texName,
+			const int unit, osg::BindImageTexture::Access access, GLenum format = 0, int level = 0, bool layered = false, int layer = 0);
 
 		/**
 		* @brief 获取图片的RGBA通道值
