@@ -11,8 +11,8 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "GMOort.h"
-#include "GMKit.h"
-#include "GMEngine.h"
+#include "../GMKit.h"
+#include "../GMEngine.h"
 
 #include <osg/BlendFunc>
 #include <osg/CullFace>

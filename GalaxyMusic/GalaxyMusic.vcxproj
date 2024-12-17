@@ -94,7 +94,7 @@
     <ClCompile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>UNICODE;_UNICODE;WIN32;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>GeneratedFiles\$(ConfigurationName);GeneratedFiles;.\GeneratedFiles;.;.\GeneratedFiles\$(ConfigurationName);.\UI;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>GeneratedFiles\$(ConfigurationName);GeneratedFiles;.\GeneratedFiles;.;.\GeneratedFiles\$(ConfigurationName);.\UI;..\Engine\Cosmos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -127,7 +127,7 @@
     <ClCompile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>UNICODE;_UNICODE;WIN32;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;QT_NO_DEBUG;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>GeneratedFiles\$(ConfigurationName);GeneratedFiles;.\GeneratedFiles;.;.\GeneratedFiles\$(ConfigurationName);.\UI;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>GeneratedFiles\$(ConfigurationName);GeneratedFiles;.\GeneratedFiles;.;.\GeneratedFiles\$(ConfigurationName);.\UI;..\Engine\Cosmos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>None</DebugInformationFormat>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
@@ -160,7 +160,7 @@
     <ClCompile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>UNICODE;_UNICODE;WIN32;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;QT_NO_DEBUG;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>GeneratedFiles\$(ConfigurationName);GeneratedFiles;.\GeneratedFiles;.;.\GeneratedFiles\$(ConfigurationName);.\UI;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>GeneratedFiles\$(ConfigurationName);GeneratedFiles;.\GeneratedFiles;.;.\GeneratedFiles\$(ConfigurationName);.\UI;..\Engine\Cosmos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
@@ -196,26 +196,26 @@
     <ClCompile Include="..\Engine\Assist\tinyxmlerror.cpp" />
     <ClCompile Include="..\Engine\Assist\tinyxmlparser.cpp" />
     <ClCompile Include="..\Engine\BindImageTexture.cpp" />
-    <ClCompile Include="..\Engine\GMAtmosphere.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMAtmosphere.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMEarth.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMEarthEngine.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMEarthTail.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMGalaxy.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMMilkyWay.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMOort.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMPlanet.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMSolar.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMTerrain.cpp" />
+    <ClCompile Include="..\Engine\Cosmos\GMVolumeBasic.cpp" />
     <ClCompile Include="..\Engine\GMAudio.cpp" />
     <ClCompile Include="..\Engine\GMCameraManipulator.cpp" />
     <ClCompile Include="..\Engine\GMCommonUniform.cpp" />
     <ClCompile Include="..\Engine\GMDataManager.cpp" />
-    <ClCompile Include="..\Engine\GMEarth.cpp" />
-    <ClCompile Include="..\Engine\GMEarthEngine.cpp" />
-    <ClCompile Include="..\Engine\GMEarthTail.cpp" />
     <ClCompile Include="..\Engine\GMEngine.cpp" />
-    <ClCompile Include="..\Engine\GMGalaxy.cpp" />
     <ClCompile Include="..\Engine\GMKit.cpp" />
-    <ClCompile Include="..\Engine\GMMilkyWay.cpp" />
-    <ClCompile Include="..\Engine\GMOort.cpp" />
-    <ClCompile Include="..\Engine\GMPlanet.cpp" />
     <ClCompile Include="..\Engine\GMPost.cpp" />
-    <ClCompile Include="..\Engine\GMSolar.cpp" />
     <ClCompile Include="..\Engine\GMStructs.cpp" />
-    <ClCompile Include="..\Engine\GMTerrain.cpp" />
     <ClCompile Include="..\Engine\GMViewWidget.cpp" />
-    <ClCompile Include="..\Engine\GMVolumeBasic.cpp" />
     <ClCompile Include="..\Engine\GMXml.cpp" />
     <ClCompile Include="GMSystemManager.cpp" />
     <ClCompile Include="main.cpp" />
@@ -249,31 +249,31 @@
     <ClInclude Include="..\Engine\Assist\tinystr.h" />
     <ClInclude Include="..\Engine\Assist\tinyxml.h" />
     <ClInclude Include="..\Engine\BindImageTexture.h" />
-    <ClInclude Include="..\Engine\GMAtmosphere.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMAtmosphere.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMCelestialScaleVisitor.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMEarth.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMEarthEngine.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMEarthTail.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMGalaxy.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMMilkyWay.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMOort.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMPlanet.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMSolar.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMTerrain.h" />
+    <ClInclude Include="..\Engine\Cosmos\GMVolumeBasic.h" />
     <ClInclude Include="..\Engine\GMAudio.h" />
     <ClInclude Include="..\Engine\GMCameraManipulator.h" />
-    <ClInclude Include="..\Engine\GMCelestialScaleVisitor.h" />
     <ClInclude Include="..\Engine\GMCommon.h" />
     <ClInclude Include="..\Engine\GMCommonUniform.h" />
     <ClInclude Include="..\Engine\GMDataManager.h" />
     <ClInclude Include="..\Engine\GMDispatchCompute.h" />
-    <ClInclude Include="..\Engine\GMEarth.h" />
-    <ClInclude Include="..\Engine\GMEarthEngine.h" />
-    <ClInclude Include="..\Engine\GMEarthTail.h" />
     <ClInclude Include="..\Engine\GMEngine.h" />
     <ClInclude Include="..\Engine\GMEnums.h" />
-    <ClInclude Include="..\Engine\GMGalaxy.h" />
     <ClInclude Include="..\Engine\GMKernel.h" />
     <ClInclude Include="..\Engine\GMKit.h" />
-    <ClInclude Include="..\Engine\GMMilkyWay.h" />
-    <ClInclude Include="..\Engine\GMOort.h" />
-    <ClInclude Include="..\Engine\GMPlanet.h" />
     <ClInclude Include="..\Engine\GMPost.h" />
     <ClInclude Include="..\Engine\GMPrerequisites.h" />
-    <ClInclude Include="..\Engine\GMSolar.h" />
     <ClInclude Include="..\Engine\GMStructs.h" />
-    <ClInclude Include="..\Engine\GMTerrain.h" />
-    <ClInclude Include="..\Engine\GMVolumeBasic.h" />
     <ClInclude Include="..\Engine\GMXml.h" />
     <ClInclude Include="resource.h" />
     <QtMoc Include="..\Engine\GMViewWidget.h" />

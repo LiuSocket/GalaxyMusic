@@ -11,8 +11,8 @@
 //////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "GMCommon.h"
-#include "GMKernel.h"
+#include "../GMCommon.h"
+#include "../GMKernel.h"
 #include "GMTerrain.h"
 
 namespace GM

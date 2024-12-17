@@ -11,9 +11,9 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "GMEarthEngine.h"
-#include "GMEngine.h"
 #include "GMEarthTail.h"
-#include "GMKit.h"
+#include "../GMEngine.h"
+#include "../GMKit.h"
 #include <osg/PointSprite>
 #include <osg/LineWidth>
 #include <osg/Texture2D>

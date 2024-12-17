@@ -11,7 +11,7 @@
 //////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "GMCommonUniform.h"
+#include "../GMCommonUniform.h"
 
 namespace GM
 {

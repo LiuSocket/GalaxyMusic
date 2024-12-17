@@ -38,11 +38,11 @@ namespace GM
 	#define GM_MAX_RADIUS				(GM_MIN_RADIUS*GM_UNIT_SCALE*2)	// 相机在每个层级空间中的最大焦距
 	#define GM_HANDLE_RADIUS			(0.15)		// 把手半径，单位：万光年，1e20
 
-	#define TRANS_ALT_NUM				(512)			// 透过率图的高度采样数 [0,fAtmosThick]m
-	#define TRANS_PITCH_NUM				(512)			// 透过率图的太阳俯仰角余弦值采样数 [地平线余弦值,1]
+	#define TRANS_ALT_NUM				(512)		// 透过率图的高度采样数 [0,fAtmosThick]m
+	#define TRANS_PITCH_NUM				(512)		// 透过率图的太阳俯仰角余弦值采样数 [地平线余弦值,1]
 
-	#define IRRA_ALT_NUM				(128)			// 辐照度的高度采样数 [0,fAtmosThick]m
-	#define IRRA_UP_NUM					(256)			// 辐照度的太阳方向与上方向的点乘采样数 [-1,1]
+	#define IRRA_ALT_NUM				(128)		// 辐照度的高度采样数 [0,fAtmosThick]m
+	#define IRRA_UP_NUM					(256)		// 辐照度的太阳方向与上方向的点乘采样数 [-1,1]
 
 	#define SCAT_PITCH_NUM				(128)		// 散射图的俯仰方向与上方向的点乘采样数 [-1,1]
 	#define SCAT_LIGHT_NUM				(32)		// 散射图的太阳方向与上方向的点乘采样数 [-1,1]

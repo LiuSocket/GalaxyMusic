@@ -11,8 +11,8 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "GMTerrain.h"
-#include "GMEngine.h"
-#include "GMKit.h"
+#include "../GMEngine.h"
+#include "../GMKit.h"
 #include <osg/CullFace>
 #include <osg/PositionAttitudeTransform>
 #include <osgDB/ReadFile>

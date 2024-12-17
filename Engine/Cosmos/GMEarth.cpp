@@ -11,10 +11,10 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "GMEarth.h"
-#include "GMEngine.h"
 #include "GMEarthTail.h"
 #include "GMEarthEngine.h"
-#include "GMKit.h"
+#include "../GMEngine.h"
+#include "../GMKit.h"
 #include <osg/LineWidth>
 #include <osg/Texture2D>
 #include <osg/Texture3D>

@@ -11,9 +11,9 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "GMPlanet.h"
-#include "GMEngine.h"
+#include "../GMEngine.h"
 
-#include "GMKit.h"
+#include "../GMKit.h"
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>
 

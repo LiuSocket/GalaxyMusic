@@ -11,10 +11,10 @@
 //////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "GMCommon.h"
-#include "GMCommonUniform.h"
-#include "GMKernel.h"
-#include "GMDispatchCompute.h"
+#include "../GMCommon.h"
+#include "../GMCommonUniform.h"
+#include "../GMKernel.h"
+#include "../GMDispatchCompute.h"
 
 #include <random>
 #include <osg/Node>

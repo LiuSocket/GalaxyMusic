@@ -11,8 +11,8 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "GMAtmosphere.h"
-#include "GMEngine.h"
-#include "GMKit.h"
+#include "../GMEngine.h"
+#include "../GMKit.h"
 #include <osg/Texture3D>
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>

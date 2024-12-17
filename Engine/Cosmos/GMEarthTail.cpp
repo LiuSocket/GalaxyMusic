@@ -11,8 +11,8 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "GMEarthTail.h"
-#include "GMKit.h"
-#include "GMEngine.h"
+#include "../GMKit.h"
+#include "../GMEngine.h"
 
 #include <osg/Depth>
 #include <osg/BlendFunc>

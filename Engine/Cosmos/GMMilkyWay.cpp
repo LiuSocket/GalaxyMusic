@@ -11,9 +11,9 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "GMMilkyWay.h"
-#include "GMKit.h"
-#include "GMEngine.h"
-#include "GMCommonUniform.h"
+#include "../GMKit.h"
+#include "../GMEngine.h"
+#include "../GMCommonUniform.h"
 
 #include <osg/BlendFunc>
 #include <osg/CullFace>
