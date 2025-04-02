@@ -1,4 +1,4 @@
-#version 430 compatibility
+#version 450 compatibility
 
 #pragma import_defines(VOLUME)
 
@@ -15,15 +15,15 @@ void main()
 {
 	vec2 sideUV = gl_TexCoord[0].xy + vec2(-0.5,-0.5)/screenSize.xy;
 
-	vec4 backgroundColor = texture2D(backgroundTex, gl_TexCoord[0].xy);
-	vec4 backSide = texture2D(backgroundTex, sideUV);
+	vec4 backgroundColor = texture(backgroundTex, gl_TexCoord[0].xy);
+	vec4 backSide = texture(backgroundTex, sideUV);
 	backSide += textureOffset(backgroundTex, sideUV, ivec2(1,0));
 	backSide += textureOffset(backgroundTex, sideUV, ivec2(1,1));
 	backSide += textureOffset(backgroundTex, sideUV, ivec2(0,1));
 	backgroundColor = mix(backgroundColor, backSide*0.25, 0.5);
 
-	vec4 sceneColor = texture2D(sceneTex, gl_TexCoord[0].xy);
-	vec4 sceneSide = texture2D(sceneTex, sideUV);
+	vec4 sceneColor = texture(sceneTex, gl_TexCoord[0].xy);
+	vec4 sceneSide = texture(sceneTex, sideUV);
 	sceneSide += textureOffset(sceneTex, sideUV, ivec2(1,0));
 	sceneSide += textureOffset(sceneTex, sideUV, ivec2(1,1));
 	sceneSide += textureOffset(sceneTex, sideUV, ivec2(0,1));
@@ -36,7 +36,7 @@ void main()
 	vec4 color = backgroundColor;
 
 #ifdef VOLUME
-	vec4 volumeColor = texture2D(volumeTex, gl_TexCoord[0].xy);
+	vec4 volumeColor = texture(volumeTex, gl_TexCoord[0].xy);
 	color.rgb = mix(color.rgb, volumeColor.rgb, volumeColor.a);
 	color.a = 1 - (1-color.a)*(1-volumeColor.a);
 #endif //VOLUME
@@ -44,7 +44,7 @@ void main()
 	color.rgb = mix(color.rgb, sceneColor.rgb, sceneColor.a);
 	color.a = 1 - (1-color.a)*(1-sceneColor.a);
 
-	vec4 foregroundColor = texture2D(foregroundTex, gl_TexCoord[0].xy);
+	vec4 foregroundColor = texture(foregroundTex, gl_TexCoord[0].xy);
 	color.rgb = mix(color.rgb, foregroundColor.rgb, foregroundColor.a);
 	color.a = 1 - (1-color.a)*(1-foregroundColor.a);
 	

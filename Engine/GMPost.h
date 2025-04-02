@@ -64,24 +64,23 @@ namespace GM
 		void ResizeScreen(const int width, const int height);
 
 		/**
-		* CreatePost
 		* 创建后期
-		* @author LiuTao
-		* @since 2022.07.20
 		* @param pSceneTex:			场景颜色图
+		* @param pDepthTex:			深度图
+		* @param pMaskTex:			遮罩图
 		* @param pBackgroundTex:	背景颜色图
 		* @param pForegroundTex:	前景颜色图
 		* @return bool 成功true， 失败false
 		*/
-		bool CreatePost(osg::Texture* pSceneTex,
+		bool CreatePost(
+			osg::Texture* pSceneTex,
+			osg::Texture* pDepthTex,
+			osg::Texture* pMaskTex,
 			osg::Texture* pBackgroundTex,
 			osg::Texture* pForegroundTex);
 
 		/**
-		* SetVolumeEnable
 		* 开关体渲染
-		* @author LiuTao
-		* @since 2022.07.28
 		* @param bEnabled: 开启或关闭体渲染
 		* @param pVolumeTex: 体渲染图
 		* @return bool 成功true， 失败false

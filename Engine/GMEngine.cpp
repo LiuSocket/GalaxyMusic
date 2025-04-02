@@ -31,11 +31,11 @@ using namespace GM;
 Global Constants
 *************************************************************************/
 static const std::string g_strGMConfigFile = "GalaxyMusic.cfg";	//!< 配置文件名
+constexpr double GM_NEARFAR_RATIO = 1e-6;
 
 /*************************************************************************
  Macro Defines
 *************************************************************************/
-#define GM_NEARFAR_RATIO			(1e-6)
 
 /*************************************************************************
  CGMEngine Methods
@@ -85,7 +85,8 @@ CGMEngine::CGMEngine():
 	m_fGalaxyDiameter(1e21),
 	m_pGalaxy(nullptr), m_pAudio(nullptr), m_pPost(nullptr),
 	m_ePlayMode(EGMA_MOD_CIRCLE),
-	m_pSceneTex(nullptr), m_pBackgroundTex(nullptr), m_pForegroundTex(nullptr)
+	m_pSceneTex(nullptr), m_pDepthTex(nullptr), m_pMaskTex(nullptr),
+	m_pBackgroundTex(nullptr), m_pForegroundTex(nullptr)
 {
 	Init();
 }
@@ -147,6 +148,30 @@ bool CGMEngine::Init()
 	m_pSceneTex->setBorderColor(osg::Vec4d(0, 0, 0, 0));
 	m_pSceneTex->setDataVariance(osg::Object::DYNAMIC);
 	m_pSceneTex->setResizeNonPowerOfTwoHint(false);
+
+	m_pDepthTex = new osg::Texture2D();
+	m_pDepthTex->setTextureSize(m_pConfigData->iScreenWidth, m_pConfigData->iScreenHeight);
+    m_pDepthTex->setInternalFormat(GL_DEPTH_COMPONENT);
+    m_pDepthTex->setSourceFormat(GL_DEPTH_COMPONENT);
+    m_pDepthTex->setSourceType(GL_FLOAT);
+    m_pDepthTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+    m_pDepthTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+    m_pDepthTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+    m_pDepthTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+    m_pDepthTex->setDataVariance(osg::Object::DYNAMIC);
+    m_pDepthTex->setResizeNonPowerOfTwoHint(false);
+
+	m_pMaskTex = new osg::Texture2D();
+    m_pMaskTex->setTextureSize(m_pConfigData->iScreenWidth, m_pConfigData->iScreenHeight);
+    m_pMaskTex->setInternalFormat(GL_RG16F);
+    m_pMaskTex->setSourceFormat(GL_RG);
+    m_pMaskTex->setSourceType(GL_FLOAT);
+	m_pMaskTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	m_pMaskTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	m_pMaskTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+	m_pMaskTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+	m_pMaskTex->setDataVariance(osg::Object::DYNAMIC);
+	m_pMaskTex->setResizeNonPowerOfTwoHint(false);
 
 	// 初始化背景相关节点
 	_InitBackground();
@@ -705,7 +730,9 @@ CGMViewWidget* CGMEngine::CreateViewWidget(QWidget* parent)
 		static_cast<double>(m_pConfigData->iScreenWidth) / static_cast<double>(m_pConfigData->iScreenHeight),
 		0.0003, 30.0);
 
-	m_pPost->CreatePost(m_pSceneTex.get(), m_pBackgroundTex.get(), m_pForegroundTex.get());
+	m_pPost->CreatePost(m_pSceneTex.get(), m_pDepthTex.get(), m_pMaskTex.get(),
+		m_pBackgroundTex.get(), m_pForegroundTex.get()
+	);
 	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
 	{
 		//m_pPost->SetVolumeEnable(true, m_pGalaxy->GetTAATex());

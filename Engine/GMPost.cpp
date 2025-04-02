@@ -92,7 +92,10 @@ void CGMPost::ResizeScreen(const int width, const int height)
 	_ResizeScreenTriangle(width, height);
 }
 
-bool CGMPost::CreatePost(osg::Texture* pSceneTex,
+bool CGMPost::CreatePost(
+	osg::Texture* pSceneTex,
+	osg::Texture* pDepthTex,
+	osg::Texture* pMaskTex,
 	osg::Texture* pBackgroundTex,
 	osg::Texture* pForegroundTex)
 {
@@ -106,6 +109,8 @@ bool CGMPost::CreatePost(osg::Texture* pSceneTex,
 	vp->setViewport(0, 0, width, height);
 	pMainCam->setRenderOrder(osg::Camera::PRE_RENDER, 20);
 	pMainCam->attach(osg::Camera::COLOR_BUFFER0, pSceneTex);
+    pMainCam->attach(osg::Camera::COLOR_BUFFER1, pMaskTex);
+    pMainCam->attach(osg::Camera::DEPTH_BUFFER, pDepthTex);
 
 	// Create post triangle
 	m_pPostGeode = new osg::Geode();

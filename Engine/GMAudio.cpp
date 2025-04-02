@@ -27,13 +27,7 @@ CGMAudio Methods
 *************************************************************************/
 
 /** @brief 构造 */
-CGMAudio::CGMAudio():
-	m_pConfigData(nullptr),m_streamAudio(0),
-	m_strCoreAudioPath("Audio/"), m_strAudioPath(L"Music/"), m_strCurrentFile(L""),
-	m_eAudioState(EGMA_STA_MUTE),
-	m_iAudioLastTime(0), m_iAudioCurrentTime(0), m_iAudioDuration(0),
-	m_fDeltaStep(0.0f), m_fConstantStep(0.1f), m_bWelcomeStart(false), m_bWelcomeEnd(false),
-	m_iWelcomeDuration(5000), m_fVolume(0.5f)
+CGMAudio::CGMAudio()
 {
 }
 
@@ -75,15 +69,16 @@ bool CGMAudio::Update(double dDeltaTime)
 		}
 	}
 
-	float fDeltaTime = float(dDeltaTime);
-	fDeltaTime += m_fDeltaStep;
-	float updateStep = m_fConstantStep;
-	while (fDeltaTime >= updateStep)
+	static double s_fConstantStep = 0.1;
+	static double s_fDeltaStep = 0.0;
+	double fDeltaTime = dDeltaTime;
+	fDeltaTime += s_fDeltaStep;
+	while (fDeltaTime >= s_fConstantStep)
 	{
-		_InnerUpdate(updateStep);
-		fDeltaTime -= updateStep;
+		_InnerUpdate(s_fConstantStep);
+		fDeltaTime -= s_fConstantStep;
 	}
-	m_fDeltaStep = fDeltaTime;
+	s_fDeltaStep = fDeltaTime;
 
 	return true;
 }
@@ -96,12 +91,7 @@ void CGMAudio::Welcome()
 	m_bWelcomeStart = true;
 }
 
-bool CGMAudio::IsWelcomeFinished()
-{
-	return m_bWelcomeEnd;
-}
-
-bool CGMAudio::SetCurrentAudio(std::wstring& strAudioFile)
+bool CGMAudio::SetCurrentAudio(const std::wstring& strAudioFile)
 {
 	if (!m_bWelcomeEnd) return false;
 
@@ -175,7 +165,7 @@ void CGMAudio::AudioControl(EGMA_COMMAND command)
 	}
 }
 
-bool CGMAudio::IsAudioOver()
+bool CGMAudio::IsAudioOver() const
 {
 	if (EGMA_STA_PLAY == m_eAudioState
 		&& m_iAudioCurrentTime == m_iAudioLastTime
@@ -196,7 +186,7 @@ bool CGMAudio::SetVolume(float fLevel)
 	return BASS_ChannelSetAttribute(m_streamAudio, BASS_ATTRIB_VOL, m_fVolume);
 }
 
-float CGMAudio::GetLevel()
+float CGMAudio::GetLevel() const
 {
 	if (EGMA_STA_PLAY != m_eAudioState || IsAudioOver())
 	{
@@ -225,37 +215,19 @@ float CGMAudio::GetLevel()
 	return fLevel;
 }
 
-int CGMAudio::GetAudioDuration()
-{
-	return m_iAudioDuration;
-}
-
 bool CGMAudio::SetAudioCurrentTime(int iTime)
 {
 	_SeekTo(iTime);
 	return true;
 }
 
-int CGMAudio::GetAudioCurrentTime()
-{
-	return m_iAudioCurrentTime;
-}
-
-/**
-* _InnerUpdate
-* 间隔更新
-* @author LiuTao
-* @since 2021.05.29
-* @param updateStep 两次间隔更新的时间差，单位s
-* @return void
-*/
 void CGMAudio::_InnerUpdate(float updateStep)
 {
 	m_iAudioLastTime = m_iAudioCurrentTime;
 	m_iAudioCurrentTime = _GetAudioCurrentTime();
 }
 
-int CGMAudio::_GetAudioCurrentTime()
+int CGMAudio::_GetAudioCurrentTime() const
 {
 	QWORD pos_bytes;
 	pos_bytes = BASS_ChannelGetPosition(m_streamAudio, BASS_POS_BYTE);
