@@ -298,6 +298,15 @@ QSlider::handle:horizontal:hover{
 	image: url(:/Resources/btn_next_hover.png);
 }
 
+/* 流浪地球管理器开启按钮 */
+#managerBtn {
+	image: url(:/Resources/btn_earth.png);
+}
+#managerBtn:hover {
+	image: url(:/Resources/btn_earth_hover.png);
+}
+
+/* 音量按钮 */
 #volumeBtn {
 	image: url(:/Resources/btn_volume.png);
 }

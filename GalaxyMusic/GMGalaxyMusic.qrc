@@ -41,5 +41,7 @@
         <file>Resources/SpinUp_Hover.png</file>
         <file>Resources/Empty.qss</file>
         <file>Resources/WELab.png</file>
+        <file>Resources/btn_earth.png</file>
+        <file>Resources/btn_earth_hover.png</file>
     </qresource>
 </RCC>

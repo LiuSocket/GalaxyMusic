@@ -34,10 +34,6 @@ CGMSystemManager Methods
 *************************************************************************/
 
 CGMSystemManager::CGMSystemManager()
-	: m_bInit(false), m_bFirst(true),
-	m_bVolumeHiding(false), m_iVolumeCount(0),
-	m_iFrameCount(0), m_iRhythmCount(0),
-	m_iTimeRhythmStart(0), m_iTimeRhythmEnd(20), m_nKeyMask(0)
 {
 }
 
