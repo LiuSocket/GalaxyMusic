@@ -176,6 +176,11 @@ namespace GM
 		* @return int: 音频的总时长
 		*/
 		int GetAudioDuration() const;
+		/**
+		* @brief 判断音频是否播放完毕
+		* @return bool 完毕返回true，未完毕返回false
+		*/
+		bool IsAudioOver() const;
 
 		/**
 		* @brief 开启“欢迎效果”

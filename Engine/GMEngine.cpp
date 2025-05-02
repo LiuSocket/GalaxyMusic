@@ -483,6 +483,11 @@ int CGMEngine::GetAudioDuration() const
 	return m_pAudio->GetAudioDuration();
 }
 
+bool CGMEngine::IsAudioOver() const
+{
+	return m_pAudio->IsAudioOver();
+}
+
 void CGMEngine::Welcome()
 {
 	m_pGalaxy->Welcome();
