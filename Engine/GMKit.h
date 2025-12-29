@@ -34,10 +34,7 @@ namespace GM
 		CGMKit() {}
 
 		/**
-		* LoadShader
-		* 加载shader
-		* @author LiuTao
-		* @since 2020.12.05
+		* @brief 加载Shader
 		* @param pStateSet:			需要加shader的状态集指针
 		* @param vertFilePath:		顶点shader路径
 		* @param fragFilePath:		片元shader路径
@@ -55,7 +52,7 @@ namespace GM
 			bool bPixelLighting = false);
 
 		/*!
-		* @brief 加载Shader by StateSet
+		* @brief 加载Shader
 		* @param pStateSet:				osg::StateSet
 		* @param vertFilePath:			the vertex glsl file path
 		* @param fragFilePath:			the fragment glsl file path
@@ -72,24 +69,24 @@ namespace GM
 			, const std::string& shaderName
 			, const bool bPixelLighting = false);
 
-		/**
-		* 加载shader
-		* @param pStateSet:			需要加shader的状态集指针
-		* @param vertFilePath:		顶点shader路径
-		* @param fragFilePath:		片元shader路径
-		* @param strShaderName:		shader的名称
-		* @return bool:				成功为true，否则false
+		/*
+		* @brief 加载Shader
+		* @param pStateSet:				osg::StateSet
+		* @param vertFilePath:			the vertex glsl file path
+		* @param fragFilePath:			the fragment glsl file path
+		* @param bForceUpdate:			force update the shader
+		* @param value:					osg::StateAttribute::GLModeValue
+		* @return bool:					成功为true，否则false
 		*/
 		static bool LoadShader(
 			osg::StateSet* pStateSet,
 			const std::string& vertFilePath,
 			const std::string& fragFilePath,
-			const std::string& strShaderName);
+			const bool bForceUpdate = false,
+			const osg::StateAttribute::GLModeValue value = osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
 
 		/**
-		* Load compute shader by stateSet
-		* @author LiuTao
-		* @since 2022.07.25
+		* @brief 加载compute shader
 		* @param pStateSet:			需要加shader的状态集指针
 		* @param compFilePath:		compute shader路径
 		* @param shaderName:		shader的名称
@@ -101,16 +98,18 @@ namespace GM
 			const std::string& shaderName = "");
 
 		/**
-		* 向状态集中添加纹理
-		* @author LiuTao
-		* @since 2022.07.29
+		* @brief 向状态集中添加纹理
 		* @param pStateSet:			需要加shader的状态集指针
 		* @param pTex:				需要添加的纹理指针
 		* @param texName:			纹理在glsl中的名称
 		* @param iUnit:				纹理单元
+		* @param value:				osg::StateAttribute::GLModeValue
 		* @return bool:				成功为true，否则false
 		*/
-		static bool AddTexture(osg::StateSet* pStateSet, osg::Texture* pTex, const char* texName, const int iUnit);
+		static bool AddTexture(
+			osg::StateSet* pStateSet,
+			osg::Texture* pTex, const char* texName, const int iUnit,
+			const osg::StateAttribute::GLModeValue value = osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
 
 		/**
 		* @brief Add texture to the compute shader image unit, only for compute shader, will add "ResetTexturesCallback" to the StateSet automatically
@@ -141,6 +140,20 @@ namespace GM
 			const osg::Image* pImg,
 			const float fX, const float fY,
 			const bool bLinear = false);
+		/**
+		* @brief 根据输入的着色器路径名称，自动生成program的名字
+		* 如果是普通着色器，则依次输入顶点和片元路径，如果是计算着色器，则只需要输入计算着色器路径，第二个路径不填
+		* @param vertShaderPath:        路径0，顶点着色器路径/计算着色器路径
+		* @param vertShaderPath:        路径1, 片元着色器路径/空
+		* @return string:               program名称
+		*/
+		static std::string GetProgramName(const std::string& path0, const std::string& path1 = "");
+		/**
+		* @brief 获取指定名称的program
+		* @param strProgramName:		program的名称
+		* @return osg::Program*:		program的指针，不存在则返回nullptr
+		*/
+		static osg::Program* GetProgram(const std::string& strProgramName);
 
 		/**
 		* @brief 16F 转 32F
@@ -169,7 +182,15 @@ namespace GM
 		{
 			return fA * (1 - fX) + fB * fX;
 		}
+		inline static osg::Vec3f Mix(const osg::Vec3f& vA, const osg::Vec3f& vB, const float fX)
+		{
+			return vA * (1 - fX) + vB * fX;
+		}
 		inline static osg::Vec4f Mix(const osg::Vec4f vA, const osg::Vec4f vB, const double fX)
+		{
+			return vA * (1 - fX) + vB * fX;
+		}
+		inline static osg::Vec3d Mix(const osg::Vec3d& vA, const osg::Vec3d& vB, const double fX)
 		{
 			return vA * (1 - fX) + vB * fX;
 		}
@@ -181,6 +202,9 @@ namespace GM
 
 		inline static unsigned int AsUint(const float x) { return *(unsigned int*)&x; }
 		inline static float AsFloat(const unsigned int x) { return *(float*)&x; }
+
+	private:
+		static std::map<std::string, osg::ref_ptr<osg::Program>>		_pProgramMap;
 	};
 
 }	// GM

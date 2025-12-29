@@ -81,7 +81,7 @@ namespace GM
 	struct SGMConfigData
 	{
 		SGMConfigData()
-			: strCorePath("../../Data/Core/"), strMediaPath(L"../../Data/Media/"),
+			: strCorePath("../Data/Core/"), strMediaPath(L"../Data/Media/"),
 			eRenderQuality(EGMRENDER_LOW), bPhoto(false), bWanderingEarth(false),
 			fFovy(40.0f), fVolume(0.5f), fMinBPM(23.0),
 			iScreenWidth(1920), iScreenHeight(1080)

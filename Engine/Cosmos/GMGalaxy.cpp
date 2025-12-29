@@ -56,7 +56,7 @@ CGMGalaxy::CGMGalaxy() :
 	m_strCoreModelPath("Models/"), m_strPlayingStarName(L""),
 	m_iPlayingAudioUID(0),m_vPlayingAudioCoord(SGMAudioCoord(0.5, 0.0)),
 	m_vPlayingStarWorld4Pos(0.0, 0.0, 0.0), m_vNearStarWorld4Pos(0, 0, 0),
-	m_vMouseWorldPos(0.0, 0.0, 0.0), m_vMouseLastWorldPos(0.0, 0.0, 0.0), m_mLastVP(osg::Matrixf()),
+	m_vMouseWorldPos(0.0, 0.0, 0.0), m_vMouseLastWorldPos(0.0, 0.0, 0.0),
 	m_pMousePosUniform(new osg::Uniform("mouseWorldPos", osg::Vec3f(0.0f, 0.0f, 0.0f))),
 	m_pAudioUVUniform(new osg::Uniform("audioUV", osg::Vec2f(0.5f, 0.0f))),
 	m_pGalaxyRadiusUniform(new osg::Uniform("galaxyRadius", 5.0f)),
@@ -581,33 +581,9 @@ bool CGMGalaxy::UpdateLater(double dDeltaTime)
 
 	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
 	{
-		// 实现抖动抗锯齿
-		// 相机正前方单位向量（世界空间）
-		osg::Vec3d vWorldEyeFrontDir = vCenter - vEye;
-		vWorldEyeFrontDir.normalize();
-		osg::Vec3d vWorldEyeRightDir = vWorldEyeFrontDir ^ vUp;
-		vWorldEyeRightDir.normalize();
-
-		m_pCommonUniform->SetEyeUpDir(vUp);		// 相机上方向在世界空间下的单位向量
-		m_pCommonUniform->SetEyeRightDir(vWorldEyeRightDir);	// 相机右方向在世界空间下的单位向量
-		m_pCommonUniform->SetEyeFrontDir(vWorldEyeFrontDir);	// 相机前方向在世界空间下的单位向量
-
-		osg::Matrixd mMainViewMatrix = GM_View->getCamera()->getViewMatrix();
 		osg::Matrixd mMainProjMatrix = GM_View->getCamera()->getProjectionMatrix();
 		osg::Matrixf mInvProjMatrix = osg::Matrixd::inverse(mMainProjMatrix);
 		m_pCommonUniform->SetMainInvProjMatrix(mInvProjMatrix);
-
-		osg::Matrixd VP = mMainViewMatrix * mMainProjMatrix;
-		// 修改VP差值矩阵
-		osg::Matrixf deltaVP = osg::Matrixf(
-			VP(0, 0) - m_mLastVP(0, 0), VP(0, 1) - m_mLastVP(0, 1), VP(0, 2) - m_mLastVP(0, 2), VP(0, 3) - m_mLastVP(0, 3),
-			VP(1, 0) - m_mLastVP(1, 0), VP(1, 1) - m_mLastVP(1, 1), VP(1, 2) - m_mLastVP(1, 2), VP(1, 3) - m_mLastVP(1, 3),
-			VP(2, 0) - m_mLastVP(2, 0), VP(2, 1) - m_mLastVP(2, 1), VP(2, 2) - m_mLastVP(2, 2), VP(2, 3) - m_mLastVP(2, 3),
-			VP(3, 0) - m_mLastVP(3, 0), VP(3, 1) - m_mLastVP(3, 1), VP(3, 2) - m_mLastVP(3, 2), VP(3, 3) - m_mLastVP(3, 3)
-		);
-		m_pCommonUniform->SetDeltaVPMatrix(deltaVP);
-		// 修改上一帧VP矩阵
-		m_mLastVP = VP;
 	}
 
 	m_pMilkyWay->UpdateLater(dDeltaTime);
@@ -626,102 +602,99 @@ bool CGMGalaxy::Load()
 		CGMKit::LoadShader(m_pGeodeStarCube_4->getStateSet(),
 			strGalaxyShader + "StarCube_4_Vert.glsl",
 			strGalaxyShader + "StarCube_4_Frag.glsl",
-			"StarCube_4");
+			true);
 	}
 	if (m_pBackgroundStarTransform.valid())
 	{
 		CGMKit::LoadShader(m_pBackgroundStarTransform->getStateSet(),
 			strGalaxyShader + "StarCube_Vert.glsl",
 			strGalaxyShader + "StarCube_Frag.glsl",
-			"StarCube");
+			true);
 	}
 	if (m_pStateSetGalaxy.valid())
 	{
 		CGMKit::LoadShader(m_pStateSetGalaxy.get(),
 			strGalaxyShader + "GalaxyStarVert.glsl",
 			strGalaxyShader + "GalaxyStarFrag.glsl",
-			"GalaxyStar");
+			true);
 	}
 	if (m_pGeodePointsN_4.valid())
 	{
 		CGMKit::LoadShader(m_pGeodePointsN_4->getOrCreateStateSet(),
 			strGalaxyShader + "StarNVert.glsl",
 			strGalaxyShader + "StarNFrag.glsl",
-			"StarN");
+			true);
 	}
 	if (m_pGeodeAudio.valid())
 	{
 		CGMKit::LoadShader(m_pGeodeAudio->getStateSet(),
 			strGalaxyShader + "AudioVert.glsl",
 			strGalaxyShader + "AudioFrag.glsl",
-			"AudioStar");
+			true);
 	}
 	if (m_pStateSetPlane.valid())
 	{
 		CGMKit::LoadShader(m_pStateSetPlane.get(),
 			strGalaxyShader + "GalaxyPlaneVert.glsl",
 			strGalaxyShader + "GalaxyPlaneFrag.glsl",
-			"GalaxyPlanet");
+			true);
 	}
 	if (m_pStarInfoTransform.valid())
 	{
 		CGMKit::LoadShader(m_pStarInfoTransform->getStateSet(),
 			strGalaxyShader + "PlayingStarVert.glsl",
 			strGalaxyShader + "PlayingStarFrag.glsl",
-			"PlayingStar");
+			true);
 	}
 	if (m_pGeodeRegion.valid())
 	{
 		CGMKit::LoadShader(m_pGeodeRegion->getStateSet(), 
 			strGalaxyShader + "AudioRegionVert.glsl",
 			strGalaxyShader + "AudioRegionFrag.glsl",
-			"AudioRegion");
+			true);
 	}
 	if (m_pGeodeGalaxyGroup_4.valid())
 	{
 		CGMKit::LoadShader(m_pGeodeGalaxyGroup_4->getStateSet(),
 			strGalaxyShader + "Galaxies_4_Vert.glsl",
 			strGalaxyShader + "Galaxies_4_Frag.glsl",
-			"Galaxies_4");
+			true);
 	}
 	if (m_pGeodeGalaxyGroup_5.valid() && m_pGeodeGalaxies_5.valid())
 	{
 		CGMKit::LoadShader(m_pGeodeGalaxyGroup_5->getStateSet(),
 			strGalaxyShader + "Galaxies_5_Vert.glsl", strGalaxyShader + "Galaxies_5_Frag.glsl",
-			"GalaxyGroup_5");
+			true);
 		CGMKit::LoadShader(m_pGeodeGalaxies_5->getStateSet(),
-			strGalaxyShader + "Galaxies_5_Vert.glsl", strGalaxyShader + "Galaxies_5_Frag.glsl",
-			"Galaxies_5");
+			strGalaxyShader + "Galaxies_5_Vert.glsl", strGalaxyShader + "Galaxies_5_Frag.glsl");
 	}
 	if (m_pGeodeSupercluster.valid() && m_pGeodeUltracluster.valid())
 	{
 		CGMKit::LoadShader(m_pGeodeSupercluster->getStateSet(),
 			strGalaxyShader + "SuperclusterVert.glsl", strGalaxyShader + "SuperclusterFrag.glsl",
-			"Supercluster");
+			true);
 		CGMKit::LoadShader(m_pGeodeUltracluster->getStateSet(),
-			strGalaxyShader + "SuperclusterVert.glsl", strGalaxyShader + "SuperclusterFrag.glsl",
-			"Ultracluster");
+			strGalaxyShader + "SuperclusterVert.glsl", strGalaxyShader + "SuperclusterFrag.glsl");
 	}
 	if (m_pGeodeMyWorld_5.valid() && m_pGeodeMyWorld_6.valid())
 	{
 		CGMKit::LoadShader(m_pGeodeMyWorld_5->getStateSet(),
 			strGalaxyShader + "MyWorldVert.glsl", strGalaxyShader + "MyWorldFrag.glsl",
-			"MyWorld_5");
+			true);
 		CGMKit::LoadShader(m_pGeodeMyWorld_6->getStateSet(),
-			strGalaxyShader + "MyWorldVert.glsl", strGalaxyShader + "MyWorldFrag.glsl",
-			"MyWorld_6");
+			strGalaxyShader + "MyWorldVert.glsl", strGalaxyShader + "MyWorldFrag.glsl");
 	}
 	if (m_pBackgroundGalaxyTransform.valid())
 	{
 		CGMKit::LoadShader(m_pBackgroundGalaxyTransform->getStateSet(),
 			strGalaxyShader + "GalaxyBackgroundVert.glsl", strGalaxyShader + "GalaxyBackgroundFrag.glsl",
-			"GalaxyBackground");
+			true);
 	}
 	if (m_pCosmosBoxGeode.valid())
 	{
 		CGMKit::LoadShader(m_pCosmosBoxGeode->getStateSet(),
 			strGalaxyShader + "CosmosBoxVert.glsl", strGalaxyShader + "CosmosBoxFrag.glsl",
-			"CosmosBox");
+			true);
 	}
 
 	m_pMilkyWay->Load();
@@ -1257,9 +1230,8 @@ bool CGMGalaxy::_CreateStarCube()
 	pSS->addUniform(m_pCommonUniform->GetStarColor());
 
 	// 添加shader
-	std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_Vert.glsl";
-	std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_Frag.glsl";
-	CGMKit::LoadShader(pSS.get(), strStarVertPath, strStarFragPath, "StarCube");
+	std::string strGalaxyShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	CGMKit::LoadShader(pSS.get(), strGalaxyShaderPath + "StarCube_Vert.glsl", strGalaxyShaderPath + "StarCube_Frag.glsl");
 
 	float fCubeSize = GM_MIN_STARS_CUBE / m_pKernelData->fUnitArray->at(3);
 	size_t iNum = m_pCubeVertArray->size();
@@ -1295,6 +1267,9 @@ bool CGMGalaxy::_CreateStarCube()
 
 bool CGMGalaxy::_CreateHandle()
 {
+	std::string strGalaxyShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	std::string strGalaxyTexPath = m_pConfigData->strCorePath + m_strGalaxyTexPath;
+
 	m_pHandleSwitch = new osg::Switch;
 	m_pStar_4_Transform->addChild(m_pHandleSwitch.get());
 	osg::ref_ptr<osg::StateSet>	pStateSet = m_pHandleSwitch->getOrCreateStateSet();
@@ -1305,11 +1280,7 @@ bool CGMGalaxy::_CreateHandle()
 	), osg::StateAttribute::ON);
 	pStateSet->setRenderBinDetails(BIN_HANDLE, "DepthSortedBin");
 	// 添加shader
-	std::string strHandleVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Handle_Vert.glsl";
-	std::string strHandleFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Handle_Frag.glsl";
-	CGMKit::LoadShader(pStateSet.get(), strHandleVertPath, strHandleFragPath, "Handle");
-
-	std::string strGalaxyTexPath = m_pConfigData->strCorePath + m_strGalaxyTexPath;
+	CGMKit::LoadShader(pStateSet.get(), strGalaxyShaderPath + "Handle_Vert.glsl", strGalaxyShaderPath + "Handle_Frag.glsl");
 
 	const float fWidth = 2.0f*GM_HANDLE_RADIUS;
 	osg::ref_ptr<osg::Geode> pHandleGeode = new osg::Geode();
@@ -1370,9 +1341,8 @@ bool CGMGalaxy::_CreateAudioPoints()
 	pStateSetAudio->addUniform(m_fStarAlphaUniform.get());
 
 	// 添加shader
-	std::string strAudioVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "AudioVert.glsl";
-	std::string strAudioFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "AudioFrag.glsl";
-	return CGMKit::LoadShader(pStateSetAudio.get(), strAudioVertPath, strAudioFragPath, "Audio");
+	std::string strPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	return CGMKit::LoadShader(pStateSetAudio.get(), strPath + "AudioVert.glsl", strPath + "AudioFrag.glsl");
 }
 
 bool CGMGalaxy::_CreateGalaxyPoints()
@@ -1488,9 +1458,8 @@ bool CGMGalaxy::_CreateGalaxyPoints()
 	m_pStateSetGalaxy->addUniform(m_fStarAlphaUniform.get());
 
 	// 添加shader
-	std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyStarVert.glsl";
-	std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyStarFrag.glsl";
-	return CGMKit::LoadShader(m_pStateSetGalaxy.get(), strStarVertPath, strStarFragPath, "GalaxyStar");
+	std::string strPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	return CGMKit::LoadShader(m_pStateSetGalaxy.get(), strPath + "GalaxyStarVert.glsl", strPath + "GalaxyStarFrag.glsl");
 }
 
 bool CGMGalaxy::_CreateStarCube_4()
@@ -1524,9 +1493,8 @@ bool CGMGalaxy::_CreateStarCube_4()
 		CGMKit::AddTexture(pSS_4.get(), m_3DShapeTex.get(), "shapeNoiseTex", iUnit++);
 
 		// 添加shader
-		std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_4_Vert.glsl";
-		std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarCube_4_Frag.glsl";
-		CGMKit::LoadShader(pSS_4.get(), strStarVertPath, strStarFragPath, "StarCube_4");
+		std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+		CGMKit::LoadShader(pSS_4.get(), strGalaxyPath + "StarCube_4_Vert.glsl", strGalaxyPath + "StarCube_4_Frag.glsl");
 	}
 
 	size_t iNum = m_pCubeVertArray->size();
@@ -1605,9 +1573,8 @@ bool CGMGalaxy::_CreateGalaxyPointsN_4(int iDens)
 		pSSN->addUniform(m_fStarAlphaUniform.get());
 
 		// 添加shader
-		std::string strStarVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarNVert.glsl";
-		std::string strStarFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "StarNFrag.glsl";
-		CGMKit::LoadShader(pSSN.get(), strStarVertPath, strStarFragPath, "StarN");
+		std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+		CGMKit::LoadShader(pSSN.get(), strGalaxyPath + "StarNVert.glsl", strGalaxyPath + "StarNFrag.glsl");
 	}
 
 	osg::Vec3f vUVW;
@@ -1726,9 +1693,8 @@ bool CGMGalaxy::_CreateGalaxyPlane_4()
 	m_pStateSetPlane->addUniform(m_pMousePosUniform.get());
 
 	// 添加shader
-	std::string strGalaxyPlaneVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyPlaneVert.glsl";
-	std::string strGalaxyPlaneFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyPlaneFrag.glsl";
-	return CGMKit::LoadShader(m_pStateSetPlane.get(), strGalaxyPlaneVertPath, strGalaxyPlaneFragPath, "GalaxyPlane");
+	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	return CGMKit::LoadShader(m_pStateSetPlane.get(), strGalaxyPath + "GalaxyPlaneVert.glsl", strGalaxyPath + "GalaxyPlaneFrag.glsl");
 }
 
 bool CGMGalaxy::_CreateGalaxies_4()
@@ -1757,9 +1723,8 @@ bool CGMGalaxy::_CreateGalaxies_4()
 		CGMKit::AddTexture(pSSG_4.get(), m_pGalaxiesTex.get(), "galaxiesTex", iUnit++);
 
 		// 添加shader
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_4_Vert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_4_Frag.glsl";
-		CGMKit::LoadShader(pSSG_4.get(), strVertPath, strFragPath, "Galaxies_4");
+		std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+		CGMKit::LoadShader(pSSG_4.get(), strGalaxyPath + "Galaxies_4_Vert.glsl", strGalaxyPath + "Galaxies_4_Frag.glsl");
 	}
 
 	osg::ref_ptr<osg::Vec4Array> vertArray = new osg::Vec4Array;
@@ -1853,9 +1818,8 @@ bool CGMGalaxy::_CreateGalaxyPlane_5()
 	CGMKit::AddTexture(pStateSet_5.get(), _CreateTexture2D(m_pGalaxyImage.get(), 4), "galaxyTex", iUnit++);
 
 	// 添加shader
-	std::string strGalaxyPlaneVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxy_5_Vert.glsl";
-	std::string strGalaxyPlaneFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxy_5_Frag.glsl";
-	return CGMKit::LoadShader(pStateSet_5.get(), strGalaxyPlaneVertPath, strGalaxyPlaneFragPath, "Galaxy_5");
+	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	return CGMKit::LoadShader(pStateSet_5.get(), strGalaxyPath + "Galaxy_5_Vert.glsl", strGalaxyPath + "Galaxy_5_Frag.glsl");
 }
 
 bool CGMGalaxy::_CreateGalaxies_5()
@@ -1896,9 +1860,8 @@ bool CGMGalaxy::_CreateGalaxies_5()
 		CGMKit::AddTexture(pSSGroup.get(), m_pGalaxiesTex.get(), "galaxiesTex", iUnit++);
 
 		// 添加shader
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_5_Vert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_5_Frag.glsl";
-		CGMKit::LoadShader(pSSGroup.get(), strVertPath, strFragPath, "Galaxies_5");
+		std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+		CGMKit::LoadShader(pSSGroup.get(), strGalaxyPath + "Galaxies_5_Vert.glsl", strGalaxyPath + "Galaxies_5_Frag.glsl");
 
 		osg::ref_ptr<osg::Vec4Array> vertArray = new osg::Vec4Array;
 		vertArray->reserve(iNum);
@@ -1951,9 +1914,8 @@ bool CGMGalaxy::_CreateGalaxies_5()
 		CGMKit::AddTexture(pSSG_5.get(), m_pGalaxiesTex.get(), "galaxiesTex", iUnit++);
 
 		// 添加shader
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_5_Vert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Galaxies_5_Frag.glsl";
-		CGMKit::LoadShader(pSSG_5.get(), strVertPath, strFragPath, "Galaxies_5");
+		std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+		CGMKit::LoadShader(pSSG_5.get(), strGalaxyPath + "Galaxies_5_Vert.glsl", strGalaxyPath + "Galaxies_5_Frag.glsl");
 	}
 
 	// 在眼点变换节点下，只创建第1、2、3层星系群，第0层星系群，单独处理
@@ -2022,9 +1984,8 @@ bool CGMGalaxy::_CreateSupercluster()
 	//CGMKit::AddTexture(pSS.get(), m_blueNoiseTex.get(), "blueNoiseTex", iUnit++);
 
 	// 添加shader
-	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SuperclusterVert.glsl";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SuperclusterFrag.glsl";
-	return CGMKit::LoadShader(pSS.get(), strVertPath, strFragPath, "Supercluster");
+	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	return CGMKit::LoadShader(pSS.get(), strGalaxyPath + "SuperclusterVert.glsl", strGalaxyPath + "SuperclusterFrag.glsl");
 }
 
 bool CGMGalaxy::_CreateUltracluster()
@@ -2058,9 +2019,8 @@ bool CGMGalaxy::_CreateUltracluster()
 	//CGMKit::AddTexture(pSS.get(), m_blueNoiseTex.get(), "blueNoiseTex", iUnit++);
 
 	// 添加shader
-	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SuperclusterVert.glsl";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "SuperclusterFrag.glsl";
-	return CGMKit::LoadShader(pSS.get(), strVertPath, strFragPath, "Supercluster");
+	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	return CGMKit::LoadShader(pSS.get(), strGalaxyPath + "SuperclusterVert.glsl", strGalaxyPath + "SuperclusterFrag.glsl");
 }
 
 bool CGMGalaxy::_CreateMyWorld()
@@ -2220,10 +2180,11 @@ bool CGMGalaxy::_CreateMyWorld()
 	//CGMKit::AddTexture(pSS_6.get(), m_2DNoiseTex.get(), "noise2DTex", iUnit_6++);
 
 	// 添加shader
-	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "MyWorldVert.glsl";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "MyWorldFrag.glsl";
-	CGMKit::LoadShader(pSS_5.get(), strVertPath, strFragPath, "MyWorld5");
-	CGMKit::LoadShader(pSS_6.get(), strVertPath, strFragPath, "MyWorld6");
+	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	std::string strVertPath = strGalaxyPath + "MyWorldVert.glsl";
+	std::string strFragPath = strGalaxyPath + "MyWorldFrag.glsl";
+	CGMKit::LoadShader(pSS_5.get(), strVertPath, strFragPath);
+	CGMKit::LoadShader(pSS_6.get(), strVertPath, strFragPath);
 
 	return true;
 }
@@ -2263,9 +2224,8 @@ bool CGMGalaxy::_CreateBackgroundGalaxy()
 	pSSGalaxyBackground->addUniform(m_pEyePos4Uniform.get());
 
 	// 添加shader
-	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyBackgroundVert.glsl";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "GalaxyBackgroundFrag.glsl";
-	return CGMKit::LoadShader(pSSGalaxyBackground.get(), strVertPath, strFragPath, "GalaxyBackground");
+	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	return CGMKit::LoadShader(pSSGalaxyBackground.get(), strGalaxyPath + "GalaxyBackgroundVert.glsl", strGalaxyPath + "GalaxyBackgroundFrag.glsl");
 }
 
 bool CGMGalaxy::_CreateCosmosBox()
@@ -2290,9 +2250,8 @@ bool CGMGalaxy::_CreateCosmosBox()
 	pStateSetCosmosBox->addUniform(m_fMyWorldAlphaUniform.get());
 
 	// 添加shader
-	std::string strCosmosBoxVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "CosmosBoxVert.glsl";
-	std::string strCosmosBoxFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "CosmosBoxFrag.glsl";
-	return CGMKit::LoadShader(pStateSetCosmosBox.get(), strCosmosBoxVertPath, strCosmosBoxFragPath, "CosmosBox");
+	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	return CGMKit::LoadShader(pStateSetCosmosBox.get(), strGalaxyPath + "CosmosBoxVert.glsl", strGalaxyPath + "CosmosBoxFrag.glsl");
 }
 
 bool CGMGalaxy::_DetachAudioPoints()
@@ -2337,9 +2296,8 @@ bool CGMGalaxy::_DetachAudioPoints()
 		pSS->addUniform(m_pCommonUniform->GetStarColor());
 
 		// 添加shader
-		std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "PlayingStarVert.glsl";
-		std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "PlayingStarFrag.glsl";
-		CGMKit::LoadShader(pSS.get(), strVertPath, strFragPath, "PlayingStar");
+		std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+		CGMKit::LoadShader(pSS.get(), strGalaxyPath + "PlayingStarVert.glsl", strGalaxyPath + "PlayingStarFrag.glsl");
 	}
 	osg::Vec3f vPos;
 	m_pCommonUniform->SetStarHiePos(vPos);
@@ -2369,9 +2327,8 @@ bool CGMGalaxy::_DetachAudioPoints()
 		pRegionSS->addUniform(m_pCommonUniform->GetTime());
 
 		// 添加shader
-		std::string strAudioRegionVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "AudioRegionVert.glsl";
-		std::string strAudioRegionFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "AudioRegionFrag.glsl";
-		CGMKit::LoadShader(pRegionSS.get(), strAudioRegionVertPath, strAudioRegionFragPath, "AudioRegion");
+		std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+		CGMKit::LoadShader(pRegionSS.get(), strGalaxyPath + "AudioRegionVert.glsl", strGalaxyPath + "AudioRegionFrag.glsl");
 	}
 	m_pGeodeRegion->setNodeMask(~0);
 

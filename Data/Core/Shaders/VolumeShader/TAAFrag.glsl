@@ -20,7 +20,7 @@ void main()
 
 	float rayPixLen = 1.0/screenSize.z; // 2.0 4.0
 	vec2 coordModXY = mod(gl_FragCoord.xy, vec2(rayPixLen)) - rayPixLen*0.5;// -0.5,0.5 / -1.5,-0.5,0.5,1.5
-	vec4 coordMod = vec4(coordModXY,coordModXY);
+	vec4 coordMod = vec4(coordModXY, coordModXY);
 	vec4 maskV = step(0, coordMod + vec4(1, 1, -1, -1)*screenSize.z - vec4(shakeVec,shakeVec));
 	float shakeMask = maskV.x*maskV.y*(1-maskV.z)*(1-maskV.w);
 	gl_FragColor = mix(currentColor, lastColor, (0.8-shakeMask*0.5)*similar);

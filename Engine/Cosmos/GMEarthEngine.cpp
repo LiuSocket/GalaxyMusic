@@ -688,28 +688,26 @@ bool CGMEarthEngine::Load()
 		CGMKit::LoadShader(m_pEarthEnginePointNode_1->getStateSet(),
 			strEarthShader + "PlanetEnginePoint.vert",
 			strEarthShader + "PlanetEnginePoint.frag",
-			"PlanetEnginePoint_1");
+			true);
 	}
 	if (m_pEarthEnginePointNode_2.valid())
 	{
 		CGMKit::LoadShader(m_pEarthEnginePointNode_2->getStateSet(),
 			strEarthShader + "PlanetEnginePoint.vert",
-			strEarthShader + "PlanetEnginePoint.frag",
-			"PlanetEnginePoint_2");
+			strEarthShader + "PlanetEnginePoint.frag");
 	}
 	if (m_pEarthEngineJetNode_1.valid())
 	{
 		CGMKit::LoadShader(m_pEarthEngineJetNode_1->getStateSet(),
 			strEarthShader + "PlanetEngineJet.vert",
 			strEarthShader + "PlanetEngineJet.frag",
-			"PlanetEngineJet_1");
+			true);
 	}
 	if (m_pEarthEngineJetNode_2.valid())
 	{
 		CGMKit::LoadShader(m_pEarthEngineJetNode_2->getStateSet(),
 			strEarthShader + "PlanetEngineJet.vert",
-			strEarthShader + "PlanetEngineJet.frag",
-			"PlanetEngineJet_2");
+			strEarthShader + "PlanetEngineJet.frag");
 	}
 	if (m_pEarthEngineBody_1.valid())
 	{
@@ -732,15 +730,19 @@ bool CGMEarthEngine::Load()
 		CGMKit::LoadShader(m_pEarthEngineStream->getStateSet(),
 			strEarthShader + "PlanetEngineJetStream.vert",
 			strEarthShader + "PlanetEngineJetStream.frag",
-			"PlanetEngineJetStream");
+			true);
 	}
 
 	return true;
 }
 
-void CGMEarthEngine::SetTex(osg::Texture* pEarthTailTex, osg::Texture* pInscatteringTex)
+void CGMEarthEngine::SetTex(
+	osg::Texture* pTailColorTex,
+	osg::Texture* pTailAlphaTex,
+	osg::Texture* pInscatteringTex)
 {
-	m_pEarthTailTex = pEarthTailTex;
+	m_pTailColorTex = pTailColorTex;
+	m_pTailAlphaTex = pTailAlphaTex;
 	m_pInscatteringTex = pInscatteringTex;
 }
 
@@ -861,13 +863,10 @@ bool CGMEarthEngine::_GenEarthEnginePoint_1()
 	pSSPlanetEnginePoint->addUniform(m_vEngineStartRatioUniform.get());
 
 	// 流浪地球尾迹（吹散的大气）
-	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEnginePoint->addUniform(pTailUniform.get());
+	CGMKit::AddTexture(pSSPlanetEnginePoint, m_pTailAlphaTex, "tailAlphaTex", 0);
 
-	std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.vert";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.frag";
-	CGMKit::LoadShader(pSSPlanetEnginePoint, strVertPath, strFragPath, "PlanetEnginePoint_1");
+	std::string strEarthPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
+	CGMKit::LoadShader(pSSPlanetEnginePoint, strEarthPath + "PlanetEnginePoint.vert", strEarthPath + "PlanetEnginePoint.frag");
 
 	return true;
 }
@@ -900,13 +899,10 @@ bool CGMEarthEngine::_GenEarthEnginePoint_2()
 	pSSPlanetEnginePoint->addUniform(m_vEngineStartRatioUniform.get());
 
 	// 流浪地球尾迹（吹散的大气）
-	pSSPlanetEnginePoint->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEnginePoint->addUniform(pTailUniform.get());
+	CGMKit::AddTexture(pSSPlanetEnginePoint, m_pTailAlphaTex, "tailAlphaTex", 0);
 
-	std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.vert";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEnginePoint.frag";
-	CGMKit::LoadShader(pSSPlanetEnginePoint, strVertPath, strFragPath, "PlanetEnginePoint_2");
+	std::string strEarthPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
+	CGMKit::LoadShader(pSSPlanetEnginePoint, strEarthPath + "PlanetEnginePoint.vert", strEarthPath + "PlanetEnginePoint.frag");
 
 	return true;
 }
@@ -941,13 +937,10 @@ bool CGMEarthEngine::_GenEarthEngineJetLine_1()
 	pSSPlanetEngineJet->addUniform(m_vEngineStartRatioUniform.get());
 
 	// 流浪地球尾迹（吹散的大气）
-	pSSPlanetEngineJet->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEngineJet->addUniform(pTailUniform.get());
+	CGMKit::AddTexture(pSSPlanetEngineJet, m_pTailAlphaTex, "tailAlphaTex", 0);
 
-	std::string strJetVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.vert";
-	std::string strJetFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.frag";
-	CGMKit::LoadShader(pSSPlanetEngineJet, strJetVertPath, strJetFragPath, "PlanetEngineJet_1");
+	std::string strEarthPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
+	CGMKit::LoadShader(pSSPlanetEngineJet, strEarthPath + "PlanetEngineJet.vert", strEarthPath + "PlanetEngineJet.frag");
 
 	return true;
 }
@@ -982,13 +975,10 @@ bool CGMEarthEngine::_GenEarthEngineJetLine_2()
 	pSSPlanetEngineJet->addUniform(m_vEngineStartRatioUniform.get());
 
 	// 流浪地球尾迹（吹散的大气）
-	pSSPlanetEngineJet->setTextureAttributeAndModes(0, m_pEarthTailTex, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", 0);
-	pSSPlanetEngineJet->addUniform(pTailUniform.get());
+	CGMKit::AddTexture(pSSPlanetEngineJet, m_pTailAlphaTex, "tailAlphaTex", 0);
 
-	std::string strJetVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.vert";
-	std::string strJetFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineJet.frag";
-	CGMKit::LoadShader(pSSPlanetEngineJet, strJetVertPath, strJetFragPath, "PlanetEngineJet_2");
+	std::string strEarthPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
+	CGMKit::LoadShader(pSSPlanetEngineJet, strEarthPath + "PlanetEngineJet.vert", strEarthPath + "PlanetEngineJet.frag");
 
 	return true;
 }
@@ -1013,6 +1003,7 @@ bool CGMEarthEngine::_GenEarthEngineBody_1()
 	pSSEngineBody->setRenderBinDetails(BIN_ROCKSPHERE, "RenderBin");
 	pSSEngineBody->setDefine("ATMOS", osg::StateAttribute::ON);
 	pSSEngineBody->setDefine("EARTH", osg::StateAttribute::ON);
+	pSSEngineBody->setDefine("WANDERING", osg::StateAttribute::ON);
 
 	pSSEngineBody->addUniform(m_pCommonUniform->GetUnit());
 	pSSEngineBody->addUniform(m_pCommonUniform->GetScreenSize());
@@ -1034,9 +1025,8 @@ bool CGMEarthEngine::_GenEarthEngineBody_1()
 	osg::ref_ptr<osg::Uniform> pInscatteringUniform = new osg::Uniform("inscatteringTex", iTexUnit++);
 	pSSEngineBody->addUniform(pInscatteringUniform.get());
 	// 流浪地球尾迹（吹散的大气）
-	pSSEngineBody->setTextureAttributeAndModes(iTexUnit, m_pEarthTailTex, osg::StateAttribute::ON);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", iTexUnit++);
-	pSSEngineBody->addUniform(pTailUniform.get());
+	CGMKit::AddTexture(pSSEngineBody, m_pTailColorTex, "tailColorTex", iTexUnit++, osg::StateAttribute::ON);
+	CGMKit::AddTexture(pSSEngineBody, m_pTailAlphaTex, "tailAlphaTex", iTexUnit++, osg::StateAttribute::ON);
 
 	std::string strEarthShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
 	std::string strGalaxyShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
@@ -1069,6 +1059,7 @@ bool CGMEarthEngine::_GenEarthEngineBody_2()
 	pSSEngineBody->setRenderBinDetails(BIN_ROCKSPHERE, "RenderBin");
 	pSSEngineBody->setDefine("ATMOS", osg::StateAttribute::ON);
 	pSSEngineBody->setDefine("EARTH", osg::StateAttribute::ON);
+	pSSEngineBody->setDefine("WANDERING", osg::StateAttribute::ON);
 
 	pSSEngineBody->addUniform(m_pCommonUniform->GetUnit());
 	pSSEngineBody->addUniform(m_pCommonUniform->GetScreenSize());
@@ -1090,9 +1081,8 @@ bool CGMEarthEngine::_GenEarthEngineBody_2()
 	osg::ref_ptr<osg::Uniform> pInscatteringUniform = new osg::Uniform("inscatteringTex", iTexUnit++);
 	pSSEngineBody->addUniform(pInscatteringUniform.get());
 	// 流浪地球尾迹（吹散的大气）
-	pSSEngineBody->setTextureAttributeAndModes(iTexUnit, m_pEarthTailTex, osg::StateAttribute::ON);
-	osg::ref_ptr<osg::Uniform> pTailUniform = new osg::Uniform("tailTex", iTexUnit++);
-	pSSEngineBody->addUniform(pTailUniform.get());
+	CGMKit::AddTexture(pSSEngineBody, m_pTailColorTex, "tailColorTex", iTexUnit++, osg::StateAttribute::ON);
+	CGMKit::AddTexture(pSSEngineBody, m_pTailAlphaTex, "tailAlphaTex", iTexUnit++, osg::StateAttribute::ON);
 
 	std::string strEarthShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
 	std::string strGalaxyShaderPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
@@ -1136,8 +1126,7 @@ bool CGMEarthEngine::_GenEarthEngineStream()
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
 	CGMKit::LoadShader(pSSEngineStream,
 		strShaderPath + "PlanetEngineJetStream.vert",
-		strShaderPath + "PlanetEngineJetStream.frag",
-		"PlanetEngineJetStream");
+		strShaderPath + "PlanetEngineJetStream.frag");
 
 	return true;
 }
@@ -1368,9 +1357,8 @@ void CGMEarthEngine::_GenEarthEngineBodyTexture(const int iTileLevel)
 			int iUnit = 0;
 			CGMKit::AddTexture(pSS, pEngineTex, "engineTex", iUnit++);
 
-			std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineRTT.vert";
-			std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineRTT.frag";
-			CGMKit::LoadShader(pSS, strVertPath, strFragPath, "PlanetEngineRTT");
+			std::string strPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
+			CGMKit::LoadShader(pSS, strPath + "PlanetEngineRTT.vert", strPath + "PlanetEngineRTT.frag");
 		}
 	}
 }
@@ -1505,9 +1493,8 @@ void CGMEarthEngine::_GenEarthEngineBloomTexture(const int iTileLevel)
 			pSS->setAttributeAndModes(new osg::Depth(osg::Depth::ALWAYS, 0, 1, false)); // no zbuffer
 			pSS->setDefine("TILE_LEVEL", std::to_string(iTileLevel), osg::StateAttribute::ON);
 
-			std::string strVertPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineBloomRTT.vert";
-			std::string strFragPath = m_pConfigData->strCorePath + m_strEarthShaderPath + "PlanetEngineBloomRTT.frag";
-			CGMKit::LoadShader(pSS, strVertPath, strFragPath, "PlanetEngineBloomRTT");
+			std::string strPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
+			CGMKit::LoadShader(pSS, strPath + "PlanetEngineBloomRTT.vert", strPath + "PlanetEngineBloomRTT.frag");
 		}
 	}
 }

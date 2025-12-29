@@ -77,20 +77,8 @@ namespace GM
 		inline osg::Uniform*const GetGalaxyAlpha() const { return m_fGalaxyAlphaUniform.get(); }
 		inline void SetGalaxyAlpha(const float f) { m_fGalaxyAlphaUniform->set(f); }
 
-		inline osg::Uniform* const GetDeltaVPMatrix() const { return m_mDeltaVPMatrixUniform.get(); }
-		inline void SetDeltaVPMatrix(const osg::Matrixf m) { m_mDeltaVPMatrixUniform->set(m); }
-
 		inline osg::Uniform* const GetMainInvProjMatrix() const { return m_mMainInvProjUniform.get(); }
 		inline void SetMainInvProjMatrix(const osg::Matrixf m) { m_mMainInvProjUniform->set(m); }
-
-		inline osg::Uniform* const GetEyeFrontDir() const { return m_vEyeFrontDirUniform.get(); }
-		inline void SetEyeFrontDir(const osg::Vec3f v) { m_vEyeFrontDirUniform->set(v); }
-
-		inline osg::Uniform* const GetEyeRightDir() const { return m_vEyeRightDirUniform.get(); }
-		inline void SetEyeRightDir(const osg::Vec3f v) { m_vEyeRightDirUniform->set(v); }
-
-		inline osg::Uniform* const GetEyeUpDir() const { return m_vEyeUpDirUniform.get(); }
-		inline void SetEyeUpDir(const osg::Vec3f v) { m_vEyeUpDirUniform->set(v); }
 
 		inline osg::Uniform* const GetViewUp() const { return m_vViewUpUniform.get(); }
 		inline void SetViewUp(const osg::Vec3f v) { m_vViewUpUniform->set(v); }
@@ -108,9 +96,6 @@ namespace GM
 		osg::ref_ptr<osg::Uniform> m_fGalaxyAlphaUniform;			//!< 星系alpha
 		osg::ref_ptr<osg::Uniform> m_mDeltaVPMatrixUniform;			//!< 相机插值VP矩阵
 		osg::ref_ptr<osg::Uniform> m_mMainInvProjUniform;			//!< 主相机的ProjectionMatrix的逆矩阵
-		osg::ref_ptr<osg::Uniform> m_vEyeFrontDirUniform;			//!< 主相机前方单位向量，在世界空间
-		osg::ref_ptr<osg::Uniform> m_vEyeRightDirUniform;			//!< 主相机右方单位向量，在世界空间
-		osg::ref_ptr<osg::Uniform> m_vEyeUpDirUniform;				//!< 主相机上方单位向量，在世界空间
 		osg::ref_ptr<osg::Uniform> m_vViewUpUniform;				//!< 眼点view空间Up向量，指向天空
 
 		double m_fRenderingTime;									//!< 三维渲染的持续时间，不是程序运行时长

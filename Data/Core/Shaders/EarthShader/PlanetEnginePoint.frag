@@ -1,7 +1,7 @@
 #version 400 compatibility
 
 uniform vec3 screenSize;
-uniform sampler2D tailTex;
+uniform sampler2D tailAlphaTex;
 uniform float unit;
 
 in float noise;
@@ -17,7 +17,7 @@ void main()
 
 	if(unit > 1e6)
 	{
-		float tailAlpha = texture(tailTex, gl_FragCoord.xy/screenSize.xy).a;
+		float tailAlpha = texture(tailAlphaTex, gl_FragCoord.xy/screenSize.xy).a;
 		alpha *= 1-tailAlpha;
 	}
 

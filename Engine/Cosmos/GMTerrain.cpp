@@ -16,6 +16,7 @@
 #include <osg/CullFace>
 #include <osg/PositionAttitudeTransform>
 #include <osgDB/ReadFile>
+#include <osgDB/WriteFile>
 
 using namespace GM;
 
@@ -148,6 +149,9 @@ bool CGMTerrain::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CG
 		osg::ref_ptr<osg::Group> pRoot = new osg::Group();
 		m_pHieRootVector.push_back(pRoot);
 	}
+
+	// 生成高程颜色映射纹理，临时函数，寄放在这里
+	//_GenerateElevationColorMap();
 
 	return true;
 }
@@ -507,6 +511,7 @@ osg::Geometry* CGMTerrain::_MakeTileGeometry(const std::vector<int>& iTileVec, i
 	int iVertPerEdge = iSegment + 1;
 	int iVertPerFace = iVertPerEdge * iVertPerEdge;
 	osg::Geometry* geom = new osg::Geometry();
+	geom->setUseDisplayList(false);
 	geom->setUseVertexBufferObjects(true);
 
 	osg::Vec3Array* verts = new osg::Vec3Array();
@@ -637,4 +642,65 @@ osg::Vec3d CGMTerrain::_GetTileCenterInBox(const std::vector<int>& iTileVec) con
 		}
 	}
 	return vECEFPosInBox;
+}
+
+void CGMTerrain::_GenerateElevationColorMap() const
+{
+	osg::ref_ptr<osg::Image> pImgDEM = osgDB::readImageFile("D:/Project/CTZB-2025080198/XiangShanMap/XiangShanMap_DEM.tga");
+	osg::ref_ptr<osg::Image> pImgColor = osgDB::readImageFile("D:/Project/CTZB-2025080198/XiangShanMap/colorLUT.tga");
+	if (!pImgDEM.valid() || !pImgColor.valid())
+		return;
+
+	int iDataSize = pImgDEM->s() * pImgDEM->t() * 3;
+	osg::ref_ptr<osg::Image> pOutImage = new osg::Image;
+	unsigned char* pData = new unsigned char[iDataSize];
+	for (int i = 0; i < pImgDEM->s(); i++)
+	{
+		for (int j = 0; j < pImgDEM->t(); j++)
+		{
+			float fX = float(i) / float(pImgDEM->s() - 1);
+			float fY = float(j) / float(pImgDEM->t() - 1);
+			float fElev = CGMKit::GetImageColor(pImgDEM, fX, fY).x();
+			// 目标图片当前像素R通道的地址
+			int iAddress = 3 * (pImgDEM->s() * j + i);
+
+			// 默认海洋的颜色
+			osg::Vec3 c1 = osg::Vec3(141.0, 211.0, 247.0) / 255.0;
+			if (fElev > 0.0f)
+			{
+				osg::Vec4 color = CGMKit::GetImageColor(pImgColor, fElev, 0.5);
+				c1 = osg::Vec3(color.x(), color.y(), color.z());
+
+				//法线
+				float fX1 = float(i + 1) / float(pImgDEM->s() - 1);
+				float fY1 = float(j + 1) / float(pImgDEM->t() - 1);
+				if (i == pImgDEM->s() - 1)
+				{
+					fX1 = float(i - 1) / float(pImgDEM->s() - 1);
+				}
+				if (j == pImgDEM->t() - 1)
+				{
+					fY1 = float(j - 1) / float(pImgDEM->t() - 1);
+				}
+				float fElev01 = CGMKit::GetImageColor(pImgDEM, fX, fY1).x();
+				float fElev10 = CGMKit::GetImageColor(pImgDEM, fX1, fY).x();
+				osg::Vec3f vNormal = osg::Vec3f(fElev10 - fElev, fElev01 - fElev, 0.01);
+				vNormal.normalize();
+				// 光源方向
+				osg::Vec3f vLight = osg::Vec3f(0.1, 1.0, 0.5);
+				vLight.normalize();
+				// ambient
+				osg::Vec3f vAmbient = c1 * 0.2f;
+				// diffuse
+				float fDotNL = osg::clampTo(vNormal * vLight, 0.0f, 1.0f);
+				osg::Vec3f vDiffuse = c1 * std::powf(fDotNL, 1.0f / 2.2f) * 0.8f;
+				c1 = vAmbient + vDiffuse;
+			}
+			pData[iAddress] = (unsigned char)(osg::clampTo(c1.x(), 0.0f, 1.0f) * 255);
+			pData[iAddress + 1] = (unsigned char)(osg::clampTo(c1.y(), 0.0f, 1.0f) * 255);
+			pData[iAddress + 2] = (unsigned char)(osg::clampTo(c1.z(), 0.0f, 1.0f) * 255);
+		}
+	}
+	pOutImage->setImage(pImgDEM->s(), pImgDEM->t(), 1, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE, pData, osg::Image::USE_NEW_DELETE);
+	osgDB::writeImageFile(*(pOutImage.get()), "D:/Project/CTZB-2025080198/XiangShanMap/XiangShanMapElev.tga");
 }

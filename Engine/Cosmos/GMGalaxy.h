@@ -662,7 +662,6 @@ namespace GM
 		osg::Vec3d										m_vNearStarWorld4Pos;			//!< 最近恒星4级世界空间位置
 		osg::Vec3d										m_vMouseWorldPos;				//!< 鼠标世界空间坐标
 		osg::Vec3d										m_vMouseLastWorldPos;			//!< 鼠标上一帧世界空间坐标
-		osg::Matrixd									m_mLastVP;						//!< 上一帧Raymarch相机的ViewProjectionMatrix
 
 		osg::ref_ptr<osg::Geode>						m_pGeodeRegion;					//!< 音频区域Geode	
 		osg::ref_ptr<osg::Geode>						m_pGeodeAudio;					//!< 未激活的音频星Geode

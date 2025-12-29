@@ -39,21 +39,12 @@ const float ALPHA_MAX = 0.99;
 const float LENGTH_MAX = 7.0;
 
 uniform float galaxyAlpha;
-uniform float pixelLength;
-uniform vec2 shakeVec;
-uniform vec2 deltaShakeVec;
 uniform vec3 screenSize;
 uniform vec3 rangeMin;
 uniform vec3 rangeMax;
-uniform vec3 eyeFrontDir;
-uniform vec3 eyeRightDir;
-uniform vec3 eyeUpDir;
-uniform vec4 noiseVec4;
 uniform mat4 invProjMatrix;
-uniform mat4 deltaViewProjMatrix;
 uniform mat4 osg_ViewMatrixInverse;
 
-uniform sampler2D lastVectorTex;
 uniform sampler2D galaxyTex;
 uniform sampler2D galaxyHeightTex;
 uniform sampler2D noise2DTex;
@@ -231,14 +222,7 @@ void main()
 {
 	vec2 cf = step(1.0, mod(gl_FragCoord.xy,2.0));
 	float checkBox = step(0.5, mod(cf.x + cf.y, 2.0));
-
 	vec3 localDir = normalize(localVertDir);
-	vec3 localNear = localDir/dot(localDir,eyeFrontDir);
-	vec2 shakeV2 = shakeVec + 0.25*(mix(noiseVec4.xy, noiseVec4.zw, checkBox) - vec2(0.5))*step(-0.9,-screenSize.z);
-	vec3 localShake = (eyeRightDir*shakeV2.x + eyeUpDir*shakeV2.y)*pixelLength;
-	// after shake
-	localDir = normalize(localNear + localShake);
-
 	vec3 WVD = localDir;
 	vec3 WCP = osg_ViewMatrixInverse[3].xyz;
 
@@ -256,9 +240,6 @@ void main()
 	vec2 lenMinMax_4 = LenMinMax(vec3(0, 0, -44.76), 45.1, WCP, WVD);
 	float lenMin = min(max(lenMinMax_1.x, lenMinMax_2.x),max(lenMinMax_3.x, lenMinMax_4.x));
 	float lenMax = max(min(lenMinMax_1.y, lenMinMax_2.y),min(lenMinMax_3.y, lenMinMax_4.y));
-
-	// back position velocity difference
-	vec3 backPosDiff = (deltaViewProjMatrix*vec4(WCP + WVD*lenMax,1)).xyz/max(1, lenMax);
 
 	vec3 normal_0 = normalize(gl_TexCoord[0].xyz);
 	vec4 norm_0 = vec4(normal_0, dot(localDir,normal_0));
@@ -332,13 +313,10 @@ void main()
 #endif // RAYS_3
 
 	nebulaAlpha = nebulaColor.a*galaxyAlpha;
-
-	vec3 posDiff = ((deltaViewProjMatrix*vec4(WCP+lenNebula*WVD,1.0)).xyz)/max(1, lenNebula);
-	// position different
-	gl_FragData[0] = vec4(mix(backPosDiff, posDiff, nebulaAlpha), 1);
-
-	// color and alpha
-	gl_FragData[1] = vec4(nebulaColor.rgb, nebulaAlpha);	
+	// color
+	gl_FragData[0] = vec4(nebulaColor.rgb, nebulaAlpha);
+	// alpha
+	gl_FragData[1] = vec4(nebulaAlpha);	
 
 	// RG = min length, B = into length, A = nebula Alpha
 	float lenWCP = length(WCP);

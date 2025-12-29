@@ -125,15 +125,15 @@ void main()
 	color += AtmosColor(vertAlt, viewDir, viewVertUp, Rg);
 #endif // ATMOS
 
+	vec2 screenCoord = gl_FragCoord.xy/screenSize.xy;
 #ifdef EARTH
 	// global shadow
-	vec2 screenCoord = gl_FragCoord.xy/screenSize.xy;
 	float globalShadow = texture(globalShadowTex, screenCoord).r;
 	color *= mix(vec3(1), mix(vec3(0.0,0.1,0.2), vec3(1), globalShadow), clamp((eyeAltitude-0.1*atmosHeight)/atmosHeight,0,1));
 #endif // EARTH
 	color = ToneMapping(color);
 	color = pow(color,vec3(1.0/2.2));
-	color += mix(-NOISE_GRANULARITY, NOISE_GRANULARITY, Random(gl_FragCoord.xy/screenSize.xy));
+	color += mix(-NOISE_GRANULARITY, NOISE_GRANULARITY, Random(screenCoord));
 
 #ifdef EARTH
 	color = mix(color, vec3(1), illumCity);
@@ -142,8 +142,9 @@ void main()
 	color = mix(color, vec3(1), illumEngine);
 	if((wanderProgress > PROGRESS_0) && (unit > 1e6))
 	{
-		vec4 tailColor = texture(tailTex, screenCoord);
-		color = mix(color, tailColor.rgb, tailColor.a);
+		vec3 tailColor = texture(tailColorTex, screenCoord).rgb;
+		vec4 tailAlpha4 = texture(tailAlphaTex, screenCoord);
+		color = mix(color, tailColor, tailAlpha4.x);
 	}
 #endif // WANDERING
 #endif // EARTH

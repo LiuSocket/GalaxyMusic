@@ -36,9 +36,6 @@ CGMCommonUniform::CGMCommonUniform():
 	m_fGalaxyAlphaUniform(new osg::Uniform("galaxyAlpha", 1.0f)),
 	m_mDeltaVPMatrixUniform(new osg::Uniform("deltaViewProjMatrix", osg::Matrixf())),
 	m_mMainInvProjUniform(new osg::Uniform("invProjMatrix", osg::Matrixf())),
-	m_vEyeFrontDirUniform(new osg::Uniform("eyeFrontDir", osg::Vec3f(0.0f, 0.0f, -1.0f))),
-	m_vEyeRightDirUniform(new osg::Uniform("eyeRightDir", osg::Vec3f(1.0f, 0.0f, 0.0f))),
-	m_vEyeUpDirUniform(new osg::Uniform("eyeUpDir", osg::Vec3f(0.0f, 1.0f, 0.0f))),
 	m_vViewUpUniform(new osg::Uniform("viewUp", osg::Vec3f(0.0f, 1.0f, 0.0f))),
 	m_fRenderingTime(0.0)
 {

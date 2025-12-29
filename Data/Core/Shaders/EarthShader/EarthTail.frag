@@ -1,4 +1,4 @@
-#version 450 compatibility
+#version 400 compatibility
 
 #pragma import_defines(BRAKE_TIME, TORQUE_TIME_0, TORQUE_TIME_1)
 #pragma import_defines(RAYS_2, RAYS_3)
@@ -51,20 +51,12 @@ const float ALPHA_MAX = 0.99;
 
 uniform float unit;
 uniform float times;
-uniform float pixelLength;
 uniform float tailVisible;
 uniform float wanderProgress;
-uniform vec2 shakeVec;
-uniform vec2 deltaShakeVec;
 uniform vec3 engineStartRatio;
 uniform vec3 screenSize;
-uniform vec3 eyeFrontDir;
-uniform vec3 eyeRightDir;
-uniform vec3 eyeUpDir;
 uniform vec3 viewLight;
-uniform vec4 noiseVec4;
 uniform mat4 invProjMatrix;
-uniform mat4 deltaViewProjMatrix;
 uniform mat4 osg_ViewMatrixInverse;
 // world up is "y", earth tail direction is near "z", 
 uniform mat4 world2ECEFMatrix;
@@ -72,7 +64,6 @@ uniform mat4 view2ECEFMatrix;
 uniform mat4 world2SpiralMatrix;
 uniform mat4 view2SpiralMatrix;
 
-uniform sampler2D lastVectorTex;
 uniform sampler2D blueNoiseTex;
 uniform sampler3D noiseShapeTex;
 uniform sampler3D noiseErosionTex;
@@ -443,14 +434,7 @@ void main()
 {
 	vec2 cf = step(1.0, mod(gl_FragCoord.xy,2.0));
 	float checkBox = step(0.5, mod(cf.x + cf.y, 2.0));
-	vec2 shakeV2 = mix(shakeVec, vec2(shakeVec.y, -shakeVec.x), checkBox);
 	vec3 localDir = normalize(localVertDir);
-	vec3 localNear = localDir/dot(localDir,eyeFrontDir);
-	float lenNearClipX = dot(localNear,eyeRightDir);
-	float lenNearClipY = dot(localNear,eyeUpDir);
-	vec3 localShake = (eyeRightDir*shakeV2.x + eyeUpDir*shakeV2.y)*pixelLength;
-	// after shake
-	localDir = normalize(localNear + localShake);
 	vec3 WVD = localDir;
 	vec3 WCP = osg_ViewMatrixInverse[3].xyz;
 
@@ -486,9 +470,6 @@ void main()
 	vec2 lenMinMax = LenMinMax(modelEyePos, modelPixDir, dstEarth);
 	float lenMin = lenMinMax.x;
 	float lenMax = lenMinMax.y;
-
-	// back position velocity difference
-	vec3 backPosDiff = (deltaViewProjMatrix*vec4(WCP + WVD*lenMax,1)).xyz/max(1, lenMax);
 
 	vec3 normal_0 = normalize(gl_TexCoord[0].xyz);
 	vec4 norm_0 = vec4(normal_0, dot(localDir,normal_0));
@@ -566,13 +547,8 @@ void main()
 
 	tailAlpha = (wanderProgress > PROGRESS_0) ? tailColor.a : 0.0;
 
-	vec3 posDiff = ((deltaViewProjMatrix*vec4(WCP+lenTail*WVD,1.0)).xyz)/max(1, lenTail);
-	// position different
-	gl_FragData[0] = vec4(mix(backPosDiff, posDiff, tailAlpha), 1);
-
-	// color and alpha
-	gl_FragData[1] = vec4(tailColor.rgb, tailAlpha);
-
-	//gl_FragData[1] = vec4(fract(max(0, lenMinMax.y-lenMinMax.x)*1e4),tailAlpha,0.1,1.0);
-	//gl_FragData[1] = vec4(fract(lenMinMax.x*1e4),tailAlpha,0.1,1.0);
+	// color
+	gl_FragData[0] = vec4(tailColor.rgb, tailAlpha);
+	// alpha
+	gl_FragData[1] = vec4(tailAlpha);
 }

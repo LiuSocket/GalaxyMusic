@@ -38,6 +38,7 @@ CGMEarthTail::CGMEarthTail(): CGMVolumeBasic(),
 	m_mView2SpiralUniform(new osg::Uniform("view2SpiralMatrix", osg::Matrixf()))
 {
 	m_pEarthTailBoxVisitor = new CEarthTailBoxVisitor();
+	m_iRandom.seed(0);
 }
 
 /** @brief 析构 */
@@ -154,7 +155,6 @@ bool CGMEarthTail::Update(double dDeltaTime)
 			if (0 != m_rayMarchCamera->getNodeMask())
 			{
 				m_rayMarchCamera->setNodeMask(0);
-				m_TAACamera->setNodeMask(0);
 			}
 		}
 		else if (3 == GM_ENGINE.GetCelestialIndex())// 地球
@@ -163,7 +163,6 @@ bool CGMEarthTail::Update(double dDeltaTime)
 			if (0 == m_rayMarchCamera->getNodeMask())
 			{
 				m_rayMarchCamera->setNodeMask(~0);
-				m_TAACamera->setNodeMask(~0);
 			}
 		}
 		else {}
@@ -177,14 +176,12 @@ bool CGMEarthTail::Update(double dDeltaTime)
 bool CGMEarthTail::UpdateLater(double dDeltaTime)
 {
 	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality &&
-		m_rayMarchCamera.valid() && m_rayMarchCamera->getNodeMask() &&
-		m_TAACamera.valid())
+		m_rayMarchCamera.valid() && m_rayMarchCamera->getNodeMask())
 	{
 		osg::Matrixd mMainViewMatrix = GM_View->getCamera()->getViewMatrix();
 		osg::Matrixd mMainProjMatrix = GM_View->getCamera()->getProjectionMatrix();
 		double fFovy, fAspectRatio, fZNear, fZFar;
 		GM_View->getCamera()->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
-		SetPixelLength(fFovy, m_iScreenHeight);
 
 		// 设置 Dodecahedron 的位置
 		osg::Matrixd mPos;
@@ -220,44 +217,35 @@ bool CGMEarthTail::Load()
 	{
 		std::string strVertPath = strEarthShader + "EarthTail.Vert";
 		std::string strFragPath = strEarthShader + "EarthTail.Frag";
-		CGMKit::LoadShader(m_pSsTailDecFace, strVertPath, strFragPath, "EarthTailFace");
-		CGMKit::LoadShader(m_pSsTailDecEdge, strVertPath, strFragPath, "EarthTailEdge");
-		CGMKit::LoadShader(m_pSsTailDecVert, strVertPath, strFragPath, "EarthTailVert");
-	}
-	if (m_statesetTAA.valid())
-	{
-		CGMKit::LoadShader(m_statesetTAA,
-			m_pConfigData->strCorePath + m_strVolumeShaderPath + "TAAVert.glsl",
-			m_pConfigData->strCorePath + m_strVolumeShaderPath + "TAAFrag.glsl",
-			"TAA");
+		CGMKit::LoadShader(m_pSsTailDecFace, strVertPath, strFragPath, true);
+		CGMKit::LoadShader(m_pSsTailDecEdge, strVertPath, strFragPath);
+		CGMKit::LoadShader(m_pSsTailDecVert, strVertPath, strFragPath);
 	}
 	if (m_pTailEnvelopeGeode2.valid())
 	{
 		CGMKit::LoadShader(m_pTailEnvelopeGeode2->getStateSet(),
 			strEarthShader + "TailEnvelope.vert",
 			strEarthShader + "TailEnvelope.frag",
-			"TailEnvelope");
+			true);
 	}
 	if (m_pSpiralPositiveGeode2.valid())
 	{
 		CGMKit::LoadShader(m_pSpiralPositiveGeode2->getStateSet(),
 			strEarthShader + "TailEnvelope.vert",
-			strEarthShader + "TailEnvelope.frag",
-			"SpiralPositive");
+			strEarthShader + "TailEnvelope.frag");
 	}
 	if (m_pSpiralNegativeGeode2.valid())
 	{
 		CGMKit::LoadShader(m_pSpiralNegativeGeode2->getStateSet(),
 			strEarthShader + "TailEnvelope.vert",
-			strEarthShader + "TailEnvelope.frag",
-			"SpiralNegative");
+			strEarthShader + "TailEnvelope.frag");
 	}
 	if (m_pEarthRingGeode2.valid())
 	{
 		CGMKit::LoadShader(m_pEarthRingGeode2->getStateSet(),
 			strEarthShader + "EarthRing.vert",
 			strEarthShader + "EarthRing.frag",
-			"EarthRing");
+			true);
 	}
 
 	return true;
@@ -265,6 +253,7 @@ bool CGMEarthTail::Load()
 
 void CGMEarthTail::MakeEarthTail()
 {
+	std::string strEarthPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
 	double fUnit2 = m_pKernelData->fUnitArray->at(2);
 
 	osg::ref_ptr<osg::Texture2D> pNoise2DTex = new osg::Texture2D;
@@ -297,10 +286,7 @@ void CGMEarthTail::MakeEarthTail()
 	pSSSpiral->addUniform(m_vViewLightUniform.get());
 	pSSSpiral->addUniform(m_vEngineStartRatioUniform.get());
 	CGMKit::AddTexture(pSSSpiral, pNoise2DTex, "noise2DTex", 0);
-	CGMKit::LoadShader(pSSSpiral,
-		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.vert",
-		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.frag",
-		"Spiral");
+	CGMKit::LoadShader(pSSSpiral, strEarthPath + "TailEnvelope.vert", strEarthPath + "TailEnvelope.frag");
 
 	m_pSpiralPositiveGeode2 = new osg::Geode;
 	m_pSpiralPositiveGeode2->setStateSet(pSSSpiral);
@@ -340,10 +326,7 @@ void CGMEarthTail::MakeEarthTail()
 	pSSTailEnvelope->addUniform(m_vViewLightUniform.get());
 	pSSTailEnvelope->addUniform(m_vEngineStartRatioUniform.get());
 	CGMKit::AddTexture(pSSTailEnvelope, pNoise2DTex, "noise2DTex", 0);
-	CGMKit::LoadShader(pSSTailEnvelope,
-		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.vert",
-		m_pConfigData->strCorePath + m_strEarthShaderPath + "TailEnvelope.frag",
-		"TailEnvelope");
+	CGMKit::LoadShader(pSSTailEnvelope, strEarthPath + "TailEnvelope.vert", strEarthPath + "TailEnvelope.frag");
 
 	m_pTailEnvelopeGeode2 = new osg::Geode;
 	m_pTailEnvelopeGeode2->setStateSet(pSSTailEnvelope);
@@ -368,11 +351,7 @@ void CGMEarthTail::MakeEarthTail()
 	pSSEarthRing->addUniform(m_vViewLightUniform.get());
 	pSSEarthRing->addUniform(m_vEngineStartRatioUniform.get());
 	CGMKit::AddTexture(pSSEarthRing, pNoise2DTex, "noise2DTex", 0);
-
-	CGMKit::LoadShader(pSSEarthRing,
-		m_pConfigData->strCorePath + m_strEarthShaderPath + "EarthRing.vert",
-		m_pConfigData->strCorePath + m_strEarthShaderPath + "EarthRing.frag",
-		"EarthRing");
+	CGMKit::LoadShader(pSSEarthRing, strEarthPath + "EarthRing.vert", strEarthPath + "EarthRing.frag");
 
 	m_pEarthRingGeode2 = new osg::Geode;
 	m_pEarthRingGeode2->setStateSet(pSSEarthRing);
@@ -382,69 +361,6 @@ void CGMEarthTail::MakeEarthTail()
 
 	// 如果是低画质，就不创建体渲染模块
 	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return;
-
-	// create the ray marching texture
-	int iWidth = 960;
-	int iHeight = 540;
-
-	m_vectorMap_0 = new osg::Texture2D;
-	m_vectorMap_0->setName("vectorMap_0");
-	m_vectorMap_0->setTextureSize(iWidth, iHeight);
-	m_vectorMap_0->setInternalFormat(GL_RGB16F_ARB);
-	m_vectorMap_0->setSourceFormat(GL_RGB);
-	m_vectorMap_0->setSourceType(GL_FLOAT);
-	m_vectorMap_0->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_vectorMap_0->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_vectorMap_0->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_vectorMap_0->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_vectorMap_0->setDataVariance(osg::Object::DYNAMIC);
-	m_vectorMap_0->setResizeNonPowerOfTwoHint(false);
-
-	m_vectorMap_1 = new osg::Texture2D;
-	m_vectorMap_1->setName("vectorMap_1");
-	m_vectorMap_1->setTextureSize(iWidth, iHeight);
-	m_vectorMap_1->setInternalFormat(GL_RGB16F_ARB);
-	m_vectorMap_1->setSourceFormat(GL_RGB);
-	m_vectorMap_1->setSourceType(GL_FLOAT);
-	m_vectorMap_1->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_vectorMap_1->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_vectorMap_1->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_vectorMap_1->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_vectorMap_1->setDataVariance(osg::Object::DYNAMIC);
-	m_vectorMap_1->setResizeNonPowerOfTwoHint(false);
-
-	m_rayMarchTex = new osg::Texture2D;
-	m_rayMarchTex->setName("EarthTailTex");
-	m_rayMarchTex->setTextureSize(iWidth, iHeight);
-	m_rayMarchTex->setInternalFormat(GL_RGBA8);
-	m_rayMarchTex->setSourceFormat(GL_RGBA);
-	m_rayMarchTex->setSourceType(GL_UNSIGNED_BYTE);
-	m_rayMarchTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_rayMarchTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_rayMarchTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_rayMarchTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_rayMarchTex->setDataVariance(osg::Object::DYNAMIC);
-	m_rayMarchTex->setResizeNonPowerOfTwoHint(false);
-
-	// Create its camera and render to it
-	m_rayMarchCamera = new osg::Camera;
-	m_rayMarchCamera->setName("rayMarchCamera");
-	m_rayMarchCamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF_INHERIT_VIEWPOINT);
-	m_rayMarchCamera->setClearMask(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-	m_rayMarchCamera->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
-	m_rayMarchCamera->setViewport(0, 0, iWidth, iHeight);
-	m_rayMarchCamera->setRenderOrder(osg::Camera::PRE_RENDER, 1);
-	m_rayMarchCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
-	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_vectorMap_0.get());
-	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_rayMarchTex.get());
-	m_rayMarchCamera->setAllowEventFocus(false);
-	m_rayMarchCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
-
-	// Raymarch交换buffer的回调函数指针
-	m_pRaymarchDrawFBOCallback = new SwitchFBOCallback(m_vectorMap_1.get(), m_vectorMap_0.get());
-	m_rayMarchCamera->setPostDrawCallback(m_pRaymarchDrawFBOCallback);
-
-	GM_Root->addChild(m_rayMarchCamera.get());
 
 	// 正十二面体方法绘制流浪地球尾迹
 	osg::Geometry* pDodecahedronFaceGeom = nullptr;
@@ -482,10 +398,6 @@ void CGMEarthTail::MakeEarthTail()
 	m_pSsTailDecVert->setDefine("RAYS_3", osg::StateAttribute::ON);
 	m_pDodecahedronVert->setStateSet(m_pSsTailDecVert);
 
-	// get and mix the last frame by TAA(temporal anti-aliasing)
-	// Add texture to TAA board,and active TAA
-	ActiveTAA(m_rayMarchTex, m_vectorMap_0);
-
 	// new stateSet for final EarthTail box
 	osg::ref_ptr<osg::StateSet> pSSEarthTail = new osg::StateSet();
 	pSSEarthTail->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
@@ -495,12 +407,12 @@ void CGMEarthTail::MakeEarthTail()
 		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
 	), osg::StateAttribute::ON);
 	pSSEarthTail->setRenderBinDetails(BIN_ATMOS_TAIL, "DepthSortedBin");
-	CGMKit::AddTexture(pSSEarthTail, m_TAATex_0, "mainTex", 0);
+	CGMKit::AddTexture(pSSEarthTail, m_rayMarchColorTex, "colorTex", 0);
+	CGMKit::AddTexture(pSSEarthTail, m_rayMarchAlphaTex, "alphaTex", 1);
 	pSSEarthTail->addUniform(m_pCommonUniform->GetScreenSize());
-	CGMKit::LoadShader(pSSEarthTail,
-		m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Default.vert",
-		m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Default.frag",
-		"EarthTailBox2");
+
+	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	CGMKit::LoadShader(pSSEarthTail, strGalaxyPath + "Default.vert", strGalaxyPath + "Default.frag");
 
 	// final sphere to show the TAA result
 	m_pTailBoxGeode2 = new osg::Geode;
@@ -535,7 +447,6 @@ bool CGMEarthTail::UpdateHierarchy(int iHieNew)
 				if (0 == m_rayMarchCamera->getNodeMask())
 				{
 					m_rayMarchCamera->setNodeMask(~0);
-					m_TAACamera->setNodeMask(~0);
 				}
 			}
 			else
@@ -543,7 +454,6 @@ bool CGMEarthTail::UpdateHierarchy(int iHieNew)
 				if (0 != m_rayMarchCamera->getNodeMask())
 				{
 					m_rayMarchCamera->setNodeMask(0);
-					m_TAACamera->setNodeMask(0);
 				}
 			}
 		}
@@ -583,7 +493,6 @@ void CGMEarthTail::SetVisible(const bool bVisible)
 		if (0 == m_rayMarchCamera->getNodeMask() && (3 == GM_ENGINE.GetCelestialIndex()))
 		{
 			m_rayMarchCamera->setNodeMask(~0);
-			m_TAACamera->setNodeMask(~0);
 		}
 	}
 	else
@@ -592,7 +501,6 @@ void CGMEarthTail::SetVisible(const bool bVisible)
 		if (0 != m_rayMarchCamera->getNodeMask())
 		{
 			m_rayMarchCamera->setNodeMask(0);
-			m_TAACamera->setNodeMask(0);
 		}
 	}
 }
@@ -1057,10 +965,7 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	pSS->setAttributeAndModes(new osg::CullFace(osg::CullFace::BACK));
 
-	pSS->addUniform(m_fPixelLengthUniform.get());
 	pSS->addUniform(m_fTailVisibleUniform.get());
-	pSS->addUniform(m_vShakeVectorUniform.get());
-	pSS->addUniform(m_vDeltaShakeUniform.get());
 	pSS->addUniform(m_mWorld2ECEFUniform.get());
 	pSS->addUniform(m_mView2ECEFUniform.get());
 	pSS->addUniform(m_mWorld2SpiralUniform.get());
@@ -1069,22 +974,17 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->addUniform(m_pCommonUniform->GetUnit());
 	pSS->addUniform(m_pCommonUniform->GetTime());
 	pSS->addUniform(m_pCommonUniform->GetScreenSize());
-	pSS->addUniform(m_pCommonUniform->GetEyeFrontDir());
-	pSS->addUniform(m_pCommonUniform->GetEyeRightDir());
-	pSS->addUniform(m_pCommonUniform->GetEyeUpDir());
 	pSS->addUniform(m_pCommonUniform->GetMainInvProjMatrix());
-	pSS->addUniform(m_pCommonUniform->GetDeltaVPMatrix());
 	pSS->addUniform(m_vEngineStartRatioUniform.get());
 	pSS->addUniform(m_fWanderProgressUniform.get());
 
 	int iUnit = 0;
-	CGMKit::AddTexture(pSS, m_vectorMap_1.get(), "lastVectorTex", iUnit++);
 	CGMKit::AddTexture(pSS, m_blueNoiseTex.get(), "blueNoiseTex", iUnit++);
 	CGMKit::AddTexture(pSS, m_3DShapeTex.get(), "noiseShapeTex", iUnit++);
 	CGMKit::AddTexture(pSS, m_3DErosionTex.get(), "noiseErosionTex", iUnit++);
 
 	std::string strPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
-	CGMKit::LoadShader(pSS, strPath + "EarthTail.vert", strPath + "EarthTail.frag", strShaderName);
+	CGMKit::LoadShader(pSS, strPath + "EarthTail.vert", strPath + "EarthTail.frag");
 
 	return true;
 }

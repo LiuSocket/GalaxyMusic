@@ -257,11 +257,11 @@ bool CGMEarth::Load()
 		CGMKit::LoadShader(m_pSSEarthAtmos_1,
 			strGalaxyShader + "CelestialAtmosphere.vert",
 			strGalaxyShader + "CelestialAtmosphere.frag",
-			"EarthAtmosphere_1");
+			true);
 		CGMKit::LoadShader(m_pSSEarthAtmos_2,
 			strGalaxyShader + "CelestialAtmosphere.vert",
 			strGalaxyShader + "CelestialAtmosphere.frag",
-			"EarthAtmosphere_2");
+			true);
 	}
 
 	if (m_pSSGlobalShadow.valid())
@@ -269,7 +269,7 @@ bool CGMEarth::Load()
 		CGMKit::LoadShader(m_pSSGlobalShadow,
 			strEarthShader + "GlobalShadow.vert",
 			strEarthShader + "GlobalShadow.frag",
-			"Global Shadow");
+			true);
 	}
 
 	if (m_pConfigData->bWanderingEarth)
@@ -560,10 +560,7 @@ bool CGMEarth::_CreateGlobalCloudShadow()
 
 	// 添加shader
 	std::string strShaderPath = m_pConfigData->strCorePath + m_strEarthShaderPath;
-	CGMKit::LoadShader(m_pSSGlobalShadow,
-		strShaderPath + "GlobalShadow.vert",
-		strShaderPath + "GlobalShadow.frag",
-		"Global Shadow");
+	CGMKit::LoadShader(m_pSSGlobalShadow,strShaderPath + "GlobalShadow.vert", strShaderPath + "GlobalShadow.frag");
 
 	m_pGlobalShadowCamera->setStateSet(m_pSSGlobalShadow);
 	// 将全球云对地阴影相机加到根节点下，只在1、2层级下才显示
@@ -678,7 +675,10 @@ bool CGMEarth::_CreateWanderingEarth()
 	{
 		m_pEarthTail->MakeEarthTail();
 
-		m_pEarthEngine->SetTex(m_pEarthTail->GetTAATex(), m_pInscatteringTex);
+		m_pEarthEngine->SetTex(
+			m_pEarthTail->GetRayMarchColorTex(),
+			m_pEarthTail->GetRayMarchAlphaTex(),
+			m_pInscatteringTex);
 		m_pEarthEngine->CreateEngine();
 	}
 
@@ -722,16 +722,13 @@ void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS, const float fTileLevel
 	osg::ref_ptr<osg::Uniform> pGlobalShadowUniform = new osg::Uniform("globalShadowTex", iGroundUnit++);
 	pSS->addUniform(pGlobalShadowUniform.get());
 	// 地面上的大气“内散射”纹理
-	pSS->setTextureAttributeAndModes(iGroundUnit, m_pInscatteringTex, iOnOverride);
-	osg::ref_ptr<osg::Uniform> pGroundInscatteringUniform = new osg::Uniform("inscatteringTex", iGroundUnit++);
-	pSS->addUniform(pGroundInscatteringUniform.get());
+	CGMKit::AddTexture(pSS, m_pInscatteringTex.get(), "inscatteringTex", iGroundUnit++);
 
 	if (m_pConfigData->bWanderingEarth)
 	{
 		// 流浪地球尾迹（吹散的大气）
-		pSS->setTextureAttributeAndModes(iGroundUnit, m_pEarthTail->GetTAATex(), iOnOverride);
-		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
-		pSS->addUniform(pGroundTailUniform.get());
+		CGMKit::AddTexture(pSS, m_pEarthTail->GetRayMarchColorTex(), "tailColorTex", iGroundUnit++);
+		CGMKit::AddTexture(pSS, m_pEarthTail->GetRayMarchAlphaTex(), "tailAlphaTex", iGroundUnit++);
 
 		pSS->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
 		pSS->addUniform(m_fWanderProgressUniform.get());
@@ -800,9 +797,8 @@ void CGMEarth::_CreateGroundMaterial(osg::StateSet* pSS) const
 	if (m_pConfigData->bWanderingEarth)
 	{
 		// 流浪地球尾迹（吹散的大气）
-		pSS->setTextureAttributeAndModes(iGroundUnit, m_pEarthTail->GetTAATex(), iOnOverride);
-		osg::ref_ptr<osg::Uniform> pGroundTailUniform = new osg::Uniform("tailTex", iGroundUnit++);
-		pSS->addUniform(pGroundTailUniform.get());
+		CGMKit::AddTexture(pSS, m_pEarthTail->GetRayMarchColorTex(), "tailColorTex", iGroundUnit++);
+		CGMKit::AddTexture(pSS, m_pEarthTail->GetRayMarchAlphaTex(), "tailAlphaTex", iGroundUnit++);
 
 		pSS->addUniform(m_pEarthEngine->GetEngineStartRatioUniform());
 		pSS->addUniform(m_fWanderProgressUniform.get());
@@ -866,9 +862,8 @@ void CGMEarth::_CreateCloudMaterial(osg::StateSet* pSS) const
 	if (m_pConfigData->bWanderingEarth)
 	{
 		// 流浪地球尾迹（吹散的大气）
-		pSS->setTextureAttributeAndModes(iCloudUnit, m_pEarthTail->GetTAATex(), iOnOverride);
-		osg::ref_ptr<osg::Uniform> pCloudTailUniform = new osg::Uniform("tailTex", iCloudUnit++);
-		pSS->addUniform(pCloudTailUniform.get());
+		CGMKit::AddTexture(pSS, m_pEarthTail->GetRayMarchColorTex(), "tailColorTex", iCloudUnit++);
+		CGMKit::AddTexture(pSS, m_pEarthTail->GetRayMarchAlphaTex(), "tailAlphaTex", iCloudUnit++);
 
 		pSS->setTextureAttributeAndModes(iCloudUnit, m_aIllumTex_T0, iOnOverride);
 		osg::ref_ptr<osg::Uniform> pCloudIllumUniform = new osg::Uniform("illumTex", iCloudUnit++);
@@ -936,10 +931,7 @@ void CGMEarth::_CreateAtmosphereMaterial(osg::StateSet* pSS) const
 	}
 
 	// 添加shader
-	CGMKit::LoadShader(pSS,
-		strShaderPath + "CelestialAtmosphere.vert",
-		strShaderPath + "CelestialAtmosphere.frag",
-		"CelestialAtmosphere");
+	CGMKit::LoadShader(pSS, strShaderPath + "CelestialAtmosphere.vert", strShaderPath + "CelestialAtmosphere.frag");
 }
 
 osg::Texture* CGMEarth::_CreateTexture2D(const std::string & fileName, const int iChannelNum) const

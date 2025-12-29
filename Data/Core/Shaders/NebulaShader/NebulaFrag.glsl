@@ -43,11 +43,7 @@ const float alphaMax = 0.95;
 
 uniform float countNum;
 uniform float noiseNum;
-uniform vec2 deltaShakeVec;
-uniform mat4 deltaViewProjMatrix;
 
-uniform sampler2D lastRayMarchTex;
-uniform sampler2D lastVectorTex;
 uniform sampler2D galaxyHeightTex;
 uniform sampler2D blueNoiseSampler;
 uniform sampler2D noise2DTex;
@@ -142,26 +138,6 @@ void main()
 #ifdef RAYMARCHING
 
 	projCoord /= screenSize.z;
-	float lastAlpha = 1.0;
-	if (gl_FragCoord.z > 0.0)
-	{
-		vec2 coordOffset = projCoord - deltaShakeVec/screenSize.xy;
-		vec3 lastVector = texture2D(lastVectorTex, coordOffset).xyz;
-		vec2 lastUV = coordOffset - lastVector.xy;
-		vec2 isIn = step(-0.5,-abs(lastUV-0.5));
-		lastAlpha = mix(1.0, texture2D(lastRayMarchTex, lastUV).a, isIn.x*isIn.y);
-	}
-
-	float lenVert = length(viewPos.xyz);
-	float switchNum = mod(countNum,2);
-	if(all(bvec2(switchNum>0.5, 0.001>lastAlpha)))
-	{
-		gl_FragData[0] = vec4(0);
-		gl_FragData[1] = vec4(0,0,0,1);
-		gl_FragData[2] = vec4(lenVert,0,0,1);
-		return;
-	}
-
 	float noiseD = texture2D(blueNoiseSampler, gl_FragCoord.xy*screenSize.z*(1+noiseNum)/128.0).r;
 	noiseD = mix(1-noiseD,noiseD,switchNum);
 	vec3 WLD = normalize(vec3(0,0,0)-WCP);// world light direction
@@ -272,12 +248,10 @@ void main()
 
 	vec3 allColor = nebulaC.rgb;
 	float allAlpha = nebulaC.a/alphaMax;
-	// color and alpha
+	// color
 	gl_FragData[0] = vec4(allColor,allAlpha);	
-
-	vec3 posDiff = (deltaViewProjMatrix*vec4(WCP+lenVoxel*WVD,1.0)).xyz/lenVoxel;
-	// position different
-	gl_FragData[1] = vec4(posDiff,1);
+	// alpha
+	gl_FragData[1] = vec4(allAlpha);
 
 	// surface distance, deep distance, deep alpha
 	gl_FragData[2] = vec4(lenSurface, lenDeep, allAlpha, 1);

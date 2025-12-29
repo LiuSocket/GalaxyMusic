@@ -16,6 +16,53 @@
 
 namespace GM
 {
+	// 环状地形的最大圈数
+	#define TERRAIN_RING_NUM				(8)
+	// 环状地形的“M*3条状积木”的最大数量
+	#define TERRAIN_M3_MAX					(TERRAIN_RING_NUM * 2)
+	// 环状地形的“M*M方形积木”的最大数量
+	#define TERRAIN_RECT_MAX				(TERRAIN_RING_NUM * 6 + 4)
+	// 环状地形的积木最大数量（条状 + 方形 + 边线 + 最里面的L形）
+	#define TERRAIN_BLOCK_MAX				(TERRAIN_M3_MAX + TERRAIN_RECT_MAX + TERRAIN_RING_NUM + 1)
+
+/*************************************************************************
+ Enums
+*************************************************************************/
+
+/*************************************************************************
+ Structs
+*************************************************************************/
+
+	/* use UBO
+	layout(std140) uniform TerrainBlock
+	{
+		vec4 SRT[TERRAIN_BLOCK_MAX];
+	}; */
+	struct STerrainBuffer
+	{
+		STerrainBuffer()
+		{
+			for (int i = 0; i < TERRAIN_BLOCK_MAX; ++i)
+			{
+				SRT[i] = osg::Vec4f(0.0, 0.0, 0.0, 0.0);
+			}
+		}
+
+		/*
+		* @brief 设置条状积木的位置
+		* @param iInstanceID:	积木的实例ID
+		* @param vPos:			积木的位置
+		* @param iLevel:		积木所在的圈数
+		*/
+		void SetRectanglePos(int iInstanceID, const osg::Vec2f& vPos, int iLevel)
+		{
+
+		}
+
+		// 每一块积木的SRT矩阵（用vec4存储以方便对齐）
+		osg::Vec4f		SRT[TERRAIN_BLOCK_MAX];
+	};
+
 	/*!
 	*  @brief 6个面的XYZ向量信息的结构体
 	*/
@@ -124,6 +171,9 @@ namespace GM
 		* @return osg::Vec3d:		返回瓦片的中心点在ECEF坐标系中的方向投影到边长为2的正方体上的坐标，出错返回(0,0,0)
 		*/
 		osg::Vec3d _GetTileCenterInBox(const std::vector<int>& iTileVec) const;
+
+		/** @brief 生成高程着色图，给其他项目用的临时函数，寄放在这里 */
+		void _GenerateElevationColorMap() const;
 
 		/**
 		* @brief 根据顶点的信息获取顶点的索引

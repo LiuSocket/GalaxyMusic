@@ -44,7 +44,10 @@ namespace GM
 		bool Load();
 
 		/* @brief 传递纹理 */
-		void SetTex(osg::Texture* pEarthTailTex, osg::Texture* pInscatteringTex);
+		void SetTex(
+			osg::Texture* pTailColorTex,
+			osg::Texture* pTailAlphaTex,
+			osg::Texture* pInscatteringTex);
 		/* @brief 传递Uniform */
 		void SetUniform(
 			osg::Uniform* pViewLigh,
@@ -207,7 +210,8 @@ namespace GM
 		osg::ref_ptr<osg::Node>							m_pEarthEngineBody_1;			//!< 1层级行星发动机主体
 		osg::ref_ptr<osg::Node>							m_pEarthEngineBody_2;			//!< 2层级行星发动机主体
 
-		osg::ref_ptr<osg::Texture>						m_pEarthTailTex;				//!< 地球尾迹纹理
+		osg::ref_ptr<osg::Texture>						m_pTailColorTex;				//!< 地球尾迹颜色纹理
+		osg::ref_ptr<osg::Texture>						m_pTailAlphaTex;				//!< 地球尾迹alpha纹理
 		osg::ref_ptr<osg::Texture>						m_pInscatteringTex;				//!< 大气内散射纹理
 
 		osg::ref_ptr<osg::Uniform>						m_vViewLightUniform;			//!< view空间的光源方向

@@ -113,22 +113,24 @@ void main()
 #endif // WANDERING
 #endif // EARTH
 	float alpha = baseColor.a*sqrt(clamp(15*abs(dot(viewVertUp, viewDir)), 0, 1));
-
+	vec2 screenCoord = gl_FragCoord.xy/screenSize.xy;
 	vec3 ECEFPos = (view2ECEFMatrix*vec4(viewPos.xyz, 1.0)).xyz;
 	// radius of sealevel ground at the vertex point, meter
 	float Rg = GeoRadius(planetRadius.x, planetRadius.y, abs(normalize(ECEFPos).z))*unit;
 	color += AtmosColor(cloudTop*unit, viewDir, viewVertUp, Rg);
 	color = ToneMapping(color*(1 - 0.9*shadow));
 	color = pow(color,vec3(1.0/2.2));
-	color += mix(-NOISE_GRANULARITY, NOISE_GRANULARITY, Random(gl_FragCoord.xy/screenSize.xy));
+	color += mix(-NOISE_GRANULARITY, NOISE_GRANULARITY, Random(screenCoord));
 
 #ifdef EARTH
 #ifdef WANDERING
 	if((wanderProgress > PROGRESS_0) && (unit > 1e6))
 	{
-		vec4 tailColor = texture(tailTex, gl_FragCoord.xy/screenSize.xy);
-		color = mix(color, tailColor.rgb, tailColor.a);
-		alpha = 1-(1-alpha)*(1-tailColor.a);		
+		vec3 tailColor = texture(tailColorTex, screenCoord).rgb;
+		vec4 tailAlpha4 = texture(tailAlphaTex, screenCoord);
+		float tailAlpha = tailAlpha4.a;
+		color = mix(color, tailColor, tailAlpha);
+		alpha = 1-(1-alpha)*(1-tailAlpha);		
 	}
 #endif // WANDERING
 #endif // EARTH

@@ -92,10 +92,9 @@ namespace GM
 		/**
 		* @brief 初始化奥尔特云状态集
 		* @param pSS				需要设置的状态集指针
-		* @param strShaderName		shader的名字
 		* @return bool				成功true，错误false
 		*/
-		bool _InitOortStateSet(osg::StateSet* pSS, const std::string strShaderName);
+		bool _InitOortStateSet(osg::StateSet* pSS);
 
 	// 变量
 	private:

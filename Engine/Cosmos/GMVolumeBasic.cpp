@@ -22,17 +22,9 @@ using namespace GM;
 CGMVolumeBasic::CGMVolumeBasic():
 	m_pKernelData(nullptr), m_pConfigData(nullptr), m_pCommonUniform(nullptr),
 	m_iScreenWidth(1920), m_iScreenHeight(1080),
-	m_strVolumeShaderPath("Shaders/VolumeShader/"), m_strCoreTexturePath("Textures/Volume/"), m_strMediaTexturePath("Volume/"),
-	m_fCountUniform(new osg::Uniform("countNum", 0.0f)),
-	m_vNoiseUniform(new osg::Uniform("noiseVec4", osg::Vec4f(0.0f, 0.0f, 0.0f, 0.0f))),
-	m_fPixelLengthUniform(new osg::Uniform("pixelLength", 0.01f)),
-	m_vShakeVectorUniform(new osg::Uniform("shakeVec", osg::Vec2f(0.5f, 0.5f))),
-	m_vDeltaShakeUniform(new osg::Uniform("deltaShakeVec", osg::Vec2f(0.0f, 0.0f))),
-	m_pRaymarchDrawFBOCallback(nullptr), m_pTAADrawFBOCallback(nullptr),
-	m_fShakeU(0.0f), m_fShakeV(0.0f), m_vLastShakeVec(osg::Vec2f(0.0f, 0.0f)),
-	m_dTimeLastFrame(0.0), m_iUnitTAA(0), m_iShakeCount(0)
+	m_strVolumeShaderPath("Shaders/VolumeShader/"), m_strCoreTexturePath("Textures/Volume/"),
+	m_strMediaTexturePath("Volume/")
 {
-	m_iRandom.seed(0);
 }
 
 CGMVolumeBasic::~CGMVolumeBasic()
@@ -54,56 +46,16 @@ void CGMVolumeBasic::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData
 	m_3DCurlTex = _Load3DCurlNoise();
 	m_blueNoiseTex = _CreateTexture2D(strTexturePath + "BlueNoise.jpg", 1);
 
-	// 传入屏幕像素尺寸，用于相机抖动
-	SetPixelLength(pConfigData->fFovy, m_iScreenHeight);
-
-	_InitTAA(pConfigData->strCorePath);
+	// 初始化TAA
+	_InitRayMarching();	
 }
 
 void CGMVolumeBasic::Update(double dDeltaTime)
 {
-	// 4 帧一个循环，4个像素之间的抖动
-	m_fShakeU = ((m_iShakeCount / 2) % 2) - 0.5f;
-	m_fShakeV = (((m_iShakeCount + 1) / 2) % 2) - 0.5f;
-
-	m_iShakeCount++;
 }
 
 void CGMVolumeBasic::UpdateLater(double dDeltaTime)
 {
-	std::uniform_int_distribution<> iPseudoNoise(0, 10000);
-
-	if (m_vNoiseUniform.valid())
-	{
-		m_vNoiseUniform->set(osg::Vec4f(
-			(iPseudoNoise(m_iRandom)) / 1e4f,
-			(iPseudoNoise(m_iRandom)) / 1e4f,
-			(iPseudoNoise(m_iRandom)) / 1e4f,
-			(iPseudoNoise(m_iRandom)) / 1e4f));
-	}	
-	if (m_vShakeVectorUniform.valid())
-		m_vShakeVectorUniform->set(osg::Vec2f(m_fShakeU, m_fShakeV));
-	if (m_fCountUniform.valid())
-		m_fCountUniform->set(float(m_iShakeCount % 100000));
-	osg::Vec2f vShakeVec = osg::Vec2f(m_fShakeU, m_fShakeV);
-	if (m_vDeltaShakeUniform.valid())
-	{
-		osg::Vec2f vDeltaShake = vShakeVec - m_vLastShakeVec;
-		m_vDeltaShakeUniform->set(vDeltaShake);
-	}
-
-	m_vLastShakeVec = vShakeVec;
-}
-
-bool CGMVolumeBasic::ActiveTAA(osg::Texture* pTex, osg::Texture* pVectorTex)
-{
-	if (!m_statesetTAA.valid()) return false;
-
-	CGMKit::AddTexture(m_statesetTAA, pTex, "currentTex", m_iUnitTAA++);
-	CGMKit::AddTexture(m_statesetTAA, pVectorTex, "velocityTex", m_iUnitTAA++);
-
-	GM_Root->addChild(m_TAACamera);
-	return true;
 }
 
 osg::Texture* CGMVolumeBasic::_CreateTexture2D(const std::string & fileName, const int iChannelNum)
@@ -161,26 +113,6 @@ void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 	if (m_rayMarchCamera.valid())
 	{
 		m_rayMarchCamera->resize(iW, iH);
-
-		m_vectorMap_1->setTextureSize(iW, iH);
-		m_vectorMap_1->dirtyTextureObject();
-
-		m_pRaymarchDrawFBOCallback->SetSize(iW, iH);
-	}
-
-	_ResizeScreenTriangle(width, height);
-
-	if (m_TAACamera.valid())
-	{
-		m_TAACamera->resize(width, height);
-		m_TAACamera->setProjectionMatrixAsOrtho2D(0, width, 0, height);
-
-		m_pTAADrawFBOCallback->SetSize(width, height);
-	}
-	if (m_TAATex_1.valid())
-	{
-		m_TAATex_1->setTextureSize(width, height);
-		m_TAATex_1->dirtyTextureObject();
 	}
 }
 
@@ -522,128 +454,52 @@ void CGMVolumeBasic::CreatePlatonicSolids(osg::Geometry ** pFaceGeom, osg::Geome
 	(*pVertGeom)->addPrimitiveSet(vertTris.get());
 }
 
-void CGMVolumeBasic::SetPixelLength(const float fFovy, const int iHeight)
+void CGMVolumeBasic::_InitRayMarching()
 {
-	if (!m_fPixelLengthUniform.valid()) return;
+	int iW = m_pConfigData->iScreenWidth / 2;
+	int iH = m_pConfigData->iScreenHeight / 2;
 
-	float fFovyRadian = osg::DegreesToRadians(fFovy);
-	float fPixelLength = tan(fFovyRadian*0.5) / (iHeight*0.5);
-	m_fPixelLengthUniform->set(fPixelLength);
-}
+	m_rayMarchColorTex = new osg::Texture2D;
+	m_rayMarchColorTex->setName("rayMarchColorTex");
+	m_rayMarchColorTex->setTextureSize(iW, iH);
+	m_rayMarchColorTex->setInternalFormat(GL_RGB8);
+	m_rayMarchColorTex->setSourceFormat(GL_RGB);
+	m_rayMarchColorTex->setSourceType(GL_UNSIGNED_BYTE);
+	m_rayMarchColorTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	m_rayMarchColorTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+	m_rayMarchColorTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+	m_rayMarchColorTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+	m_rayMarchColorTex->setDataVariance(osg::Object::DYNAMIC);
+	m_rayMarchColorTex->setResizeNonPowerOfTwoHint(false);
 
-osg::Texture2D* CGMVolumeBasic::CreateTexture(
-	const osg::Vec2i & size,
-	GLint internalFormat,
-	GLenum sourceFormat,
-	GLenum sourceType)
-{
-	osg::Texture2D* texture = new osg::Texture2D();
-	texture->setTextureSize(size.x(), size.y());
-	texture->setInternalFormat(internalFormat);
-	texture->setSourceFormat(sourceFormat);
-	texture->setSourceType(sourceType);
+	m_rayMarchAlphaTex = new osg::Texture2D;
+	m_rayMarchAlphaTex->setName("rayMarchAlphaTex");
+	m_rayMarchAlphaTex->setTextureSize(iW, iH);
+	m_rayMarchAlphaTex->setInternalFormat(GL_RGBA8);
+	m_rayMarchAlphaTex->setSourceFormat(GL_RGBA);
+	m_rayMarchAlphaTex->setSourceType(GL_UNSIGNED_BYTE);
+	m_rayMarchAlphaTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
+	m_rayMarchAlphaTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::NEAREST);
+	m_rayMarchAlphaTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+	m_rayMarchAlphaTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+	m_rayMarchAlphaTex->setDataVariance(osg::Object::DYNAMIC);
+	m_rayMarchAlphaTex->setResizeNonPowerOfTwoHint(false);
 
-	texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	texture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	texture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	texture->setBorderColor(osg::Vec4d(0, 0, 0, 0));
-	texture->setDataVariance(osg::Object::DYNAMIC);
-	texture->setResizeNonPowerOfTwoHint(false);
-	return texture;
-}
+	// Create its camera and render to it
+	m_rayMarchCamera = new osg::Camera;
+	m_rayMarchCamera->setName("rayMarchCamera");
+	m_rayMarchCamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF_INHERIT_VIEWPOINT);
+	m_rayMarchCamera->setClearMask(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+	m_rayMarchCamera->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
+	m_rayMarchCamera->setViewport(0, 0, iW, iH);
+	m_rayMarchCamera->setRenderOrder(osg::Camera::PRE_RENDER, 1);
+	m_rayMarchCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
+	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_rayMarchColorTex.get());
+	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_rayMarchAlphaTex.get());
+	m_rayMarchCamera->setAllowEventFocus(false);
+	m_rayMarchCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
 
-void CGMVolumeBasic::_InitTAA(std::string strCorePath)
-{
-	int iW = m_pConfigData->iScreenWidth;
-	int iH = m_pConfigData->iScreenHeight;
-
-	m_TAATex_0 = CreateTexture(osg::Vec2i(iW, iH));
-	m_TAATex_1 = CreateTexture(osg::Vec2i(iW, iH));
-
-	m_TAACamera = new osg::Camera;
-	m_TAACamera->setName("TAACamera");
-	m_TAACamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF_INHERIT_VIEWPOINT);
-	m_TAACamera->setClearMask(GL_COLOR_BUFFER_BIT);
-	m_TAACamera->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
-	m_TAACamera->setViewport(0, 0, iW, iH);
-	m_TAACamera->setRenderOrder(osg::Camera::PRE_RENDER,2);
-	m_TAACamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
-	m_TAACamera->attach(osg::Camera::COLOR_BUFFER, m_TAATex_0.get());
-	m_TAACamera->setAllowEventFocus(false);
-	m_TAACamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
-	m_TAACamera->setViewMatrix(osg::Matrix::identity());
-	m_TAACamera->setProjectionMatrixAsOrtho2D(0, iW, 0, iH);
-	m_TAACamera->setProjectionResizePolicy(osg::Camera::FIXED);
-
-	// TAA交换buffer的回调函数指针
-	m_pTAADrawFBOCallback = new SwitchFBOCallback(m_TAATex_1.get(), m_TAATex_0.get());
-	m_TAACamera->setPostDrawCallback(m_pTAADrawFBOCallback);
-
-	m_pTAAGeode = new osg::Geode();
-	m_pTAAGeode->addDrawable(_CreateScreenTriangle(iW, iH));
-	m_TAACamera->addChild(m_pTAAGeode.get());
-
-	m_statesetTAA = m_pTAAGeode->getOrCreateStateSet();
-	m_statesetTAA->addUniform(m_pCommonUniform->GetScreenSize());
-	m_statesetTAA->addUniform(m_vShakeVectorUniform.get());
-
-	CGMKit::AddTexture(m_statesetTAA.get(), m_TAATex_1.get(), "lastTex", m_iUnitTAA++);
-
-	std::string strTAAVertPath = m_pConfigData->strCorePath + m_strVolumeShaderPath + "TAAVert.glsl";
-	std::string strTAAFragPath = m_pConfigData->strCorePath + m_strVolumeShaderPath + "TAAFrag.glsl";
-	CGMKit::LoadShader(m_statesetTAA.get(), strTAAVertPath, strTAAFragPath, "TAA");
-}
-
-/**
-* 创建渲染面
-* @author LiuTao
-* @since 2020.09.01
-* @param width: 面的宽度
-* @param height: 面的高度
-* @return osg::Geometry* 返回几何节点指针
-*/
-osg::Geometry* CGMVolumeBasic::_CreateScreenTriangle(const int width, const int height)
-{
-	osg::Geometry* pGeometry = new osg::Geometry();
-
-	osg::ref_ptr<osg::Vec3Array> verArray = new osg::Vec3Array;
-	verArray->push_back(osg::Vec3(0, 0, 0));
-	verArray->push_back(osg::Vec3(2*width, 0, 0));
-	verArray->push_back(osg::Vec3(0, 2*height, 0));
-	pGeometry->setVertexArray(verArray);
-
-	osg::ref_ptr<osg::Vec2Array> textArray = new osg::Vec2Array;
-	textArray->push_back(osg::Vec2(0, 0));
-	textArray->push_back(osg::Vec2(2, 0));
-	textArray->push_back(osg::Vec2(0, 2));
-	pGeometry->setTexCoordArray(0, textArray);
-
-	osg::ref_ptr <osg::Vec3Array> normal = new osg::Vec3Array;
-	normal->push_back(osg::Vec3(0, 1, 0));
-	pGeometry->setNormalArray(normal);
-	pGeometry->setNormalBinding(osg::Geometry::BIND_OVERALL);
-
-	pGeometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::TRIANGLES, 0, 3));
-
-	pGeometry->setUseVertexBufferObjects(true);
-	pGeometry->setUseDisplayList(false);
-	pGeometry->setDataVariance(osg::Object::DYNAMIC);
-	pGeometry->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pGeometry->getOrCreateStateSet()->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
-
-	return pGeometry;
-}
-
-void CGMVolumeBasic::_ResizeScreenTriangle(const int width, const int height)
-{
-	osg::ref_ptr<osg::Geometry> pGeometry = m_pTAAGeode->asGeode()->getDrawable(0)->asGeometry();
-	osg::ref_ptr<osg::Vec3Array> verArray = new osg::Vec3Array;
-	verArray->push_back(osg::Vec3(0, 0, 0));
-	verArray->push_back(osg::Vec3(2 * width, 0, 0));
-	verArray->push_back(osg::Vec3(0, 2 * height, 0));
-	pGeometry->setVertexArray(verArray);
-	pGeometry->dirtyBound();
+	GM_Root->addChild(m_rayMarchCamera.get());
 }
 
 osg::Texture* CGMVolumeBasic::_Load3DShapeNoise() const

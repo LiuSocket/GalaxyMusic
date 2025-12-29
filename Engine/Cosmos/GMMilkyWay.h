@@ -101,10 +101,9 @@ namespace GM
 		* @brief 初始化银河系状态集
 		* @param pSS				需要设置的状态集指针
 		* @param sVR				星系体积范围
-		* @param strShaderName		shader的名字
 		* @return bool				成功true，错误false
 		*/
-		bool _InitMilkyWayStateSet(osg::StateSet* pSS,const SGMVolumeRange& sVR, const std::string strShaderName);
+		bool _InitMilkyWayStateSet(osg::StateSet* pSS,const SGMVolumeRange& sVR);
 
 	// 变量
 	private:

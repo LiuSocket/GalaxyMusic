@@ -16,6 +16,8 @@
 
 using namespace GM;
 
+std::map<std::string, osg::ref_ptr<osg::Program>>	CGMKit::_pProgramMap;
+
 bool CGMKit::LoadShader(
 	osg::StateSet* pStateSet,
 	const std::string& vertFilePath,
@@ -106,20 +108,44 @@ bool CGMKit::LoadShaderWithCommonFrag(osg::StateSet * pStateSet,
 }
 
 bool CGMKit::LoadShader(
-	osg::StateSet* pStateSet,
-	const std::string& vertFilePath,
-	const std::string& fragFilePath,
-	const std::string& strShaderName)
+	osg::StateSet* pStateSet
+	, const std::string& vertFilePath
+	, const std::string& fragFilePath
+	, const bool bForceUpdate
+	, const osg::StateAttribute::GLModeValue value)
 {
-	osg::ref_ptr<osg::Program> pProgram = new osg::Program;
-	pProgram->setName(strShaderName);
+	std::string shaderName = GetProgramName(vertFilePath, fragFilePath);
+	osg::ref_ptr<osg::Program> pProgram = nullptr;
+	// 如果已经有这个program，则复用
+	if (_pProgramMap.find(shaderName) != _pProgramMap.end())
+	{
+		if (bForceUpdate)
+		{
+			_pProgramMap.erase(shaderName);
+			pProgram = new osg::Program;
+			pProgram->setName(shaderName);
+			_pProgramMap[shaderName] = pProgram;
+		}
+		else
+		{
+			pProgram = _pProgramMap.at(shaderName);
+			pStateSet->setAttributeAndModes(pProgram, value);
+			return true;
+		}
+	}
+	else
+	{
+		pProgram = new osg::Program;
+		pProgram->setName(shaderName);
+		_pProgramMap[shaderName] = pProgram;
+	}
 
-	osg::Shader *pVertShader = new osg::Shader;
+	osg::Shader* pVertShader = new osg::Shader;
 	pVertShader->setType(osg::Shader::VERTEX);
 	std::string vertOut = _ReadShaderFile(vertFilePath);
 	pVertShader->setShaderSource(vertOut);
 
-	osg::Shader *pFragShader = new osg::Shader;
+	osg::Shader* pFragShader = new osg::Shader;
 	pFragShader->setType(osg::Shader::FRAGMENT);
 	std::string fragOut = _ReadShaderFile(fragFilePath);
 	pFragShader->setShaderSource(fragOut);
@@ -128,7 +154,7 @@ bool CGMKit::LoadShader(
 	{
 		pProgram->addShader(pVertShader);
 		pProgram->addShader(pFragShader);
-		pStateSet->setAttributeAndModes(pProgram.get(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+		pStateSet->setAttributeAndModes(pProgram, value);
 		return true;
 	}
 	else
@@ -155,12 +181,16 @@ bool CGMKit::LoadComputeShader(
 	return true;
 }
 
-bool CGMKit::AddTexture(osg::StateSet* pStateSet, osg::Texture* pTex, const char* texName, const int iUnit)
+bool CGMKit::AddTexture(
+	osg::StateSet* pStateSet,
+	osg::Texture* pTex, const char* texName, const int iUnit,
+	const osg::StateAttribute::GLModeValue value)
 {
 	if (!pStateSet || !pTex || ("" == texName) || (iUnit < 0)) 	return false;
 
-	pStateSet->setTextureAttributeAndModes(iUnit, pTex);
-	pStateSet->addUniform(new osg::Uniform(texName, iUnit));
+	pStateSet->setTextureAttributeAndModes(iUnit, pTex, value);
+	osg::ref_ptr<osg::Uniform> pUniform = new osg::Uniform(texName, iUnit);
+	pStateSet->addUniform(pUniform.get());
 
 	return true;
 }
@@ -213,6 +243,48 @@ osg::Vec4f CGMKit::GetImageColor(const osg::Image* pImg, const float fX, const f
 		unsigned int uT1 = osg::minimum(iH - 1, uT + unsigned int((fDeltaT>0.5f) ? 1 : 0));
 		return pImg->getColor(uS1, uT1);
 	}
+}
+
+std::string CGMKit::GetProgramName(const std::string& path0, const std::string& path1)
+{
+	std::string str0 = path0;
+	std::string str1 = path1;
+
+	// 先尽量缩短字符串
+	_ReplaceIn(str0, "Data/Resources/", "");
+	_ReplaceIn(str1, "Data/Resources/", "");
+
+	_ReplaceIn(str0, ".glsl", "_");
+	_ReplaceIn(str1, ".glsl", "_");
+
+	// 再将字符串中的"../"和"./"替换成 "_"
+	_ReplaceIn(str0, "../", "");
+	_ReplaceIn(str0, "./", "");
+
+	_ReplaceIn(str1, "../", "");
+	_ReplaceIn(str1, "./", "");
+
+	// 再将字符串中的"/"和"\\"和"."和":"替换成 "_"
+	_ReplaceIn(str0, "/", "_");
+	_ReplaceIn(str0, "\\", "_");
+	_ReplaceIn(str0, ".", "_");
+	_ReplaceIn(str0, ":", "_");
+
+	_ReplaceIn(str1, "/", "_");
+	_ReplaceIn(str1, "\\", "_");
+	_ReplaceIn(str1, ".", "_");
+	_ReplaceIn(str1, ":", "_");
+
+	return str0 + "_" + str1;
+}
+
+osg::Program* CGMKit::GetProgram(const std::string& strProgramName)
+{
+	if (_pProgramMap.find(strProgramName) != _pProgramMap.end())
+	{
+		return _pProgramMap.at(strProgramName).get();
+	}
+	return nullptr;
 }
 
 float CGMKit::Half_2_Float(const unsigned short x)

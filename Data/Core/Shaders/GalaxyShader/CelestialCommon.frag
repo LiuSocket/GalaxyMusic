@@ -1,4 +1,4 @@
-#version 450 compatibility
+#version 400 compatibility
 
 #pragma import_defines(ATMOS, EARTH, WANDERING)
 
@@ -20,7 +20,8 @@ uniform float minDotUL;
 uniform float unit;
 
 #ifdef WANDERING
-uniform sampler2D tailTex;
+uniform sampler2D tailColorTex;
+uniform sampler2D tailAlphaTex;
 uniform vec3 engineStartRatio;
 uniform float wanderProgress;
 #endif // WANDERING

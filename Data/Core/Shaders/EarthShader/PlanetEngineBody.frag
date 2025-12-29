@@ -1,8 +1,6 @@
 #ifdef EARTH
 
-uniform float wanderProgress;
 uniform sampler2D baseColorTex;
-uniform sampler2D tailTex;
 
 in float diffuse;
 in vec3 viewPos;
@@ -33,15 +31,18 @@ void main()
 	// atmosphere
 	color.rgb += AtmosColor(vertAlt, viewDir, viewEngineUp, Rg);
 
+	vec2 screenCoord = gl_FragCoord.xy/screenSize.xy;
 	if((wanderProgress > PROGRESS_3_1) && (unit > 1e6))
 	{
-		vec4 tailColor = texture(tailTex, gl_FragCoord.xy/screenSize.xy);
-		color.rgb = mix(color.rgb, tailColor.rgb, tailColor.a);
+		vec3 tailColor = texture(tailColorTex, screenCoord).rgb;
+		vec4 tailAlpha4 = texture(tailAlphaTex, screenCoord);
+		float tailAlpha = tailAlpha4.a;
+		color.rgb = mix(color.rgb, tailColor, tailAlpha);
 	}
 
 	color.rgb = ToneMapping(color.rgb);
 	color.rgb = pow(color.rgb,vec3(1.0/2.2));
-	color.rgb += mix(-NOISE_GRANULARITY, NOISE_GRANULARITY, Random(gl_FragCoord.xy/screenSize.xy));
+	color.rgb += mix(-NOISE_GRANULARITY, NOISE_GRANULARITY, Random(screenCoord));
 
 	gl_FragColor = color;
 }

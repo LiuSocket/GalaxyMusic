@@ -68,7 +68,6 @@ bool CGMOort::Update(double dDeltaTime)
 			if (0 != m_rayMarchCamera->getNodeMask())
 			{
 				m_rayMarchCamera->setNodeMask(0);
-				m_TAACamera->setNodeMask(0);
 				m_pOortTransform4->setNodeMask(0);
 			}
 		}
@@ -78,7 +77,6 @@ bool CGMOort::Update(double dDeltaTime)
 			if (0 == m_rayMarchCamera->getNodeMask())
 			{
 				m_rayMarchCamera->setNodeMask(~0);
-				m_TAACamera->setNodeMask(~0);
 				m_pOortTransform4->setNodeMask(~0);
 			}
 		}
@@ -92,7 +90,6 @@ bool CGMOort::Update(double dDeltaTime)
 			if (0 != m_rayMarchCamera->getNodeMask())
 			{
 				m_rayMarchCamera->setNodeMask(0);
-				m_TAACamera->setNodeMask(0);
 				m_pGeodeOort3->setNodeMask(0);
 			}
 		}
@@ -102,7 +99,6 @@ bool CGMOort::Update(double dDeltaTime)
 			if (0 == m_rayMarchCamera->getNodeMask())
 			{
 				m_rayMarchCamera->setNodeMask(~0);
-				m_TAACamera->setNodeMask(~0);
 				m_pGeodeOort3->setNodeMask(~0);
 			}
 		}
@@ -117,14 +113,12 @@ bool CGMOort::Update(double dDeltaTime)
 bool CGMOort::UpdateLater(double dDeltaTime)
 {
 	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality &&
-		m_rayMarchCamera.valid() && m_rayMarchCamera->getNodeMask() &&
-		m_TAACamera.valid())
+		m_rayMarchCamera.valid() && m_rayMarchCamera->getNodeMask())
 	{
 		osg::Matrixd mMainViewMatrix = GM_View->getCamera()->getViewMatrix();
 		osg::Matrixd mMainProjMatrix = GM_View->getCamera()->getProjectionMatrix();
 		double fFovy, fAspectRatio, fZNear, fZFar;
 		GM_View->getCamera()->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
-		SetPixelLength(fFovy, m_iScreenHeight);
 
 		// 设置 Dodecahedron 的位置
 		osg::Matrixd mPos;
@@ -164,15 +158,9 @@ bool CGMOort::Load()
 	{
 		std::string strVertPath = strShader + "Oort.Vert";
 		std::string strFragPath = strShader + "Oort.Frag";
-		CGMKit::LoadShader(m_pSsOortDecFace.get(), strVertPath, strFragPath, "OortFace");
-		CGMKit::LoadShader(m_pSsOortDecEdge.get(), strVertPath, strFragPath, "OortEdge");
-		CGMKit::LoadShader(m_pSsOortDecVert.get(), strVertPath, strFragPath, "OortVert");
-	}
-	if (m_statesetTAA.valid())
-	{
-		std::string strTAAVertPath = m_pConfigData->strCorePath + m_strVolumeShaderPath + "TAAVert.glsl";
-		std::string strTAAFragPath = m_pConfigData->strCorePath + m_strVolumeShaderPath + "TAAFrag.glsl";
-		CGMKit::LoadShader(m_statesetTAA.get(), strTAAVertPath, strTAAFragPath, "TAA");
+		CGMKit::LoadShader(m_pSsOortDecFace.get(), strVertPath, strFragPath,true);
+		CGMKit::LoadShader(m_pSsOortDecEdge.get(), strVertPath, strFragPath);
+		CGMKit::LoadShader(m_pSsOortDecVert.get(), strVertPath, strFragPath);
 	}
 	return true;
 }
@@ -186,69 +174,6 @@ void CGMOort::MakeOort()
 	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreGalaxyTexPath;
 	m_galaxyTex = _CreateTexture2D(strTexturePath + "milkyWay_color.tga", 4);
 	m_galaxyHeightTex = _CreateTexture2D(strTexturePath + "milkyWay_height.tga", 4);
-
-	// create the ray marching texture
-	int iWidth = 960;
-	int iHeight = 540;
-
-	m_vectorMap_0 = new osg::Texture2D;
-	m_vectorMap_0->setName("vectorMap_0");
-	m_vectorMap_0->setTextureSize(iWidth, iHeight);
-	m_vectorMap_0->setInternalFormat(GL_RGB16F_ARB);
-	m_vectorMap_0->setSourceFormat(GL_RGB);
-	m_vectorMap_0->setSourceType(GL_FLOAT);
-	m_vectorMap_0->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_vectorMap_0->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_vectorMap_0->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_vectorMap_0->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_vectorMap_0->setDataVariance(osg::Object::DYNAMIC);
-	m_vectorMap_0->setResizeNonPowerOfTwoHint(false);
-
-	m_vectorMap_1 = new osg::Texture2D;
-	m_vectorMap_1->setName("vectorMap_1");
-	m_vectorMap_1->setTextureSize(iWidth, iHeight);
-	m_vectorMap_1->setInternalFormat(GL_RGB16F_ARB);
-	m_vectorMap_1->setSourceFormat(GL_RGB);
-	m_vectorMap_1->setSourceType(GL_FLOAT);
-	m_vectorMap_1->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_vectorMap_1->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_vectorMap_1->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_vectorMap_1->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_vectorMap_1->setDataVariance(osg::Object::DYNAMIC);
-	m_vectorMap_1->setResizeNonPowerOfTwoHint(false);
-
-	m_rayMarchTex = new osg::Texture2D;
-	m_rayMarchTex->setName("OortTex");
-	m_rayMarchTex->setTextureSize(iWidth, iHeight);
-	m_rayMarchTex->setInternalFormat(GL_RGBA8);
-	m_rayMarchTex->setSourceFormat(GL_RGBA);
-	m_rayMarchTex->setSourceType(GL_UNSIGNED_BYTE);
-	m_rayMarchTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-	m_rayMarchTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-	m_rayMarchTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-	m_rayMarchTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-	m_rayMarchTex->setDataVariance(osg::Object::DYNAMIC);
-	m_rayMarchTex->setResizeNonPowerOfTwoHint(false);
-
-	// Create its camera and render to it
-	m_rayMarchCamera = new osg::Camera;
-	m_rayMarchCamera->setName("rayMarchCamera");
-	m_rayMarchCamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF_INHERIT_VIEWPOINT);
-	m_rayMarchCamera->setClearMask(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-	m_rayMarchCamera->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
-	m_rayMarchCamera->setViewport(0, 0, iWidth, iHeight);
-	m_rayMarchCamera->setRenderOrder(osg::Camera::PRE_RENDER, 1);
-	m_rayMarchCamera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT);
-	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER0, m_vectorMap_0.get());
-	m_rayMarchCamera->attach(osg::Camera::COLOR_BUFFER1, m_rayMarchTex.get());
-	m_rayMarchCamera->setAllowEventFocus(false);
-	m_rayMarchCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
-
-	// Raymarch交换buffer的回调函数指针
-	m_pRaymarchDrawFBOCallback = new SwitchFBOCallback(m_vectorMap_1.get(), m_vectorMap_0.get());
-	m_rayMarchCamera->setPostDrawCallback(m_pRaymarchDrawFBOCallback);
-
-	GM_Root->addChild(m_rayMarchCamera.get());
 
 	// 正十二面体方法绘制奥尔特星云
 	osg::Geometry* pDodecahedronFaceGeom = nullptr;
@@ -266,14 +191,14 @@ void CGMOort::MakeOort()
 	m_pDodecahedronFace->addDrawable(pDodecahedronFaceGeom);
 	m_pDodecahedronTrans->addChild(m_pDodecahedronFace.get());
 	m_pSsOortDecFace = new osg::StateSet();
-	_InitOortStateSet(m_pSsOortDecFace.get(), "OortFace");
+	_InitOortStateSet(m_pSsOortDecFace.get());
 	m_pDodecahedronFace->setStateSet(m_pSsOortDecFace.get());
 
 	m_pDodecahedronEdge = new osg::Geode();
 	m_pDodecahedronEdge->addDrawable(pDodecahedronEdgeGeom);
 	m_pDodecahedronTrans->addChild(m_pDodecahedronEdge.get());
 	m_pSsOortDecEdge = new osg::StateSet();
-	_InitOortStateSet(m_pSsOortDecEdge.get(), "OortEdge");
+	_InitOortStateSet(m_pSsOortDecEdge.get());
 	m_pSsOortDecEdge->setDefine("RAYS_2", osg::StateAttribute::ON);
 	m_pDodecahedronEdge->setStateSet(m_pSsOortDecEdge.get());
 
@@ -281,15 +206,10 @@ void CGMOort::MakeOort()
 	m_pDodecahedronVert->addDrawable(pDodecahedronVertGeom);
 	m_pDodecahedronTrans->addChild(m_pDodecahedronVert.get());
 	m_pSsOortDecVert = new osg::StateSet();
-	_InitOortStateSet(m_pSsOortDecVert.get(), "OortVert");
+	_InitOortStateSet(m_pSsOortDecVert.get());
 	m_pSsOortDecVert->setDefine("RAYS_2", osg::StateAttribute::ON);
 	m_pSsOortDecVert->setDefine("RAYS_3", osg::StateAttribute::ON);
 	m_pDodecahedronVert->setStateSet(m_pSsOortDecVert.get());
-
-	// get and mix the last frame by TAA(temporal anti-aliasing)
-	// Add texture to TAA board,and active TAA
-	ActiveTAA(m_rayMarchTex.get(), m_vectorMap_0.get());
-
 
 	// new stateSet for final Oort sphere
 	osg::ref_ptr<osg::StateSet> pSSOort = new osg::StateSet();
@@ -300,12 +220,11 @@ void CGMOort::MakeOort()
 		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
 	), osg::StateAttribute::ON);
 	pSSOort->setRenderBinDetails(BIN_MILKYWAY, "DepthSortedBin"); // to do
-	CGMKit::AddTexture(pSSOort.get(), m_TAATex_0.get(), "mainTex", 0);
+	CGMKit::AddTexture(pSSOort, m_rayMarchColorTex, "colorTex", 0);
+	CGMKit::AddTexture(pSSOort, m_rayMarchAlphaTex, "alphaTex", 1);
 	pSSOort->addUniform(m_pCommonUniform->GetScreenSize());
 	std::string strShader = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
-	std::string strVertPath = strShader + "Default.vert";
-	std::string strFragPath = strShader + "Default.frag";
-	CGMKit::LoadShader(pSSOort.get(), strVertPath, strFragPath, "OortSphere3");
+	CGMKit::LoadShader(pSSOort.get(), strShader + "Default.vert", strShader + "Default.frag");
 
 	// final sphere to show the TAA result
 	m_pGeodeOort3 = new osg::Geode;
@@ -336,7 +255,6 @@ bool CGMOort::UpdateHierarchy(int iHieNew)
 			if (0 == m_rayMarchCamera->getNodeMask())
 			{
 				m_rayMarchCamera->setNodeMask(~0);
-				m_TAACamera->setNodeMask(~0);
 			}
 
 			if (3 == iHieNew)
@@ -368,7 +286,6 @@ bool CGMOort::UpdateHierarchy(int iHieNew)
 			if (0 != m_rayMarchCamera->getNodeMask())
 			{
 				m_rayMarchCamera->setNodeMask(0);
-				m_TAACamera->setNodeMask(0);
 				m_pGeodeOort3->setNodeMask(0);
 				m_pOortTransform4->setNodeMask(0);
 			}
@@ -460,7 +377,7 @@ osg::Geometry* CGMOort::_MakeSphereGeometry(const float fRadius, const int iLatS
 	return geom;
 }
 
-bool CGMOort::_InitOortStateSet(osg::StateSet * pSS, const std::string strShaderName)
+bool CGMOort::_InitOortStateSet(osg::StateSet * pSS)
 {
 	if (!pSS) return false;
 
@@ -468,32 +385,23 @@ bool CGMOort::_InitOortStateSet(osg::StateSet * pSS, const std::string strShader
 	pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 	pSS->setAttributeAndModes(new osg::CullFace(osg::CullFace::BACK));
 
-	pSS->addUniform(m_fPixelLengthUniform.get());
 	pSS->addUniform(m_fUnitUniform.get());
 	pSS->addUniform(m_fOortVisibleUniform.get());
-	pSS->addUniform(m_vShakeVectorUniform.get());
-	pSS->addUniform(m_vDeltaShakeUniform.get());
 	pSS->addUniform(m_mAttitudeUniform.get());
 	pSS->addUniform(m_pCommonUniform->GetLevelArray());
 	pSS->addUniform(m_pCommonUniform->GetTime());
 	pSS->addUniform(m_pCommonUniform->GetScreenSize());
-	pSS->addUniform(m_pCommonUniform->GetEyeFrontDir());
-	pSS->addUniform(m_pCommonUniform->GetEyeRightDir());
-	pSS->addUniform(m_pCommonUniform->GetEyeUpDir());
 	pSS->addUniform(m_pCommonUniform->GetStarHiePos());
 	pSS->addUniform(m_pCommonUniform->GetStarColor());
 	pSS->addUniform(m_pCommonUniform->GetMainInvProjMatrix());
-	pSS->addUniform(m_pCommonUniform->GetDeltaVPMatrix());
 
 	int iUnit = 0;
-	CGMKit::AddTexture(pSS, m_vectorMap_1.get(), "lastVectorTex", iUnit++);
 	CGMKit::AddTexture(pSS, m_blueNoiseTex.get(), "blueNoiseTex", iUnit++);
 	CGMKit::AddTexture(pSS, m_3DShapeTex.get(), "noiseShapeTex", iUnit++);
 	CGMKit::AddTexture(pSS, m_3DErosionTex.get(), "noiseErosionTex", iUnit++);
 
-	std::string strVertPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Oort.vert";
-	std::string strFragPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath + "Oort.frag";
-	CGMKit::LoadShader(pSS, strVertPath, strFragPath, strShaderName);
+	std::string strShader = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
+	CGMKit::LoadShader(pSS, strShader + "Oort.vert", strShader + "Oort.frag");
 
 	return true;
 }

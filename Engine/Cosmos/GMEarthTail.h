@@ -301,6 +301,8 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_vEngineStartRatioUniform;
 
 		osg::ref_ptr<CEarthTailBoxVisitor>				m_pEarthTailBoxVisitor;			//!< 地球尾迹的画布盒的访问器
+
+		std::default_random_engine						m_iRandom;
 	};
 
 }	// GM
