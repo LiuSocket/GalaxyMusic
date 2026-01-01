@@ -245,6 +245,8 @@ namespace GM
 	*/
 	enum EGMRENDER_QUALITY
 	{
+		/** 最低画质 */
+		EGMRENDER_LOWEST,
 		/** 低画质 */
 		EGMRENDER_LOW,
 		/** 普通画质 */

@@ -13,7 +13,6 @@
 
 #include "../GMCommon.h"
 #include "../GMKernel.h"
-#include <random>
 #include <osg/MatrixTransform>
 #include <osg/Texture>
 #include <osg/Texture2D>
@@ -29,59 +28,6 @@ namespace GM
 	Class
 	*************************************************************************/
 	class CGMCommonUniform;
-
-	class SwitchFBOCallback : public osg::Camera::DrawCallback
-	{
-	public:
-		SwitchFBOCallback(osg::Texture *dst, osg::Texture *src) :
-			_dstTexture(dst), _srcTexture(src)
-		{
-			_fbo = new osg::FrameBufferObject();
-			_width = dynamic_cast<osg::Texture2D*>(_srcTexture.get())->getTextureWidth();
-			_height = dynamic_cast<osg::Texture2D*>(_srcTexture.get())->getTextureHeight();
-		}
-
-		void SetSize(unsigned int width, unsigned int height)
-		{
-			_width = width;
-			_height = height;
-		}
-
-		virtual void operator() (osg::RenderInfo& renderInfo) const
-		{
-			osg::GLExtensions* ext = renderInfo.getState()->get<osg::GLExtensions>();
-			bool fbo_supported = ext && ext->isFrameBufferObjectSupported;
-
-			_fbo->setAttachment(osg::Camera::COLOR_BUFFER0, osg::FrameBufferAttachment((osg::Texture2D*)(_srcTexture.get())));
-			_fbo->setAttachment(osg::Camera::COLOR_BUFFER1, osg::FrameBufferAttachment((osg::Texture2D*)(_dstTexture.get())));
-			_srcTexture->apply(*renderInfo.getState());
-			_dstTexture->apply(*renderInfo.getState());
-
-			if (fbo_supported && ext->glBlitFramebuffer)
-			{
-				(_fbo.get())->apply(*renderInfo.getState());
-				ext->glBindFramebuffer(GL_FRAMEBUFFER_EXT, _fbo->getHandle(renderInfo.getContextID()));
-				ext->glFramebufferTexture2D(GL_READ_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, _srcTexture->getTextureObject(renderInfo.getContextID())->id(), 0);
-				ext->glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT1_EXT, GL_TEXTURE_2D, _dstTexture->getTextureObject(renderInfo.getContextID())->id(), 0);
-
-				glDrawBuffer(GL_COLOR_ATTACHMENT1_EXT);
-
-				ext->glBlitFramebuffer(
-					0, 0, static_cast<GLint>(_width), static_cast<GLint>(_height),
-					0, 0, static_cast<GLint>(_width), static_cast<GLint>(_height),
-					GL_COLOR_BUFFER_BIT, GL_LINEAR);
-			}
-
-			ext->glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
-		}
-
-	private:
-		osg::ref_ptr<osg::FrameBufferObject> _fbo;
-		osg::ref_ptr<osg::Texture> _dstTexture;
-		osg::ref_ptr<osg::Texture> _srcTexture;
-		unsigned int _width = 1920;
-		unsigned int _height = 1080;
-	};
 
 	/*!
 	*  @class CGMVolumeBasic
@@ -172,12 +118,11 @@ namespace GM
 		SGMKernelData*										m_pKernelData;					//!< 内核数据
 		SGMConfigData*										m_pConfigData;					//!< 配置数据
 		CGMCommonUniform*									m_pCommonUniform;				//!< 公共Uniform
-		int													m_iScreenWidth;					//!< 当前屏幕宽度
-		int													m_iScreenHeight;				//!< 当前屏幕高度
 		std::string											m_strVolumeShaderPath;			//!< Volume shader 着色器路径
 		std::string											m_strCoreTexturePath;			//!< Volume texture 核心贴图路径
 		std::string											m_strMediaTexturePath;			//!< Volume texture 非核心贴图路径
 
+		osg::ref_ptr<osg::Group>							m_pVolumeRoot;					//!< 体渲染根节点
 		osg::ref_ptr<osg::MatrixTransform>					m_pDodecahedronTrans;			//!< 正12面体变换节点
 		osg::ref_ptr<osg::Geode>							m_pDodecahedronFace;			//!< 12面体的“面”几何节点
 		osg::ref_ptr<osg::Geode>							m_pDodecahedronEdge;			//!< 12面体的“边”几何节点

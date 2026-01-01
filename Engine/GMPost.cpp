@@ -48,7 +48,7 @@ bool CGMPost::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCo
 	m_pConfigData = pConfigData;
 	m_pCommonUniform = pCommonUniform;
 
-	m_bVolume = EGMRENDER_LOW != pConfigData->eRenderQuality ? true : false;
+	m_bVolume = EGMRENDER_LOWEST != pConfigData->eRenderQuality ? true : false;
 
 	return true;
 }
@@ -107,7 +107,6 @@ bool CGMPost::CreatePost(
 	osg::Camera* pMainCam = GM_View->getCamera();
 	osg::Viewport* vp = pMainCam->getViewport();
 	vp->setViewport(0, 0, width, height);
-	pMainCam->setRenderOrder(osg::Camera::PRE_RENDER, 20);
 	pMainCam->attach(osg::Camera::COLOR_BUFFER0, pSceneTex);
     pMainCam->attach(osg::Camera::COLOR_BUFFER1, pMaskTex);
     pMainCam->attach(osg::Camera::DEPTH_BUFFER, pDepthTex);
@@ -150,7 +149,7 @@ bool CGMPost::CreatePost(
 
 bool CGMPost::SetVolumeEnable(bool bEnabled, osg::Texture* pVolumeTex)
 {
-	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return false;
+	if (EGMRENDER_LOWEST == m_pConfigData->eRenderQuality) return false;
 
 	osg::ref_ptr<osg::StateSet>	pSsPost = m_pPostGeode->getStateSet();
 
@@ -183,7 +182,7 @@ bool CGMPost::SetVolumeEnable(bool bEnabled, osg::Texture* pVolumeTex)
 
 bool CGMPost::UpdateHierarchy(int iHieNew)
 {
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
+	if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality)
 	{
 		osg::ref_ptr<osg::StateSet>	pSsPost = m_pPostGeode->getStateSet();
 
@@ -197,6 +196,10 @@ bool CGMPost::UpdateHierarchy(int iHieNew)
 		//}
 	}
 	return true;
+}
+
+void CGMPost::_CreateHalfDepth()
+{
 }
 
 osg::Geometry* CGMPost::_CreateScreenTriangle(const int width, const int height)

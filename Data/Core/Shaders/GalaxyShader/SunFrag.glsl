@@ -40,7 +40,7 @@ void main()
 
 	vec3 viewVertDir = normalize(viewPos);
 	vec3 viewNorm = normalize(viewNormal);
-	float dotVN = max(0,dot(-viewVertDir, viewNorm));
+	float dotVN = dot(-viewVertDir, viewNorm);
 
 	vec2 dirtNoise = texture3D(shapeNoiseTex, noiseCoord_1*25.0).xy;
 	vec2 shapeNoise = texture3D(shapeNoiseTex, noiseCoord_2*13.0*(1-0.1*dirtNoise.y-0.05*abs(fract(times*0.1)-0.5)-0.02*level[0])).xy;
@@ -55,6 +55,6 @@ void main()
 			mix(starBaseColor, vec3(1), 0.8),
 			mix(1-dirtNoise.x, shapeNoise.y, 2*abs(shapeNoise.x-0.5))),
 		0.2+0.8*brightness*level[int(levelCoord)]);
-	sunColor = mix(vec3(1), sunColor, dotVN*exp2(-length(viewPos)*5));
+	sunColor = mix(vec3(1), sunColor, max(0.3,dotVN)*exp2(-length(viewPos)*5));
 	gl_FragColor = vec4(sunColor,1);
 }

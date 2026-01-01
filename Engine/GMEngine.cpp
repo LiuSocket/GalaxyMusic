@@ -738,7 +738,7 @@ CGMViewWidget* CGMEngine::CreateViewWidget(QWidget* parent)
 	m_pPost->CreatePost(m_pSceneTex.get(), m_pDepthTex.get(), m_pMaskTex.get(),
 		m_pBackgroundTex.get(), m_pForegroundTex.get()
 	);
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
+	if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality)
 	{
 		//m_pPost->SetVolumeEnable(true, m_pGalaxy->GetTAATex());
 	}

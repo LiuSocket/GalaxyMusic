@@ -55,11 +55,8 @@ namespace GM
 		bool Load();
 		/**
 		* 修改屏幕尺寸时调用此函数
-		* @author LiuTao
-		* @since 2022.07.21
 		* @param width: 屏幕宽度
 		* @param height: 屏幕高度
-		* @return void
 		*/
 		void ResizeScreen(const int width, const int height);
 
@@ -97,19 +94,20 @@ namespace GM
 
 	private:
 		/**
-		* @brief 创建渲染面
-		*屏幕两倍大小的三角面，比矩形效率要高一些
+		* @brief 生成半分辨率的深度棋盘格纹理
+		*/
+		void _CreateHalfDepth();
+		/**
+		* @brief 创建渲染面，屏幕两倍大小的三角面，比矩形效率要高一些
 		* @param width: 等效矩形的宽度
 		* @param height: 等效矩形的高度
 		* @return osg::Geometry* 返回几何节点指针
 		*/
 		osg::Geometry* _CreateScreenTriangle(const int width, const int height);
 		/**
-		* @brief 给渲染面重设尺寸
-		* 屏幕两倍大小的三角面，比矩形效率要高一些
+		* @brief 给渲染面重设尺寸，屏幕两倍大小的三角面，比矩形效率要高一些
 		* @param width: 等效矩形的宽度
 		* @param height: 等效矩形的高度
-		* @return void
 		*/
 		void _ResizeScreenTriangle(const int width, const int height);
 

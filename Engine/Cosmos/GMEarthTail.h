@@ -13,6 +13,8 @@
 #include "GMVolumeBasic.h"
 #include "../GMCommonUniform.h"
 
+#include <random>
+
 namespace GM
 {
 	/*************************************************************************

@@ -579,7 +579,7 @@ bool CGMGalaxy::UpdateLater(double dDeltaTime)
 		break;
 	}
 
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
+	if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality)
 	{
 		osg::Matrixd mMainProjMatrix = GM_View->getCamera()->getProjectionMatrix();
 		osg::Matrixf mInvProjMatrix = osg::Matrixd::inverse(mMainProjMatrix);
@@ -870,7 +870,7 @@ bool CGMGalaxy::CreateGalaxy(double fDiameter)
 	// 背景宇宙
 	_CreateCosmosBox();
 
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
+	if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality)
 	{
 		m_pMilkyWay->MakeMilkyWay(fDiameter, fDiameter, 0.13f * fDiameter);
 	}
@@ -1445,7 +1445,7 @@ bool CGMGalaxy::_CreateGalaxyPoints()
 	m_pStateSetGalaxy->setRenderBinDetails(BIN_STARS_0, "DepthSortedBin");
 
 	int iUnit = 0;
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
+	if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality)
 	{
 		m_pStateSetGalaxy->setDefine("HIGH_QUALITY", osg::StateAttribute::ON);
 		CGMKit::AddTexture(m_pStateSetGalaxy.get(), m_pMilkyWay->GetDistanceMap(), "distanceTex", iUnit++);
@@ -1558,7 +1558,7 @@ bool CGMGalaxy::_CreateGalaxyPointsN_4(int iDens)
 		pSSN->setRenderBinDetails(BIN_STARS_1, "DepthSortedBin");
 
 		int iUnit = 0;
-		if (EGMRENDER_LOW != m_pConfigData->eRenderQuality)
+		if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality)
 		{
 			pSSN->setDefine("HIGH_QUALITY", osg::StateAttribute::ON);
 			CGMKit::AddTexture(pSSN.get(), m_pMilkyWay->GetDistanceMap(), "distanceTex", iUnit++);

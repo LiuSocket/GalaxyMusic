@@ -51,7 +51,7 @@ bool CGMEarthTail::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, 
 {
 	CGMVolumeBasic::Init(pKernelData, pConfigData, pCommonUniform);
 
-	if (EGMRENDER_LOW != pConfigData->eRenderQuality)
+	if (EGMRENDER_LOWEST != pConfigData->eRenderQuality)
 	{
 
 	}
@@ -118,7 +118,7 @@ bool CGMEarthTail::Update(double dDeltaTime)
 	else {}
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////
-	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return true;
+	if (EGMRENDER_LOWEST == m_pConfigData->eRenderQuality) return true;
 
 	if (fWanderProgress < PROGRESS_0)
 	{
@@ -175,7 +175,7 @@ bool CGMEarthTail::Update(double dDeltaTime)
 /** @brief 更新(在主相机更新姿态之后) */
 bool CGMEarthTail::UpdateLater(double dDeltaTime)
 {
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality &&
+	if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality &&
 		m_rayMarchCamera.valid() && m_rayMarchCamera->getNodeMask())
 	{
 		osg::Matrixd mMainViewMatrix = GM_View->getCamera()->getViewMatrix();
@@ -298,13 +298,13 @@ void CGMEarthTail::MakeEarthTail()
 	m_pSpiralNegativeGeode2->addDrawable(_MakeSpiralGeometry(osg::WGS_84_RADIUS_EQUATOR / fUnit2, false));
 	m_pSpiralTransform2->addChild(m_pSpiralNegativeGeode2);
 
-	GM_Root->addChild(m_pSpiralTransform2);
+	m_pVolumeRoot->addChild(m_pSpiralTransform2);
 
 	///////////////////////////////////////////////////////////////////////////////////////////
 	// 创建尾迹相关的节点，这里的尾迹不包括气体螺旋，因为气体螺旋不能跟着地球自转
 	m_pTailTransform2 = new osg::PositionAttitudeTransform();
 	m_pTailTransform2->setNodeMask(0);
-	GM_Root->addChild(m_pTailTransform2);
+	m_pVolumeRoot->addChild(m_pTailTransform2);
 
 	double fRadiusHie2 = EARTH_TAIL_RADIUS / fUnit2;
 	double fLengthHie2 = EARTH_TAIL_LENGTH / fUnit2;
@@ -357,10 +357,10 @@ void CGMEarthTail::MakeEarthTail()
 	m_pEarthRingGeode2->setStateSet(pSSEarthRing);
 	m_pEarthRingGeode2->addDrawable(_MakeEarthRingGeometry(osg::WGS_84_RADIUS_EQUATOR / fUnit2));
 	m_pTailTransform2->addChild(m_pEarthRingGeode2);
-	GM_Root->addChild(m_pTailTransform2);
+	m_pVolumeRoot->addChild(m_pTailTransform2);
 
 	// 如果是低画质，就不创建体渲染模块
-	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return;
+	if (EGMRENDER_LOWEST == m_pConfigData->eRenderQuality) return;
 
 	// 正十二面体方法绘制流浪地球尾迹
 	osg::Geometry* pDodecahedronFaceGeom = nullptr;
@@ -440,7 +440,7 @@ bool CGMEarthTail::UpdateHierarchy(int iHieNew)
 				m_pSpiralTransform2->setNodeMask(0);
 		}
 
-		if (EGMRENDER_LOW != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
+		if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
 		{
 			if (2 == iHieNew)
 			{
@@ -485,7 +485,7 @@ void CGMEarthTail::SetVisible(const bool bVisible)
 		}
 	}
 
-	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return;
+	if (EGMRENDER_LOWEST == m_pConfigData->eRenderQuality) return;
 
 	if(m_bVisible)
 	{

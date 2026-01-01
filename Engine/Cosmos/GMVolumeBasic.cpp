@@ -13,7 +13,6 @@
 #include "../GMCommonUniform.h"
 #include "../GMKit.h"
 
-#include <osg/Texture2D>
 #include <osg/Texture3D>
 #include <osgDB/ReadFile>
 
@@ -21,7 +20,6 @@ using namespace GM;
 
 CGMVolumeBasic::CGMVolumeBasic():
 	m_pKernelData(nullptr), m_pConfigData(nullptr), m_pCommonUniform(nullptr),
-	m_iScreenWidth(1920), m_iScreenHeight(1080),
 	m_strVolumeShaderPath("Shaders/VolumeShader/"), m_strCoreTexturePath("Textures/Volume/"),
 	m_strMediaTexturePath("Volume/")
 {
@@ -37,10 +35,15 @@ void CGMVolumeBasic::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData
 	m_pConfigData = pConfigData;
 	m_pCommonUniform = pCommonUniform;
 
-	m_iScreenWidth = pConfigData->iScreenWidth;
-	m_iScreenHeight = pConfigData->iScreenHeight;
+	m_pVolumeRoot = new osg::Group();
+	GM_Root->addChild(m_pVolumeRoot.get());
+	osg::ref_ptr<osg::StateSet> pSS = m_pVolumeRoot->getOrCreateStateSet();
+	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality)
+	{
+		pSS->setDefine("RESOLUTION_QUARTER", osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+	}
 
-	std::string strTexturePath = pConfigData->strCorePath + m_strCoreTexturePath;
+	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreTexturePath;
 	m_3DShapeTex = _Load3DShapeNoise();
 	m_3DErosionTex = _Load3DErosionNoise();
 	m_3DCurlTex = _Load3DCurlNoise();
@@ -105,11 +108,8 @@ osg::Texture* CGMVolumeBasic::_CreateTexture2D(const std::string & fileName, con
 
 void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 {
-	m_iScreenWidth = width;
-	m_iScreenHeight = height;
-
-	int iW = std::ceil(0.5 * width);
-	int iH = std::ceil(0.5 * height);
+	int iW = width / 4;
+	int iH = height / 4;
 	if (m_rayMarchCamera.valid())
 	{
 		m_rayMarchCamera->resize(iW, iH);
@@ -456,14 +456,14 @@ void CGMVolumeBasic::CreatePlatonicSolids(osg::Geometry ** pFaceGeom, osg::Geome
 
 void CGMVolumeBasic::_InitRayMarching()
 {
-	int iW = m_pConfigData->iScreenWidth / 2;
-	int iH = m_pConfigData->iScreenHeight / 2;
+	int iW = m_pConfigData->iScreenWidth / 4;
+	int iH = m_pConfigData->iScreenHeight / 4;
 
 	m_rayMarchColorTex = new osg::Texture2D;
 	m_rayMarchColorTex->setName("rayMarchColorTex");
 	m_rayMarchColorTex->setTextureSize(iW, iH);
-	m_rayMarchColorTex->setInternalFormat(GL_RGB8);
-	m_rayMarchColorTex->setSourceFormat(GL_RGB);
+	m_rayMarchColorTex->setInternalFormat(GL_RGBA8);
+	m_rayMarchColorTex->setSourceFormat(GL_RGBA);
 	m_rayMarchColorTex->setSourceType(GL_UNSIGNED_BYTE);
 	m_rayMarchColorTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
 	m_rayMarchColorTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);

@@ -45,7 +45,7 @@ bool CGMMilkyWay::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, C
 
 	m_2DNoiseTex = _CreateTexture2D(m_pConfigData->strCorePath + m_strCoreGalaxyTexPath + "2DNoise.tga", 4);
 
-	if (EGMRENDER_LOW != pConfigData->eRenderQuality)
+	if (EGMRENDER_LOWEST != pConfigData->eRenderQuality)
 	{
 		m_distanceMap = new osg::Texture2D;
 		m_distanceMap->setName("distanceMap");
@@ -67,7 +67,7 @@ bool CGMMilkyWay::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, C
 /** @brief 更新 */
 bool CGMMilkyWay::Update(double dDeltaTime)
 {
-	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return true;
+	if (EGMRENDER_LOWEST == m_pConfigData->eRenderQuality) return true;
 
 	if (4 == m_pKernelData->iHierarchy)
 	{
@@ -99,7 +99,7 @@ bool CGMMilkyWay::Update(double dDeltaTime)
 /** @brief 更新(在主相机更新姿态之后) */
 bool CGMMilkyWay::UpdateLater(double dDeltaTime)
 {
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality &&
+	if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality &&
 		m_rayMarchCamera.valid() && m_rayMarchCamera->getNodeMask())
 	{
 		// 实现抖动抗锯齿
@@ -221,7 +221,7 @@ void CGMMilkyWay::MakeMilkyWay(double fLength, double fWidth, double fHeight, do
 	std::string strFragPath = strShader + "Default.frag";
 	CGMKit::LoadShader(pSSMilkyWay.get(), strVertPath, strFragPath);
 
-	GM_Root->addChild(m_pGeodeMilkyWay.get());
+	m_pVolumeRoot->addChild(m_pGeodeMilkyWay.get());
 }
 
 void CGMMilkyWay::ResizeScreen(const int width, const int height)
@@ -238,7 +238,7 @@ void CGMMilkyWay::ResizeScreen(const int width, const int height)
 
 bool CGMMilkyWay::UpdateHierarchy(int iHieNew)
 {
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
+	if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
 	{
 		if (4 == iHieNew)
 		{

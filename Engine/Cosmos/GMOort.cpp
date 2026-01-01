@@ -46,7 +46,7 @@ bool CGMOort::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCo
 {
 	CGMVolumeBasic::Init(pKernelData, pConfigData, pCommonUniform);
 
-	if (EGMRENDER_LOW != pConfigData->eRenderQuality)
+	if (EGMRENDER_LOWEST != pConfigData->eRenderQuality)
 	{
 
 	}
@@ -57,7 +57,7 @@ bool CGMOort::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData, CGMCo
 /** @brief 更新 */
 bool CGMOort::Update(double dDeltaTime)
 {
-	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality) return true;
+	if (EGMRENDER_LOWEST == m_pConfigData->eRenderQuality) return true;
 
 	if (4 == m_pKernelData->iHierarchy)
 	{
@@ -112,7 +112,7 @@ bool CGMOort::Update(double dDeltaTime)
 /** @brief 更新(在主相机更新姿态之后) */
 bool CGMOort::UpdateLater(double dDeltaTime)
 {
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality &&
+	if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality &&
 		m_rayMarchCamera.valid() && m_rayMarchCamera->getNodeMask())
 	{
 		osg::Matrixd mMainViewMatrix = GM_View->getCamera()->getViewMatrix();
@@ -231,14 +231,14 @@ void CGMOort::MakeOort()
 	m_pGeodeOort3->setNodeMask(0);
 	m_pGeodeOort3->addDrawable(_MakeSphereGeometry(fRadiusHie3));
 	m_pGeodeOort3->setStateSet(pSSOort.get());
-	GM_Root->addChild(m_pGeodeOort3.get());
+	m_pVolumeRoot->addChild(m_pGeodeOort3.get());
 
 	m_pOortTransform4 = new osg::PositionAttitudeTransform();
 	osg::ref_ptr<osg::Geode> pGeodeOort4 = new osg::Geode;
 	m_pOortTransform4->addChild(pGeodeOort4.get());
 	pGeodeOort4->addDrawable(_MakeSphereGeometry(fRadiusHie4));
 	m_pOortTransform4->setStateSet(pSSOort.get());
-	GM_Root->addChild(m_pOortTransform4.get());
+	m_pVolumeRoot->addChild(m_pOortTransform4.get());
 }
 
 void CGMOort::ResizeScreen(const int width, const int height)
@@ -248,7 +248,7 @@ void CGMOort::ResizeScreen(const int width, const int height)
 
 bool CGMOort::UpdateHierarchy(int iHieNew)
 {
-	if (EGMRENDER_LOW != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
+	if (EGMRENDER_LOWEST != m_pConfigData->eRenderQuality && m_rayMarchCamera.valid())
 	{
 		if (4 == iHieNew || 3 == iHieNew)
 		{

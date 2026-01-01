@@ -2,6 +2,7 @@
 
 #pragma import_defines(BRAKE_TIME, TORQUE_TIME_0, TORQUE_TIME_1)
 #pragma import_defines(RAYS_2, RAYS_3)
+#pragma import_defines(RESOLUTION_QUARTER)
 
 struct commonParam {
 	vec4 norm;
@@ -505,7 +506,7 @@ void main()
 	cP.lenMax = lenMax;
 	cP.noiseD = noiseD;
 
-	float earthBright = 0*exp(min(0, 1-dstEarth)*200);
+	float earthBright = exp(min(0, 1-dstEarth)*200);
 	vec4 backColor = vec4(vec3(0.8,0.9,1.0)*earthBright,0);
 	float tailAlpha = 1.0;
 	float lenTail = cP.lenMin;// tail surface length
