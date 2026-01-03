@@ -6,6 +6,7 @@
 
 struct commonParam {
 	vec4 norm;
+	vec4 len4;
 	vec3 modelEyePos;
 	vec3 modelPixDir;
 	vec3 modelSunDir;
@@ -54,6 +55,7 @@ uniform float unit;
 uniform float times;
 uniform float tailVisible;
 uniform float wanderProgress;
+uniform float pixelLength;
 uniform vec3 engineStartRatio;
 uniform vec3 screenSize;
 uniform vec3 viewLight;
@@ -98,21 +100,61 @@ vec2 SphereLenMinMax(float sphereR, vec3 modelSpherePos, vec3 modelEyePos, vec3 
 	return SphereLenMinMax(sphereR, modelSpherePos, modelEyePos, modelPixDir, dstTail);
 }
 
-#ifdef BRAKE_TIME
-// (length min,length max)
-// dstEarth means the normalized distance to Earth core, [0,1]
-vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
+// dstEarth means the distance to Earth core, [0,1], 1 means the sight just touches earth
+float LenEarth(vec3 modelEyePos, vec3 modelPixDir, vec3 viewDir, out float dstEarth, out vec4 len4)
 {
-	// cull by earth
-	float dotED = dot(-modelEyePos, modelPixDir);
-	vec3 modelCorePointM = modelEyePos + dotED*modelPixDir;
-	dstEarth = length(modelCorePointM)/EARTH_RADIUS;
-	float lenEarthH = EARTH_RADIUS*sqrt(max(0,1-dstEarth*dstEarth));
-	vec2 lenMinMax = vec2(0, 1e9);
+#if (defined(TORQUE_TIME_0) || defined(TORQUE_TIME_1))
+	// up direction in model space
+	vec3 upDir = (view2SpiralMatrix*vec4(0,1,0,0)).xyz;
+	// right direction in model space
+	vec3 rightDir = (view2SpiralMatrix*vec4(1,0,0,0)).xyz;
+#else // !TORQUE_TIME_X
+	// up direction in model space
+	vec3 upDir = (view2SpiralMatrix*vec4(0,1,0,0)).xyz;
+	// right direction in model space
+	vec3 rightDir = (view2ECEFMatrix*vec4(1,0,0,0)).xyz;
+#endif // TORQUE_TIME_X or not
 
-	// tail sphere
+	vec3 upOffset = upDir;
+	vec3 rightOffset = rightDir;
+#ifdef RESOLUTION_QUARTER
+	upOffset *= pixelLength;
+	rightOffset *= pixelLength;
+#else // !RESOLUTION_QUARTER
+	upOffset *= 0.5*pixelLength;
+	rightOffset *= 0.5*pixelLength;
+#endif // RESOLUTION_QUARTER or not
+
+	const mat4 filterMatrix = mat4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1);
+	dstEarth = 0;
+	len4 = vec4(0);
+	vec3 modelPixNearPos = modelPixDir/viewDir.z;
+	float lenEarthMin = 1e9;
+	for(int i = 0 ; i < 4 ; i++)
+	{
+		vec3 modelPixDirI = modelPixNearPos + rightOffset*sign(mod(float(i), 1.5)-0.5) + upOffset*sign(i-1.5);
+		modelPixDirI = normalize(modelPixDirI);
+		float dotED = dot(-modelEyePos, modelPixDirI);
+		vec3 modelCorePointM = modelEyePos + dotED*modelPixDirI;
+		float dstEarthI = length(modelCorePointM)/EARTH_RADIUS;
+		dstEarth += dstEarthI;
+		// lenEarthH means the half length of the sight through earth
+		float lenEarthH = EARTH_RADIUS*sqrt(max(0,1-dstEarth*dstEarth));
+		float lenEarthMinI = (dstEarthI > 1) ? 1e9 : dotED - lenEarthH;
+		len4 += filterMatrix[i]*vec4(lenEarthMinI);
+		lenEarthMin = min(lenEarthMin, lenEarthMinI);
+	}
+	dstEarth *= 0.25;
+	return lenEarthMin;
+}
+
+#ifdef BRAKE_TIME
+
+vec2 BrakeRingLenMinMax(vec3 modelEyePos, vec3 modelPixDir)
+{
+	vec2 lenMinMax = vec2(0, 1e9);
 	float radiusI = EARTH_RADIUS * 15;
-	for(int i = 0 ; i < 2 ; i ++)
+	for(int i = 0 ; i < 2 ; i++)
 	{
 		vec3 spherePosI = vec3(0.0, 0.0, (float(i)*2-1)*EARTH_RADIUS*14.9);
 		vec2 lenTailMinMax = SphereLenMinMax(radiusI, spherePosI, modelEyePos, modelPixDir);
@@ -120,8 +162,17 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 		lenMinMax.x = max(lenMinMax.x, lenTailMinMax.x);
 		lenMinMax.y = min(lenMinMax.y, lenTailMinMax.y);
 	}
+	return lenMinMax;
+}
 
-	lenMinMax.y = min(lenMinMax.y, dotED - lenEarthH + 1e9*float(dstEarth>1));
+// (length min,length max)
+// dstEarth means the normalized distance to Earth core, [0,1], 1 means the sight just touches earth
+vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, vec3 viewDir, out float dstEarth, out vec4 len4)
+{
+	// Brake ring sphere
+	vec2 lenMinMax = BrakeRingLenMinMax(modelEyePos, modelPixDir);
+	// cull by earth
+	lenMinMax.y = min(lenMinMax.y, LenEarth(modelEyePos, modelPixDir, viewDir, dstEarth, len4));
 	return lenMinMax;
 }
 
@@ -155,20 +206,12 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 }
 
 #elif (defined(TORQUE_TIME_0) || defined(TORQUE_TIME_1))
-// (length min,length max)
-// dstEarth means the normalized distance to Earth core, [0,1]
-vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
-{
-	// cull by earth
-	float dotED = dot(-modelEyePos, modelPixDir);
-	vec3 modelCorePointM = modelEyePos + dotED*modelPixDir;
-	dstEarth = length(modelCorePointM)/EARTH_RADIUS;
-	float lenEarthH = EARTH_RADIUS*sqrt(max(0,1-dstEarth*dstEarth));
-	vec2 lenMinMax = vec2(1e9, 0.0);
 
-	// tail sphere
+vec2 TorqueLenMinMax(vec3 modelEyePos, vec3 modelPixDir)
+{
+	vec2 lenMinMax = vec2(1e9, 0.0);
 	float radiusI = EARTH_RADIUS*1.03;
-	for(int i = 0 ; i < 2 ; i ++)
+	for(int i = 0 ; i < 2 ; i++)
 	{
 		vec3 sphereOutPosI = (float(i)*2-1)*EARTH_RADIUS*vec3(0.0, -0.1, 0.3);
 #ifdef TORQUE_TIME_1
@@ -179,8 +222,17 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 		lenMinMax.x = min(lenMinMax.x, lenOutMinMax.x);
 		lenMinMax.y = max(lenMinMax.y, lenOutMinMax.y);
 	}
+	return lenMinMax;
+}
 
-	lenMinMax.y = min(lenMinMax.y, dotED - lenEarthH + 1e9*float(1<dstEarth));
+// (length min,length max)
+// dstEarth means the normalized distance to Earth core, [0,1], 1 means the sight just touches earth
+vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, vec3 viewDir, out float dstEarth, out vec4 len4)
+{
+	// torque sphere
+	vec2 lenMinMax = TorqueLenMinMax(modelEyePos, modelPixDir);
+	// cull by earth
+	lenMinMax.y = min(lenMinMax.y, LenEarth(modelEyePos, modelPixDir, viewDir, dstEarth, len4));
 	return lenMinMax;
 }
 
@@ -223,20 +275,10 @@ float AtmosDens(vec3 modelStepPos, vec3 modelStepDir)
 
 #else // !BRAKE_TIME && !TORQUE_TIME_X
 
-// (length min,length max)
-// dstEarth means the normalized distance to Earth core, [0,1]
-vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
+vec2 TailSphereLenMinMax(vec3 modelEyePos, vec3 modelPixDir, inout float dstOut)
 {
-	// cull by earth
-	float dotED = dot(-modelEyePos, modelPixDir);
-	vec3 modelCorePointM = modelEyePos + dotED*modelPixDir;
-	dstEarth = length(modelCorePointM)/EARTH_RADIUS;
-	float lenEarthH = EARTH_RADIUS*sqrt(max(0,1-dstEarth*dstEarth));
 	vec2 lenMinMax = vec2(1e9, 0);
-	float dstOut = dstEarth;
-
-	// tail sphere
-	for(int i = 0 ; i < 6 ; i ++)
+	for(int i = 0 ; i < 6 ; i++)
 	{
 		float f = float(i);
 		float radiusScale = 0.45 + 0.55*exp2(-f*0.8);
@@ -250,8 +292,11 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 		lenMinMax.y = max(lenMinMax.y, lenTailMinMax.y);
 		dstOut = min(dstOut, dstTail);
 	}
+	return lenMinMax;
+}
 
-	// tail cylinder
+vec2 TailCylinderLenMinMax(vec3 modelEyePos, vec3 modelPixDir, float dstOut, vec2 lenSphereMinMax)
+{
 	float lenEyePos = length(modelEyePos);
 	vec3 verticalVec = normalize(vec3(-modelPixDir.y, modelPixDir.x, 0.0));
 	float lenCyd2View = abs(dot(verticalVec, modelEyePos));
@@ -277,15 +322,26 @@ vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, out float dstEarth)
 	lenCydMinMax = mix(lenCydMinMax, vec2(1e9, 0), step(1, cydMask));
 
 	// tail cylinder | sphere
-	lenMinMax.x = min(lenMinMax.x, lenCydMinMax.x);
-	lenMinMax.y = max(lenMinMax.y, lenCydMinMax.y);
-	dstOut = min(dstOut, cydMask);
+	lenCydMinMax = vec2( min(lenSphereMinMax.x, lenCydMinMax.x), max(lenSphereMinMax.y, lenCydMinMax.y) );
 
-	lenMinMax = max(vec2(0), lenMinMax);
-	lenMinMax = mix(lenMinMax, vec2(1e9, 0), float(1 < dstOut));
-	lenMinMax = mix(lenMinMax, vec2(max(0, modelEyePos.z-TAIL_LENGTH), lenEyePos), isInTail*isEyeTailSameSide);
-	lenMinMax.y = min(lenMinMax.y, dotED - lenEarthH + 1e9*step(1, dstEarth));
+	lenCydMinMax = max(vec2(0), lenCydMinMax);
+	lenCydMinMax = mix(lenCydMinMax, vec2(1e9, 0), step(1, min(dstOut, cydMask)));
+	lenCydMinMax = mix(lenCydMinMax, vec2(max(0, modelEyePos.z-TAIL_LENGTH), lenEyePos), isInTail*isEyeTailSameSide);
+	return lenCydMinMax;
+}
 
+// (length min,length max)
+// dstEarth means the normalized distance to Earth core, [0,1], 1 means the sight just touches earth
+vec2 LenMinMax(vec3 modelEyePos, vec3 modelPixDir, vec3 viewDir, out float dstEarth, out vec4 len4)
+{
+	float lenEarth = LenEarth(modelEyePos, modelPixDir, viewDir, dstEarth, len4);
+	float dstOut = dstEarth;
+	// tail sphere
+	vec2 lenSphereMinMax = TailSphereLenMinMax(modelEyePos, modelPixDir, dstOut);
+	// tail cylinder | sphere
+	vec2 lenMinMax = TailCylinderLenMinMax(modelEyePos, modelPixDir, dstOut, lenSphereMinMax);
+	// cull by earth
+	lenMinMax.y = min(lenMinMax.y, lenEarth);
 	return lenMinMax;
 }
 
@@ -352,13 +408,13 @@ vec3 ToneMapping(vec3 color)
 	return pow((color * (A * color + B)) / (color * (C * color + D) + E), vec3(1.0/2.2));
 }
 
-void Tail(commonParam cP, inout vec4 tailColor, inout float lenTail)
+void Tail(commonParam cP, inout vec3 tailColor, inout vec4 tailAlpha4)
 {
 	float lenUnitMin = cP.lenUnit * cP.norm.w;
 	float lenD = min(LENGTH_MAX, cP.lenMax - cP.lenMin);
 	vec4 tailC = vec4(0);
+	vec4 tailA4 = vec4(0);
 	float denSum = 0.0;
-	float hasTail = 0.0;
 	float lenFirstRange = STEP_NUM * cP.lenUnit;
 	float isInRange = step(0.0,lenFirstRange*(exp2(RANGE_MAX)*(1+LAST_SCLAE)-1)-cP.lenMin);
 	float jStart = min(RANGE_MAX-isInRange, floor(log2(cP.lenMin/lenFirstRange+1)));
@@ -415,20 +471,20 @@ void Tail(commonParam cP, inout vec4 tailColor, inout float lenTail)
 				float dotVUL = dot(modelStepDir, cP.modelSunDir);
 				diffuse *= smoothstep(vec3(-0.55,-0.52,-0.5), vec3(0.2,0.24,0.28), vec3(dotVUL));
 				// all color
-				vec3 chrome = ambient + diffuse; 
+				vec3 chrome = ambient + diffuse;
 
 				float tailA = 1 - exp2(-atmosDens * (0.25+0.2*exp2(min(0,1-ratioR))));
-				tailC += vec4(chrome*tailA, tailA)*(1-tailC.a);			
+				tailA4 = 1-(1-tailA4)*(1-step(vec4(0), cP.len4-lenS)*tailA);
+				tailC += vec4(chrome*tailA, tailA)*(1-tailC.a);
 			}
 
 			lenStep += lenUnitJ;
-			hasTail = min(hasTail + step(0.6,tailC.a), 1);
-			lenTail = mix(lenS, lenTail, hasTail);
 		}
 	}
 	tailC.rgb /= 0.001+tailC.a;
 	float tailAlpha = tailVisible*tailC.a/ALPHA_MAX;
-	tailColor = mix(tailColor, vec4(ToneMapping(tailC.rgb), tailAlpha), tailAlpha);
+	tailColor = mix(tailColor, ToneMapping(tailC.rgb), tailAlpha);
+	tailAlpha4 = 1-(1-tailAlpha4)*(1-tailA4);
 }
 
 void main() 
@@ -468,7 +524,8 @@ void main()
 	float noiseD = texture(blueNoiseTex, gl_FragCoord.xy*screenSize.z/(abs(fract(times*10)-0.5)*10+64)).r;
 	// bounding shape
 	float dstEarth = 0;
-	vec2 lenMinMax = LenMinMax(modelEyePos, modelPixDir, dstEarth);
+	vec4 len4 = vec4(0);
+	vec2 lenMinMax = LenMinMax(modelEyePos, modelPixDir, viewDir, dstEarth, len4);
 	float lenMin = lenMinMax.x;
 	float lenMax = lenMinMax.y;
 
@@ -495,6 +552,7 @@ void main()
 	vec3 lenUnit = STEP_LENGTH/nd;
 
 	commonParam cP;
+	cP.len4 = len4;
 	cP.norm = norm_0;
 	cP.modelEyePos = modelEyePos;
 	cP.modelPixDir = modelPixDir;
@@ -507,16 +565,12 @@ void main()
 	cP.noiseD = noiseD;
 
 	float earthBright = exp(min(0, 1-dstEarth)*200);
-	vec4 backColor = vec4(vec3(0.8,0.9,1.0)*earthBright,0);
-	float tailAlpha = 1.0;
-	float lenTail = cP.lenMin;// tail surface length
+	vec3 backColor = vec3(0.8,0.9,1.0)*earthBright;
+	vec4 tailAlpha4 = vec4(0);
 
-	float lenTail_0 = cP.lenMin;
-	vec4 tailC_0 = backColor;
-	Tail(cP, tailC_0, lenTail_0);
-
-	lenTail = lenTail_0;
-	vec4 tailColor = tailC_0;
+	vec3 tailC_0 = backColor;
+	Tail(cP, tailC_0, tailAlpha4);
+	vec3 tailColor = tailC_0;
 
 #ifdef RAYS_2
 	cP.norm = norm_1;
@@ -524,11 +578,11 @@ void main()
 	cP.lenUnit = lenUnit.y;
 	cP.lenMin = max(lenMin,lenStart.y);
 
-	float lenTail_1 = cP.lenMin;
-	vec4 tailC_1 = backColor;
-	Tail(cP, tailC_1, lenTail_1);
+	vec4 tailAlpha4_1 = vec4(0);
+	vec3 tailC_1 = backColor;
+	Tail(cP, tailC_1, tailAlpha4_1);
 	
-	lenTail = mix(lenTail, lenTail_1, weight.y);
+	tailAlpha4 = mix(tailAlpha4, tailAlpha4_1, weight.y);
 	tailColor = mix(tailColor, tailC_1, weight.y);
 #endif // RAYS_2
 
@@ -538,18 +592,17 @@ void main()
 	cP.lenUnit = lenUnit.z;
 	cP.lenMin = max(lenMin,lenStart.z);
 
-	float lenTail_2 = cP.lenMin;
-	vec4 tailC_2 = backColor;
-	Tail(cP, tailC_2, lenTail_2);
+	vec4 tailAlpha4_2 = vec4(0);
+	vec3 tailC_2 = backColor;
+	Tail(cP, tailC_2, tailAlpha4_2);
 		
-	lenTail = mix(lenTail, lenTail_2, weight.z);
+	tailAlpha4 = mix(tailAlpha4, tailAlpha4_2, weight.z);
 	tailColor = mix(tailColor, tailC_2, weight.z);
 #endif // RAYS_3
 
-	tailAlpha = (wanderProgress > PROGRESS_0) ? tailColor.a : 0.0;
-
+	tailAlpha4 *= float(wanderProgress > PROGRESS_0);
 	// color
-	gl_FragData[0] = vec4(tailColor.rgb, tailAlpha);
+	gl_FragData[0] = vec4(tailColor, 0.25*(tailAlpha4.x+tailAlpha4.y+tailAlpha4.z+tailAlpha4.w));
 	// alpha
-	gl_FragData[1] = vec4(tailAlpha);
+	gl_FragData[1] = tailAlpha4;
 }

@@ -20,6 +20,8 @@ using namespace GM;
 
 CGMVolumeBasic::CGMVolumeBasic():
 	m_pKernelData(nullptr), m_pConfigData(nullptr), m_pCommonUniform(nullptr),
+	m_fResolutionScale(0.25f),
+	m_fPixelLengthUniform(new osg::Uniform("pixelLength", 0.01f)),
 	m_strVolumeShaderPath("Shaders/VolumeShader/"), m_strCoreTexturePath("Textures/Volume/"),
 	m_strMediaTexturePath("Volume/")
 {
@@ -41,7 +43,13 @@ void CGMVolumeBasic::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData
 	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality)
 	{
 		pSS->setDefine("RESOLUTION_QUARTER", osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+		m_fResolutionScale = 0.25f;
 	}
+	else if (EGMRENDER_NORMAL == m_pConfigData->eRenderQuality)
+	{
+		m_fResolutionScale = 0.5f;
+	}
+	else{}
 
 	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreTexturePath;
 	m_3DShapeTex = _Load3DShapeNoise();
@@ -59,6 +67,9 @@ void CGMVolumeBasic::Update(double dDeltaTime)
 
 void CGMVolumeBasic::UpdateLater(double dDeltaTime)
 {
+	double fFovy, fAspectRatio, fZNear, fZFar;
+	GM_View->getCamera()->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
+	_SetPixelLength(fFovy, m_pConfigData->iScreenHeight);
 }
 
 osg::Texture* CGMVolumeBasic::_CreateTexture2D(const std::string & fileName, const int iChannelNum)
@@ -108,8 +119,8 @@ osg::Texture* CGMVolumeBasic::_CreateTexture2D(const std::string & fileName, con
 
 void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 {
-	int iW = width / 4;
-	int iH = height / 4;
+	int iW = width * m_fResolutionScale;
+	int iH = height * m_fResolutionScale;
 	if (m_rayMarchCamera.valid())
 	{
 		m_rayMarchCamera->resize(iW, iH);
@@ -456,8 +467,8 @@ void CGMVolumeBasic::CreatePlatonicSolids(osg::Geometry ** pFaceGeom, osg::Geome
 
 void CGMVolumeBasic::_InitRayMarching()
 {
-	int iW = m_pConfigData->iScreenWidth / 4;
-	int iH = m_pConfigData->iScreenHeight / 4;
+	int iW = m_pConfigData->iScreenWidth * m_fResolutionScale;
+	int iH = m_pConfigData->iScreenHeight * m_fResolutionScale;
 
 	m_rayMarchColorTex = new osg::Texture2D;
 	m_rayMarchColorTex->setName("rayMarchColorTex");
@@ -499,7 +510,16 @@ void CGMVolumeBasic::_InitRayMarching()
 	m_rayMarchCamera->setAllowEventFocus(false);
 	m_rayMarchCamera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
 
-	GM_Root->addChild(m_rayMarchCamera.get());
+	m_pVolumeRoot->addChild(m_rayMarchCamera.get());
+}
+
+void CGMVolumeBasic::_SetPixelLength(const float fFovy, const int iHeight)
+{
+	if (!m_fPixelLengthUniform.valid()) return;
+
+	float fFovyRadian = osg::DegreesToRadians(fFovy);
+	float fPixelLength = tan(fFovyRadian * 0.5) / (iHeight * 0.5);
+	m_fPixelLengthUniform->set(fPixelLength);
 }
 
 osg::Texture* CGMVolumeBasic::_Load3DShapeNoise() const

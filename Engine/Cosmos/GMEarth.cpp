@@ -703,6 +703,15 @@ void CGMEarth::_CreateTerrainMaterial(osg::StateSet* pSS, const float fTileLevel
 	// 地球宏定义
 	pSS->setDefine("EARTH", osg::StateAttribute::ON);
 	pSS->setDefine("ATMOS", osg::StateAttribute::ON);
+	// set resolution scale
+	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality)
+	{
+		pSS->setDefine("RESOLUTION_QUARTER", osg::StateAttribute::ON);
+	}
+	else if (EGMRENDER_NORMAL == m_pConfigData->eRenderQuality)
+	{
+	}
+	else {}
 
 	int iGroundUnit = 0;
 	// 基础贴图
@@ -771,6 +780,15 @@ void CGMEarth::_CreateGroundMaterial(osg::StateSet* pSS) const
 	// 地球宏定义
 	pSS->setDefine("EARTH", osg::StateAttribute::ON);
 	pSS->setDefine("ATMOS", osg::StateAttribute::ON);
+	// set resolution scale
+	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality)
+	{
+		pSS->setDefine("RESOLUTION_QUARTER", osg::StateAttribute::ON);
+	}
+	else if (EGMRENDER_NORMAL == m_pConfigData->eRenderQuality)
+	{
+	}
+	else {}
 
 	int iGroundUnit = 0;
 	// 基础贴图
@@ -844,6 +862,15 @@ void CGMEarth::_CreateCloudMaterial(osg::StateSet* pSS) const
 	// 默认地球
 	pSS->setDefine("EARTH", osg::StateAttribute::ON);
 	pSS->setDefine("SATURN", osg::StateAttribute::OFF);
+	// set resolution scale
+	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality)
+	{
+		pSS->setDefine("RESOLUTION_QUARTER", osg::StateAttribute::ON);
+	}
+	else if (EGMRENDER_NORMAL == m_pConfigData->eRenderQuality)
+	{
+	}
+	else {}
 
 	int iCloudUnit = 0;
 	// 基础贴图

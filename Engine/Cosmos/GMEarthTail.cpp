@@ -180,8 +180,6 @@ bool CGMEarthTail::UpdateLater(double dDeltaTime)
 	{
 		osg::Matrixd mMainViewMatrix = GM_View->getCamera()->getViewMatrix();
 		osg::Matrixd mMainProjMatrix = GM_View->getCamera()->getProjectionMatrix();
-		double fFovy, fAspectRatio, fZNear, fZFar;
-		GM_View->getCamera()->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
 
 		// ÉèÖÃ Dodecahedron µÄÎ»ÖÃ
 		osg::Matrixd mPos;
@@ -212,6 +210,7 @@ bool CGMEarthTail::UpdateLater(double dDeltaTime)
 bool CGMEarthTail::Load()
 {
 	std::string strEarthShader = m_pConfigData->strCorePath + m_strEarthShaderPath;
+	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 
 	if (m_pSsTailDecFace.valid() && m_pSsTailDecEdge.valid() && m_pSsTailDecVert.valid())
 	{
@@ -245,6 +244,13 @@ bool CGMEarthTail::Load()
 		CGMKit::LoadShader(m_pEarthRingGeode2->getStateSet(),
 			strEarthShader + "EarthRing.vert",
 			strEarthShader + "EarthRing.frag",
+			true);
+	}
+	if (m_pTailBoxGeode2.valid())
+	{
+		CGMKit::LoadShader(m_pTailBoxGeode2->getStateSet(),
+			strGalaxyPath + "Default.vert",
+			strGalaxyPath + "Default.frag",
 			true);
 	}
 
@@ -407,6 +413,16 @@ void CGMEarthTail::MakeEarthTail()
 		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
 	), osg::StateAttribute::ON);
 	pSSEarthTail->setRenderBinDetails(BIN_ATMOS_TAIL, "DepthSortedBin");
+	// set resolution scale
+	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality)
+	{
+		pSSEarthTail->setDefine("RESOLUTION_QUARTER", osg::StateAttribute::ON);
+	}
+	else if (EGMRENDER_NORMAL == m_pConfigData->eRenderQuality)
+	{
+	}
+	else {}
+
 	CGMKit::AddTexture(pSSEarthTail, m_rayMarchColorTex, "colorTex", 0);
 	CGMKit::AddTexture(pSSEarthTail, m_rayMarchAlphaTex, "alphaTex", 1);
 	pSSEarthTail->addUniform(m_pCommonUniform->GetScreenSize());
@@ -414,7 +430,7 @@ void CGMEarthTail::MakeEarthTail()
 	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
 	CGMKit::LoadShader(pSSEarthTail, strGalaxyPath + "Default.vert", strGalaxyPath + "Default.frag");
 
-	// final sphere to show the TAA result
+	// final sphere to show the result
 	m_pTailBoxGeode2 = new osg::Geode;
 	m_pTailTransform2->addChild(m_pTailBoxGeode2);
 	m_pTailBoxGeode2->addDrawable(_MakeTailBoxGeometry(fLengthHie2, fRadiusHie2));
@@ -966,6 +982,7 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->setAttributeAndModes(new osg::CullFace(osg::CullFace::BACK));
 
 	pSS->addUniform(m_fTailVisibleUniform.get());
+	pSS->addUniform(m_fPixelLengthUniform.get());
 	pSS->addUniform(m_mWorld2ECEFUniform.get());
 	pSS->addUniform(m_mView2ECEFUniform.get());
 	pSS->addUniform(m_mWorld2SpiralUniform.get());
