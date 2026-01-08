@@ -39,17 +39,8 @@ void CGMVolumeBasic::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData
 
 	m_pVolumeRoot = new osg::Group();
 	GM_Root->addChild(m_pVolumeRoot.get());
-	osg::ref_ptr<osg::StateSet> pSS = m_pVolumeRoot->getOrCreateStateSet();
-	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality)
-	{
-		pSS->setDefine("RESOLUTION_QUARTER", osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
-		m_fResolutionScale = 0.25f;
-	}
-	else if (EGMRENDER_NORMAL == m_pConfigData->eRenderQuality)
-	{
-		m_fResolutionScale = 0.5f;
-	}
-	else{}
+
+	m_fResolutionScale = (EGMRENDER_LOW == m_pConfigData->eRenderQuality) ? 0.25f : 0.5f;
 
 	std::string strTexturePath = m_pConfigData->strCorePath + m_strCoreTexturePath;
 	m_3DShapeTex = _Load3DShapeNoise();
@@ -67,9 +58,6 @@ void CGMVolumeBasic::Update(double dDeltaTime)
 
 void CGMVolumeBasic::UpdateLater(double dDeltaTime)
 {
-	double fFovy, fAspectRatio, fZNear, fZFar;
-	GM_View->getCamera()->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
-	_SetPixelLength(fFovy, m_pConfigData->iScreenHeight);
 }
 
 osg::Texture* CGMVolumeBasic::_CreateTexture2D(const std::string & fileName, const int iChannelNum)
@@ -125,6 +113,10 @@ void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 	{
 		m_rayMarchCamera->resize(iW, iH);
 	}
+
+	double fFovy, fAspectRatio, fZNear, fZFar;
+	GM_View->getCamera()->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
+	_SetPixelLength(fFovy, iH);
 }
 
 void CGMVolumeBasic::CreatePlatonicSolids(osg::Geometry ** pFaceGeom, osg::Geometry ** pEdgeGeom, osg::Geometry ** pVertGeom) const

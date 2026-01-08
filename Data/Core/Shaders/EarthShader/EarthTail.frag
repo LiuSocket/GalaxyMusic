@@ -2,7 +2,6 @@
 
 #pragma import_defines(BRAKE_TIME, TORQUE_TIME_0, TORQUE_TIME_1)
 #pragma import_defines(RAYS_2, RAYS_3)
-#pragma import_defines(RESOLUTION_QUARTER)
 
 struct commonParam {
 	vec4 norm;
@@ -115,36 +114,28 @@ float LenEarth(vec3 modelEyePos, vec3 modelPixDir, vec3 viewDir, out float dstEa
 	vec3 rightDir = (view2ECEFMatrix*vec4(1,0,0,0)).xyz;
 #endif // TORQUE_TIME_X or not
 
-	vec3 upOffset = upDir;
-	vec3 rightOffset = rightDir;
-#ifdef RESOLUTION_QUARTER
-	upOffset *= pixelLength;
-	rightOffset *= pixelLength;
-#else // !RESOLUTION_QUARTER
-	upOffset *= 0.5*pixelLength;
-	rightOffset *= 0.5*pixelLength;
-#endif // RESOLUTION_QUARTER or not
-
-	const mat4 filterMatrix = mat4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1);
-	dstEarth = 0;
-	len4 = vec4(0);
+	vec3 upOffset = upDir*pixelLength*0.25;
+	vec3 rightOffset = rightDir*pixelLength*0.25;
+	float lenI[4] = float[](0.0, 0.0, 0.0, 0.0);
 	vec3 modelPixNearPos = modelPixDir/viewDir.z;
 	float lenEarthMin = 1e9;
+	dstEarth = 0;
 	for(int i = 0 ; i < 4 ; i++)
 	{
-		vec3 modelPixDirI = modelPixNearPos + rightOffset*sign(mod(float(i), 1.5)-0.5) + upOffset*sign(i-1.5);
+		vec3 modelPixDirI = modelPixNearPos + rightOffset*sign(abs(1-i/1.5)-0.5) + upOffset*sign(1.5-i);
 		modelPixDirI = normalize(modelPixDirI);
-		float dotED = dot(-modelEyePos, modelPixDirI);
-		vec3 modelCorePointM = modelEyePos + dotED*modelPixDirI;
+		float dotED = dot(modelEyePos, modelPixDirI);
+		vec3 modelCorePointM = modelEyePos - dotED*modelPixDirI;
 		float dstEarthI = length(modelCorePointM)/EARTH_RADIUS;
 		dstEarth += dstEarthI;
 		// lenEarthH means the half length of the sight through earth
 		float lenEarthH = EARTH_RADIUS*sqrt(max(0,1-dstEarth*dstEarth));
-		float lenEarthMinI = (dstEarthI > 1) ? 1e9 : dotED - lenEarthH;
-		len4 += filterMatrix[i]*vec4(lenEarthMinI);
+		float lenEarthMinI = (abs(dotED) - lenEarthH) + float(dstEarthI>=0.999)*1e9;
+		lenI[i] = lenEarthMinI;
 		lenEarthMin = min(lenEarthMin, lenEarthMinI);
 	}
 	dstEarth *= 0.25;
+	len4 = vec4(lenI[0],lenI[1],lenI[2],lenI[3]);
 	return lenEarthMin;
 }
 
@@ -408,12 +399,12 @@ vec3 ToneMapping(vec3 color)
 	return pow((color * (A * color + B)) / (color * (C * color + D) + E), vec3(1.0/2.2));
 }
 
-void Tail(commonParam cP, inout vec3 tailColor, inout vec4 tailAlpha4)
+void Tail(commonParam cP, inout vec3 tailColor, out vec4 tailAlpha4)
 {
+	tailAlpha4 = vec4(0);
+	vec4 tailC = vec4(0);
 	float lenUnitMin = cP.lenUnit * cP.norm.w;
 	float lenD = min(LENGTH_MAX, cP.lenMax - cP.lenMin);
-	vec4 tailC = vec4(0);
-	vec4 tailA4 = vec4(0);
 	float denSum = 0.0;
 	float lenFirstRange = STEP_NUM * cP.lenUnit;
 	float isInRange = step(0.0,lenFirstRange*(exp2(RANGE_MAX)*(1+LAST_SCLAE)-1)-cP.lenMin);
@@ -474,7 +465,7 @@ void Tail(commonParam cP, inout vec3 tailColor, inout vec4 tailAlpha4)
 				vec3 chrome = ambient + diffuse;
 
 				float tailA = 1 - exp2(-atmosDens * (0.25+0.2*exp2(min(0,1-ratioR))));
-				tailA4 = 1-(1-tailA4)*(1-step(vec4(0), cP.len4-lenS)*tailA);
+				tailAlpha4 = 1-(1-tailAlpha4)*(1-step(vec4(0), cP.len4-lenS)*tailA);
 				tailC += vec4(chrome*tailA, tailA)*(1-tailC.a);
 			}
 
@@ -484,7 +475,6 @@ void Tail(commonParam cP, inout vec3 tailColor, inout vec4 tailAlpha4)
 	tailC.rgb /= 0.001+tailC.a;
 	float tailAlpha = tailVisible*tailC.a/ALPHA_MAX;
 	tailColor = mix(tailColor, ToneMapping(tailC.rgb), tailAlpha);
-	tailAlpha4 = 1-(1-tailAlpha4)*(1-tailA4);
 }
 
 void main() 
@@ -521,7 +511,7 @@ void main()
 	float forwardScattering = (1-gForward*gForward)/(4*M_PI*pow(1+gForward*gForward-2*gForward*dotVL,1.5));
 	float scattering = 0.5 + forwardScattering;
 
-	float noiseD = texture(blueNoiseTex, gl_FragCoord.xy*screenSize.z/(abs(fract(times*10)-0.5)*10+64)).r;
+	float noiseD = texture(blueNoiseTex, gl_FragCoord.xy*screenSize.z/(fract(times*0.1)+64)).r;
 	// bounding shape
 	float dstEarth = 0;
 	vec4 len4 = vec4(0);
@@ -564,8 +554,8 @@ void main()
 	cP.lenMax = lenMax;
 	cP.noiseD = noiseD;
 
-	float earthBright = exp(min(0, 1-dstEarth)*200);
-	vec3 backColor = vec3(0.8,0.9,1.0)*earthBright;
+	float earthBright = exp(min(0, 1-dstEarth)*50);
+	vec3 backColor = vec3(0.08,0.09,0.1)*earthBright;
 	vec4 tailAlpha4 = vec4(0);
 
 	vec3 tailC_0 = backColor;
