@@ -478,11 +478,11 @@ void CGMVolumeBasic::_InitRayMarching()
 	m_rayMarchAlphaTex = new osg::Texture2D;
 	m_rayMarchAlphaTex->setName("rayMarchAlphaTex");
 	m_rayMarchAlphaTex->setTextureSize(iW, iH);
-	m_rayMarchAlphaTex->setInternalFormat(GL_RGBA8);
-	m_rayMarchAlphaTex->setSourceFormat(GL_RGBA);
+	m_rayMarchAlphaTex->setInternalFormat(GL_R8);
+	m_rayMarchAlphaTex->setSourceFormat(GL_RED);
 	m_rayMarchAlphaTex->setSourceType(GL_UNSIGNED_BYTE);
-	m_rayMarchAlphaTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
-	m_rayMarchAlphaTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::NEAREST);
+	m_rayMarchAlphaTex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+	m_rayMarchAlphaTex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
 	m_rayMarchAlphaTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
 	m_rayMarchAlphaTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 	m_rayMarchAlphaTex->setDataVariance(osg::Object::DYNAMIC);

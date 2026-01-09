@@ -1,51 +1,27 @@
 #version 400 compatibility
 
-#pragma import_defines(RESOLUTION_QUARTER)
-
 uniform vec3 screenSize;
-
 uniform sampler2D colorTex;
 uniform sampler2D alphaTex;
 
+vec2 CheckBoxMask(vec2 fragCoord)
+{
+	vec4 cf = step(vec4(1.0, 1.0, 2.0, 2.0), mod(fragCoord.xyxy,vec4(2.0, 2.0, 4.0, 4.0)));
+	return step(vec2(0.5), mod(vec2(cf.x + cf.y, cf.z + cf.w), vec2(2.0)));
+}
+
+/* noise float between 0.0~1.0 */
+float NoiseV1(vec2 co)
+{
+	return fract(sin(dot(co, vec2(12.9898,78.233))) * 43758.5453);
+}
+
 void main()
 {
-	vec2 uv = gl_FragCoord.xy/screenSize.xy;
-	vec4 finalColor = texture(colorTex, uv);
-
-#ifdef RESOLUTION_QUARTER
-	vec2 subPixDir = sign(mod(gl_FragCoord.xy, vec2(4))-2);
-	vec2 alphaPixelUnit = subPixDir*4;
-#else // !RESOLUTION_QUARTER
-	vec2 subPixDir = sign(mod(gl_FragCoord.xy, vec2(2))-1);
-	vec2 alphaPixelUnit = subPixDir*2;
-#endif // RESOLUTION_QUARTER or not
-
-	vec4 alpha4_00 = texture(alphaTex, uv);
-	vec4 alpha4_10 = texture(alphaTex, (gl_FragCoord.xy + vec2(alphaPixelUnit.x, 0))/screenSize.xy);
-	vec4 alpha4_01 = texture(alphaTex, (gl_FragCoord.xy + vec2(0, alphaPixelUnit.y))/screenSize.xy);
-	vec4 alpha4_11 = texture(alphaTex, (gl_FragCoord.xy + alphaPixelUnit)/screenSize.xy);
-
-	bool isLU = (subPixDir.y-subPixDir.x)>1;
-	bool isRU = (subPixDir.y+subPixDir.x)>1;
-	bool isRD = (subPixDir.x-subPixDir.y)>1;
-	bool isLD = (subPixDir.y+subPixDir.x)<(-1);
-
-	vec4 corner4 = vec4(isRD, isLD, isLU, isRU);
-	vec4 filter_10 = max(corner4, corner4.wzyx);
-	vec4 filter_01 = max(corner4, corner4.yxwz);
-	vec4 filter_11 = corner4;
-
-#ifdef RESOLUTION_QUARTER
-	float finalAlpha = (dot(vec4(1), alpha4_00)
-					+ dot(filter_10, alpha4_10)
-					+ dot(filter_01, alpha4_01)
-					+ dot(filter_11, alpha4_11))/9;
-#else // !RESOLUTION_QUARTER
-	float finalAlpha = (dot(vec4(1), alpha4_00)
-					+ dot(filter_10, alpha4_10)
-					+ dot(filter_01, alpha4_01)
-					+ dot(filter_11, alpha4_11))/9;
-#endif // RESOLUTION_QUARTER or not
-
-	gl_FragColor = vec4(finalColor.rgb, finalAlpha);
+	vec2 pixUnit = 1.0/screenSize.xy;
+	vec2 uv = gl_FragCoord.xy*pixUnit;
+	vec2 checkBox = CheckBoxMask(gl_FragCoord.xy);
+	float noise = NoiseV1(uv);
+	vec2 noiseV2 = pixUnit*noise*(checkBox-0.5);
+	gl_FragColor = texture(colorTex, uv + noiseV2);
 }
