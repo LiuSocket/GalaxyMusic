@@ -21,7 +21,7 @@ using namespace GM;
 CGMVolumeBasic::CGMVolumeBasic():
 	m_pKernelData(nullptr), m_pConfigData(nullptr), m_pCommonUniform(nullptr),
 	m_fResolutionScale(0.25f),
-	m_fPixelLengthUniform(new osg::Uniform("pixelLength", 0.01f)),
+	//m_fPixelLengthUniform(new osg::Uniform("pixelLength", 0.01f)),
 	m_strVolumeShaderPath("Shaders/VolumeShader/"), m_strCoreTexturePath("Textures/Volume/"),
 	m_strMediaTexturePath("Volume/")
 {
@@ -114,9 +114,9 @@ void CGMVolumeBasic::ResizeScreen(const int width, const int height)
 		m_rayMarchCamera->resize(iW, iH);
 	}
 
-	double fFovy, fAspectRatio, fZNear, fZFar;
-	GM_View->getCamera()->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
-	_SetPixelLength(fFovy, iH);
+	//double fFovy, fAspectRatio, fZNear, fZFar;
+	//GM_View->getCamera()->getProjectionMatrixAsPerspective(fFovy, fAspectRatio, fZNear, fZFar);
+	//_SetPixelLength(fFovy, iH);
 }
 
 void CGMVolumeBasic::CreatePlatonicSolids(osg::Geometry ** pFaceGeom, osg::Geometry ** pEdgeGeom, osg::Geometry ** pVertGeom) const
@@ -505,14 +505,14 @@ void CGMVolumeBasic::_InitRayMarching()
 	m_pVolumeRoot->addChild(m_rayMarchCamera.get());
 }
 
-void CGMVolumeBasic::_SetPixelLength(const float fFovy, const int iHeight)
-{
-	if (!m_fPixelLengthUniform.valid()) return;
-
-	float fFovyRadian = osg::DegreesToRadians(fFovy);
-	float fPixelLength = tan(fFovyRadian * 0.5) / (iHeight * 0.5);
-	m_fPixelLengthUniform->set(fPixelLength);
-}
+//void CGMVolumeBasic::_SetPixelLength(const float fFovy, const int iHeight)
+//{
+//	if (!m_fPixelLengthUniform.valid()) return;
+//
+//	float fFovyRadian = osg::DegreesToRadians(fFovy);
+//	float fPixelLength = tan(fFovyRadian * 0.5) / (iHeight * 0.5);
+//	m_fPixelLengthUniform->set(fPixelLength);
+//}
 
 osg::Texture* CGMVolumeBasic::_Load3DShapeNoise() const
 {

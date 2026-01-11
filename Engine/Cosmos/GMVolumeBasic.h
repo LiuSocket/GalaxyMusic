@@ -113,7 +113,7 @@ namespace GM
 		* @param fFovy : 相机垂直FOV，单位：°
 		* @param iHeight : 屏幕高度上的像素数量
 		*/
-		void _SetPixelLength(const float fFovy, const int iHeight);
+		//void _SetPixelLength(const float fFovy, const int iHeight);
 
 		osg::Texture* _Load3DShapeNoise() const;
 		osg::Texture* _Load3DErosionNoise() const;
@@ -130,7 +130,7 @@ namespace GM
 
 		float												m_fResolutionScale;				//!< 体渲染分辨率缩放比例
 
-		osg::ref_ptr<osg::Uniform>							m_fPixelLengthUniform;			//!< 1米近截面处的像素长度Uniform
+		//osg::ref_ptr<osg::Uniform>							m_fPixelLengthUniform;			//!< 1米近截面处的像素长度Uniform
 
 		osg::ref_ptr<osg::Group>							m_pVolumeRoot;					//!< 体渲染根节点
 		osg::ref_ptr<osg::MatrixTransform>					m_pDodecahedronTrans;			//!< 正12面体变换节点

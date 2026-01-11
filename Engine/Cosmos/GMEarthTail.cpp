@@ -413,18 +413,8 @@ void CGMEarthTail::MakeEarthTail()
 		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_ONE
 	), osg::StateAttribute::ON);
 	pSSEarthTail->setRenderBinDetails(BIN_ATMOS_TAIL, "DepthSortedBin");
-	// set resolution scale
-	if (EGMRENDER_LOW == m_pConfigData->eRenderQuality)
-	{
-		pSSEarthTail->setDefine("RESOLUTION_QUARTER", osg::StateAttribute::ON);
-	}
-	else if (EGMRENDER_NORMAL == m_pConfigData->eRenderQuality)
-	{
-	}
-	else {}
 
 	CGMKit::AddTexture(pSSEarthTail, m_rayMarchColorTex, "colorTex", 0);
-	CGMKit::AddTexture(pSSEarthTail, m_rayMarchAlphaTex, "alphaTex", 1);
 	pSSEarthTail->addUniform(m_pCommonUniform->GetScreenSize());
 
 	std::string strGalaxyPath = m_pConfigData->strCorePath + m_strGalaxyShaderPath;
@@ -982,7 +972,6 @@ bool CGMEarthTail::_InitEarthTailStateSet(osg::StateSet * pSS, const std::string
 	pSS->setAttributeAndModes(new osg::CullFace(osg::CullFace::BACK));
 
 	pSS->addUniform(m_fTailVisibleUniform.get());
-	pSS->addUniform(m_fPixelLengthUniform.get());
 	pSS->addUniform(m_mWorld2ECEFUniform.get());
 	pSS->addUniform(m_mView2ECEFUniform.get());
 	pSS->addUniform(m_mWorld2SpiralUniform.get());

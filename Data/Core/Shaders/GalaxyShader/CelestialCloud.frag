@@ -1,5 +1,4 @@
 #pragma import_defines(SATURN)
-#pragma import_defines(RESOLUTION_QUARTER)
 
 #ifdef SATURN
 uniform float cosNorthLight;

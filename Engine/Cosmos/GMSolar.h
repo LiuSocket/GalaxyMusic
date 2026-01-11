@@ -459,7 +459,8 @@ namespace GM
 		osg::ref_ptr<osg::Uniform>						m_fBackgroundSunAlphaUniform;	//!< 背景太阳alpha的Uniform
 		osg::ref_ptr<osg::Uniform>						m_fSunEdgeUniform;				//!< 太阳辉光板上的太阳边缘位置Uniform
 		osg::ref_ptr<osg::Uniform>						m_fSupernovaLightUniform;		//!< 控制超新星的亮度的Uniform
-		osg::ref_ptr<osg::Uniform>						m_fSupernovaAlphaUniform;		//!< 眩光（中心，刺状）的alpha
+		osg::ref_ptr<osg::Uniform>						m_fSupernovaAlphaUniform;		//!< 刺状眩光的alpha
+		osg::ref_ptr<osg::Uniform>						m_fSupernovaWidthUniform;		//!< 刺状眩光的宽度，单位：像素
 		osg::ref_ptr<osg::Uniform>						m_fSupernovaBloomScaleUniform;	//!< 控制超新星的bloom大小的Uniform
 		osg::ref_ptr<osg::Uniform>						m_fSupernovaBloomAlphaUniform;	//!< 控制超新星的bloom不透明度的Uniform
 		osg::ref_ptr<osg::Uniform>						m_fPlanetNumUniform;			//!< 行星数量的Uniform

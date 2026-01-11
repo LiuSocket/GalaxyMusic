@@ -2,7 +2,6 @@
 
 uniform vec3 screenSize;
 uniform sampler2D colorTex;
-uniform sampler2D alphaTex;
 
 vec2 CheckBoxMask(vec2 fragCoord)
 {

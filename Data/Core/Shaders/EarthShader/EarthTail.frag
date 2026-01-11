@@ -53,7 +53,6 @@ uniform float unit;
 uniform float times;
 uniform float tailVisible;
 uniform float wanderProgress;
-uniform float pixelLength;
 uniform vec3 engineStartRatio;
 uniform vec3 screenSize;
 uniform vec3 viewLight;

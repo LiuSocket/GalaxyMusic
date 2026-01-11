@@ -1,5 +1,4 @@
 #pragma import_defines(TILE)
-#pragma import_defines(RESOLUTION_QUARTER)
 
 uniform sampler2DArray baseTex;
 uniform vec2 planetRadius;
