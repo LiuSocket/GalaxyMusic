@@ -5,6 +5,7 @@
 
 struct commonParam {
 	vec4 norm;
+	vec4 noiseD;
 	vec3 modelEyePos;
 	vec3 modelPixDir;
 	vec3 modelSunDir;
@@ -13,7 +14,6 @@ struct commonParam {
 	float lenUnit;
 	float lenMin;
 	vec2 lenMax;
-	float noiseD;
 };
 const float hash[256] = float[](
 	151,160,137, 91, 90, 15,131, 13,201, 95, 96, 53,194,233,  7,225,
@@ -391,12 +391,12 @@ void Tail(commonParam cP, inout vec3 tailColor, out vec2 tailAlphaMinMax)
 		float stepNumJ = STEP_NUM*lastScale;
 		float lenRange = lenFirstRange*numJ*lastScale;
 		float startStepNum = floor(stepNumJ*max(0, cP.lenMin-lenMinJ)/lenRange);
-		float lenStartStep = lenMinJ + cP.noiseD*lenUnitJ*0.01;
+		float lenStartStep = lenMinJ + cP.noiseD.x*lenUnitJ*0.01;
 		float lenStep = startStepNum*lenUnitJ; // from (i*lenUnitJ) to (lenRange)
 		float lenS = lenStartStep + lenStep; // distance from eye to this step
 		for(int i = int(startStepNum);all(bvec3(tailC.a<ALPHA_MAX, lenStep<(lenRange*0.999), lenS<(cP.lenMin+lenD))); i++)
 		{
-			lenS = lenStartStep + lenStep*(1-0.01*cP.noiseD);
+			lenS = lenStartStep + lenStep*(1-0.01*cP.noiseD.y);
 			vec3 modelStepPos = cP.modelEyePos + cP.modelPixDir*lenS;
 			vec3 modelStepDir = normalize(modelStepPos);
 
@@ -419,7 +419,7 @@ void Tail(commonParam cP, inout vec3 tailColor, out vec2 tailAlphaMinMax)
 				float densLight = atmosDens;
 				for(int k = 0; k < LIGHT_SAMPLE; k++)
 				{
-					float lenK = (1+0.1*cP.noiseD)*LIGHT_LEN[k];
+					float lenK = (1+0.1*cP.noiseD.z)*LIGHT_LEN[k];
 					vec3 modelStepPosK = modelStepPos - cP.modelSunDir*lenK;
 					vec3 modelStepDirK = normalize(modelStepPosK);
 					float atmosDensK = AtmosDens(modelStepPosK, modelStepDirK);
@@ -482,7 +482,7 @@ void main()
 	float forwardScattering = (1-gForward*gForward)/(4*M_PI*pow(1+gForward*gForward-2*gForward*dotVL,1.5));
 	float scattering = 0.5 + forwardScattering;
 
-	float noiseD = texture(blueNoiseTex, gl_FragCoord.xy*screenSize.z/(fract(times*0.1)+64)).r;
+	vec4 noiseD = texture(blueNoiseTex, gl_FragCoord.xy*screenSize.z/128.0);
 	// bounding shape
 	float dstEarth = 0;
 	vec3 lenMinMax = LenMinMax(modelEyePos, modelPixDir, dstEarth);
@@ -513,6 +513,7 @@ void main()
 
 	commonParam cP;
 	cP.norm = norm_0;
+	cP.noiseD = noiseD;
 	cP.modelEyePos = modelEyePos;
 	cP.modelPixDir = modelPixDir;
 	cP.modelSunDir = modelSunDir;
@@ -521,7 +522,6 @@ void main()
 	cP.lenUnit = lenUnit.x;
 	cP.lenMin = max(lenMin,lenStart.x);
 	cP.lenMax = lenMax;
-	cP.noiseD = noiseD;
 
 	float earthBright = exp(min(0, 1-dstEarth)*50);
 	vec3 backColor = vec3(0.08,0.15,0.2)*earthBright;

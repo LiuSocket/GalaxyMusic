@@ -46,7 +46,7 @@ void CGMVolumeBasic::Init(SGMKernelData* pKernelData, SGMConfigData* pConfigData
 	m_3DShapeTex = _Load3DShapeNoise();
 	m_3DErosionTex = _Load3DErosionNoise();
 	m_3DCurlTex = _Load3DCurlNoise();
-	m_blueNoiseTex = _CreateTexture2D(strTexturePath + "BlueNoise.jpg", 1);
+	m_blueNoiseTex = _CreateTexture2D(strTexturePath + "BlueNoise_RGBA.tga", 4);
 
 	// ≥ı ºªØTAA
 	_InitRayMarching();	

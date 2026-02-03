@@ -1118,7 +1118,7 @@ bool CGMEarthEngine::_GenEarthEngineStream()
 
 	// ÅçÉäÁ÷ÔëÉùÌùÍ¼
 	pSSEngineStream->setTextureAttributeAndModes(0,
-		_CreateTexture2D(m_pConfigData->strCorePath + "Textures/Volume/BlueNoise.jpg", 1),
+		_CreateTexture2D(m_pConfigData->strCorePath + "Textures/Volume/BlueNoise_RGBA.tga", 4),
 		osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
 	osg::ref_ptr<osg::Uniform> pBlueNoiseUniform = new osg::Uniform("blueNoiseTex", 0);
 	pSSEngineStream->addUniform(pBlueNoiseUniform.get());
