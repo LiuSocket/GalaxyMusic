@@ -23,7 +23,20 @@ namespace GM
 	/*************************************************************************
 	Structs
 	*************************************************************************/
+	// 面类型枚举（用于扩张操作）
+	enum FaceType
+	{
+		FACE_VERTEX,   // 顶点面（原顶点拉伸形成的三角形）
+		FACE_ORIGINAL, // 原面面（原面拉伸形成的多边形）
+		FACE_EDGE      // 棱面（原棱拉伸形成的四边形）
+	};
 
+	// 带类型的面结构
+	struct FaceWithType
+	{
+		std::vector<int> indices;
+		FaceType type;
+	};
 	/*************************************************************************
 	Class
 	*************************************************************************/
@@ -105,7 +118,52 @@ namespace GM
 			osg::Geometry** pEdgeGeom,
 			osg::Geometry** pVertGeom) const;
 
+		/**
+		* @brief 生成足球（C60-富勒烯）实体（12个五边形和20个六边形以及他们之间的融合带组成的实体）
+		* @param pFaceGeom:		12个五边形+20个六边形
+		* @param pEdgeGeom:		90个四边形
+		* @param pVertGeom:		60个三角形
+		*/
+		void CreateFootballSolids(
+			osg::Geometry** pFaceGeom,
+			osg::Geometry** pEdgeGeom,
+			osg::Geometry** pVertGeom) const;
+
 	private:
+		/**
+		 * 截角操作（输出普通面列表）
+		 * @param inputVerts  原始顶点数组
+		 * @param inputFaces  原始面列表（逆时针顺序）
+		 * @param fBevel      切角比例 (0~0.5)
+		 * @param outputVerts 输出新顶点数组
+		 * @param outputFaces 输出新面列表（普通面，每个面由顶点索引组成）
+		 * @param outputEdges 输出边集合（每条边由两个顶点索引组成，无序）
+		 */
+		void _TruncatePolyhedron(
+			const osg::ref_ptr<osg::Vec3Array>& inputVerts,
+			const std::vector<std::vector<int>>& inputFaces,
+			float fBevel,
+			osg::ref_ptr<osg::Vec3Array>& outputVerts,
+			std::vector<std::vector<int>>& outputFaces,
+			std::vector<std::pair<int, int>>& outputEdges) const;
+
+		/**
+		 * 扩张操作（输出带类型的面列表）
+		 * @param inputVerts  原始顶点数组
+		 * @param inputFaces  原始面列表（逆时针顺序）
+		 * @param fOffset     扩张距离（沿法线方向移动量）
+		 * @param outputVerts 输出新顶点数组
+		 * @param outputFaces 输出新面列表（带类型）
+		 * @param outputEdges 输出边集合
+		 */
+		void _ExpandPolyhedron(
+			const osg::ref_ptr<osg::Vec3Array>& inputVerts,
+			const std::vector<std::vector<int>>& inputFaces,
+			float fOffset,
+			osg::ref_ptr<osg::Vec3Array>& outputVerts,
+			std::vector<FaceWithType>& outputFaces,
+			std::vector<std::pair<int, int>>& outputEdges) const;
+
 		/** @brief raymarching初始化，用于体渲染 */
 		void _InitRayMarching();
 		/**

@@ -160,7 +160,8 @@ void CGMMilkyWay::MakeMilkyWay(double fLength, double fWidth, double fHeight, do
 	osg::Geometry* pDodecahedronEdgeGeom = nullptr;
 	osg::Geometry* pDodecahedronVertGeom = nullptr;
 
-	CreatePlatonicSolids(&pDodecahedronFaceGeom, &pDodecahedronEdgeGeom, &pDodecahedronVertGeom);
+	//CreatePlatonicSolids(&pDodecahedronFaceGeom, &pDodecahedronEdgeGeom, &pDodecahedronVertGeom);
+	CreateFootballSolids(&pDodecahedronFaceGeom, &pDodecahedronEdgeGeom, &pDodecahedronVertGeom);
 
 	// make the transform of Dodecahedron :
 	m_pDodecahedronTrans = new osg::MatrixTransform();
@@ -357,7 +358,7 @@ bool CGMMilkyWay::_InitMilkyWayStateSet(osg::StateSet * pSS, const SGMVolumeRang
 
 	pSS->setMode(GL_BLEND, osg::StateAttribute::OFF);
 	pSS->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-	pSS->setAttributeAndModes(new osg::CullFace(osg::CullFace::BACK));
+	pSS->setAttributeAndModes(new osg::CullFace(osg::CullFace::FRONT));
 
 	pSS->addUniform(m_pCommonUniform->GetGalaxyAlpha());
 	pSS->addUniform(m_pCommonUniform->GetScreenSize());
